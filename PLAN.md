@@ -27,6 +27,40 @@
 | 市场 | 按 region_id 隔离 |
 | **NXC 经济** | **Bitcoin 式稀缺代币, 硬顶 21M, 减半, 难度调节** |
 
+## Product Framing
+
+> Agentropolis 有两个不可拆分的产品目标:
+> 1. 可玩的 AI-native simulated world
+> 2. 可稳定接入外部玩家 AI 的 control plane
+>
+> 这不是两个并排产品，而是一个共享内核系统的两个交付面。
+
+### Four-Layer Architecture
+
+| Layer | 核心职责 | 必须服务谁 |
+|------|----------|-----------|
+| **Shared World Kernel** | Agent 身份、世界/区域、库存、市场、生产、运输、housekeeping、经济状态一致性 | 游戏玩法 + 外部 AI |
+| **Control Contract Plane** | REST/MCP 契约、auth/authz、idempotency、错误语义、quota、concurrency guard、budget guard | 所有机器客户端 |
+| **Interaction Surfaces** | Dashboard、Digest、Training、Autonomy、MCP toolset、OpenClaw skill/config | 玩家与外部 AI 交互面 |
+| **Ops & Governance** | Observability、经济调参、feature flags、snapshot/replay、backup/restore、rollout gate | 线上运营与事故恢复 |
+
+### Planning Principles
+
+1. 新功能不能绕过 Shared World Kernel 和 Control Contract Plane 直接暴露给外部 AI。
+2. `OpenClaw Integration` 可以先做本地原型，但对外开放必须经过 rollout gate。
+3. `game_engine.py`、`main.py`、`models/agent.py`、`config.py`、`mcp/*` 是高冲突热点文件，计划上应视为串行集成点，不应假设无限并行。
+4. “可玩世界”与“外部 AI 平台”必须共享同一份状态模型、同一套权限语义、同一套失败/重试语义。
+
+### External Rollout Gate
+
+> 面向外部玩家或持续运行的 AI agent 接入，不以“API 能调用”为准，而以下列门槛为准:
+
+- Control Contract baseline ready: 冻结 transport 选择（SSE vs streamable-http）、versioning、idempotency、error taxonomy、pagination、auth scopes
+- Concurrency Guard ready: #78-#80 完成并通过压力测试
+- Abuse/Budget Guard ready: per-agent/per-tool 配额、spending caps、kill switch
+- Observability baseline ready: request/job metrics、经济健康指标、告警、结构化日志
+- Recovery baseline ready: snapshot/backup/restore 或最小可用修复工具
+
 ---
 
 ## Layer 0: Foundation (阻塞型, 1 CC)
@@ -156,6 +190,187 @@
 | **Wave 7A** | #64, #65, #66, #67 | 4 | Wave 6 done |
 | **Wave 7B** | #68, #69, #71 | 3 | Wave 7A done (+ #35 for #69) |
 | **Wave 7C** | #70 | 1 | #64 + #68 done |
+
+---
+
+## Cross-Cutting Capability Buckets (Not Yet Mapped To Issue IDs)
+
+> 下列能力对“双目标共享内核”是必要项，但目前尚未单独拆成 issue。它们不是锦上添花，而是外部 AI 接入和长期运营的前置条件。
+
+### 1. Control Contract
+
+- REST/MCP versioning policy
+- Freeze one MCP transport contract for external clients
+- Idempotency key / retry safety for all state-mutating actions
+- Unified error taxonomy: auth, validation, conflict, retryable, rate-limited, degraded
+- Pagination / cursor contract for high-cardinality feeds
+- Partial failure / async acceptance semantics
+
+### 2. AuthZ / Abuse / Budget Guard
+
+- Agent / Company / Guild / Admin 的资源权限边界
+- MCP tool scopes and dangerous-operation gating
+- Per-agent, per-tool, per-IP quota
+- Spending caps, daily/hourly budgets, emergency freeze / read-only mode
+
+### 3. Execution Model
+
+- 明确 request path vs background job vs housekeeping phase
+- Retry, dedupe, dead-letter, compensation policy
+- Periodic tasks 的 failure handling 与 backfill policy
+- 外部 AI 命令的 sync/async acknowledgement 约定
+
+### 4. Observability
+
+- Structured logging
+- Request / MCP / housekeeping metrics
+- Slow query / queue lag / lock contention visibility
+- Economy health dashboard: source/sink, inflation, inventory starvation, stuck orders
+- Agent behavior metrics: success rate, tool failure rate, autopilot interventions
+
+### 5. Economy Governance
+
+- Tunable parameter registry
+- Feature flags / staged rollout for economy changes
+- Balance-change review checklist
+- Economic regression scenarios and acceptance thresholds
+
+### 6. State Recovery
+
+- World snapshot / replay
+- Backup / restore runbook
+- Data repair / backfill scripts
+- Migration rollback constraints and irreversible-change policy
+
+### 7. Interface Parity Testing
+
+- REST vs MCP parity tests for shared service functions
+- Auth scope coverage tests
+- Contract compatibility tests for external clients
+
+## Proposed Control-Plane Backlog (#81+, Not Yet Created)
+
+> 下列编号是建议保留给下一批 cross-cutting issues 的候选 backlog。
+> 它们目前**不是**已创建的 GitHub issues，不计入顶部 `Total Issues`，也不能直接 `gh issue view`。
+> 作用是把“必须补但尚未 issue 化”的能力，从概念清单收敛成可执行工作包。
+
+### Proposed Issues
+
+| Proposed ID | Title | Scope | Recommended Depends On | Key Files |
+|-------------|-------|-------|------------------------|-----------|
+| `#81` | Control Contract Baseline | 冻结 MCP transport、REST/MCP versioning、idempotency、error taxonomy、pagination、async acceptance semantics | #16, #30-#35 | `api/schemas.py`, `mcp/server.py`, `main.py`, `README.md` |
+| `#82` | Authorization & Tool Scope Model | Agent/Company/Guild/Admin authz、tool scopes、dangerous operation gates | #16, #30-#35, #81 | `api/auth.py`, `deps.py`, `mcp/*`, `api/*` |
+| `#83` | Abuse & Budget Guard | quota、per-tool limits、spending caps、kill switch、read-only mode | #78-#80, #82 | `config.py`, `deps.py`, `middleware/*`, `services/*`, `main.py` |
+| `#84` | Execution Semantics & Job Model | sync vs async command contract、retry/dedupe/dead-letter、housekeeping failure/backfill policy | #23, #39-#44, #50, #64-#71, #81 | `services/game_engine.py`, `services/*`, `main.py`, `docs/` |
+| `#85` | Observability Baseline | structured logs、metrics、traces、queue/lock visibility、economy health dashboard baseline | #23, #78-#80, #84 | `main.py`, `services/game_engine.py`, `services/*`, `config.py` |
+| `#86` | Economy Governance & Tunables | parameter registry、feature flags、balance review checklist、economic regression scenarios | #16, #23, #29, #38, #85 | `config.py`, `services/seed.py`, `services/*`, `tests/` |
+| `#87` | State Recovery & Repair Tooling | snapshot/replay、backup/restore runbook、repair/backfill scripts、migration rollback policy | #16, #23, #37, #84 | `cli.py`, `alembic/`, `scripts/*`, `services/*` |
+| `#88` | REST/MCP Contract Parity Test Suite | parity tests、scope coverage、external client compatibility checks | #81, #82, #84, #85 | `tests/contract/*`, `tests/e2e/*`, `mcp/*`, `api/*` |
+
+### Suggested Sequencing
+
+| Stage | Proposed Issues | Why |
+|-------|-----------------|-----|
+| **Contract Freeze** | #81, #82 | 先冻结 transport、versioning、permission 语义，避免外部接入前持续漂移 |
+| **Safety Layer** | #83, #84 | 把 abuse/budget guard 和执行语义从隐性约定变成系统行为 |
+| **Operate Safely** | #85, #86, #87 | 补 observability、调参治理、事故恢复 |
+| **Prove Consistency** | #88 | 用 parity tests 把 REST/MCP/shared service 三层绑紧 |
+
+### Rollout Policy
+
+- `#72-#77 OpenClaw Integration` 可以在 `#81-#84` 之前做本地原型联调
+- 面向外部玩家、持续运行 agent、公开文档承诺前，至少应完成 `#81`, `#82`, `#83`, `#85`, `#87`, `#88`
+- 若 `#84` 未完成，所有 async/周期任务语义只能视为实验性，不应对外承诺稳定行为
+
+### Draft Issue Specs
+
+#### Draft `#81` — Control Contract Baseline
+
+- **Goal**: 冻结外部客户端的最小稳定契约，避免 REST/MCP transport、错误语义、幂等等核心行为持续漂移。
+- **In Scope**: 选定单一 MCP transport；定义 API/MCP versioning；为所有 state-mutating actions 规定 idempotency 行为；统一 error taxonomy；定义 pagination / async acceptance contract；更新 README 与接入文档。
+- **Out Of Scope**: 新增业务玩法；扩大量工具数量；引入复杂 RBAC 细节。
+- **Acceptance**:
+  - 存在一份对外 contract spec，覆盖 REST 与 MCP
+  - README、PLAN、实现入口对 MCP transport 的表述一致
+  - 所有写操作都标注 idempotent / non-idempotent / async accepted 语义
+  - error code / error shape 可被外部客户端稳定消费
+
+#### Draft `#82` — Authorization & Tool Scope Model
+
+- **Goal**: 把“能连上 API key”提升为“有明确资源边界和 tool scope 的权限系统”。
+- **In Scope**: Agent / Company / Guild / Admin actor model；acting-as 规则；REST route scopes；MCP tool scopes；dangerous-operation confirmation / gating；权限拒绝错误模型。
+- **Out Of Scope**: 细粒度组织后台；复杂 UI 权限面板。
+- **Acceptance**:
+  - 关键资源都有 owner / actor / allowed action 定义
+  - MCP tools 不再默认“有 key 就全能调用”
+  - 至少覆盖交易、生产、运输、公会、运维级操作的 scope
+  - 存在 scope coverage tests
+
+#### Draft `#83` — Abuse & Budget Guard
+
+- **Goal**: 为持续运行的外部 AI 加上配额、预算和紧急制动，避免错误 agent 把世界或账本打穿。
+- **In Scope**: per-agent / per-tool / per-IP quota；spending caps；budget exhaustion behavior；kill switch；read-only / degraded mode；unsafe operation denylist。
+- **Out Of Scope**: 完整风控平台；复杂信誉分系统。
+- **Acceptance**:
+  - 可以对单 agent 或单 tool 执行限流和封禁
+  - 可配置预算上限触发阻断而非静默失败
+  - 存在全局只读或外部接入熔断开关
+  - 有针对 429 / 403 / degraded mode 的集成测试
+
+#### Draft `#84` — Execution Semantics & Job Model
+
+- **Goal**: 把命令执行、housekeeping、周期任务、失败补偿这些隐性机制显式化，避免客户端和服务端对时序理解不一致。
+- **In Scope**: sync vs async command contract；accepted/pending/completed/failed 状态语义；retry / dedupe / dead-letter policy；housekeeping failure handling；backfill rules；周期任务的 observability hooks。
+- **Out Of Scope**: 引入大型消息队列平台；完整 workflow engine。
+- **Acceptance**:
+  - 文档能明确回答“一个调用什么时候算成功”
+  - 周期任务失败后有 retry 或人工修复路径
+  - housekeeping 不再是黑盒 sweep，而有 phase-level result contract
+  - async/周期任务语义在 REST 与 MCP 中一致
+
+#### Draft `#85` — Observability Baseline
+
+- **Goal**: 让系统能被运营、排障和调优，而不是只靠日志 grep。
+- **In Scope**: structured logs；request / MCP / housekeeping metrics；queue lag / lock contention / slow query visibility；economy health 指标；agent behavior / autopilot intervention metrics；最小告警基线。
+- **Out Of Scope**: 完整 BI 平台；复杂商业报表。
+- **Acceptance**:
+  - 关键请求和后台任务都有统一 trace/log context
+  - 至少能观察 API 错误率、MCP 调用失败率、housekeeping 时长、锁冲突、经济失衡指标
+  - 有最小 dashboard 或导出接口供外部监控系统采集
+  - rollout gate 可基于指标判断是否放量
+
+#### Draft `#86` — Economy Governance & Tunables
+
+- **Goal**: 把经济平衡从“改 seed / 改常量”升级为“可治理、可回滚、可评审”的参数系统。
+- **In Scope**: tunable parameter registry；feature flags；balance change checklist；经济回归场景；source/sink 健康阈值；主要参数的 owner 说明。
+- **Out Of Scope**: 自动调参 AI；复杂 live-ops 后台。
+- **Acceptance**:
+  - 核心经济参数有集中登记和默认值来源
+  - 经济改动可以分阶段 rollout
+  - 至少有一组经济回归测试场景
+  - source/sink / inflation / starvation 等关键指标有验收阈值
+
+#### Draft `#87` — State Recovery & Repair Tooling
+
+- **Goal**: 当经济状态、周期任务或数据迁移出问题时，有恢复和修复手段，而不是只能手改数据库。
+- **In Scope**: snapshot / replay strategy；backup / restore runbook；repair/backfill scripts；migration rollback constraints；不可逆变更清单；最小事故演练文档。
+- **Out Of Scope**: 跨地域灾备；企业级 RPO/RTO 承诺。
+- **Acceptance**:
+  - 存在至少一条可执行的备份恢复路径
+  - 可以重放或补算关键 housekeeping / market / economy 状态
+  - 迁移和 backfill 有明确安全边界
+  - 发生数据漂移时有 documented repair flow
+
+#### Draft `#88` — REST/MCP Contract Parity Test Suite
+
+- **Goal**: 用测试锁住“同一 service、双接口”的承诺，避免 REST 和 MCP 各自漂移。
+- **In Scope**: REST/MCP parity tests；auth scope coverage；contract compatibility fixtures；关键读写路径的 golden test cases；外部 client smoke tests。
+- **Out Of Scope**: 全量 UI 测试；非关键路径的 exhaustive fuzzing。
+- **Acceptance**:
+  - 至少覆盖交易、库存、生产、旅行、通知、策略配置等主路径
+  - 同一操作经 REST 与 MCP 触发时，状态变化和错误语义一致
+  - contract-breaking change 能在 CI 中直接暴露
+  - OpenClaw 接入 smoke tests 复用同一套 contract fixture
 
 ---
 
@@ -518,6 +733,7 @@
 ## Layer 4: OpenClaw Integration (3-4 CC)
 
 > 让 OpenClaw 代理能作为 Agentropolis Agent 完整参与世界。面向外部玩家，非自用。
+> 本层允许在本地或封闭环境先做联调原型，但外部公开接入必须满足上文 `External Rollout Gate`。
 
 ### Core Integration
 
@@ -576,9 +792,9 @@
 
 | Wave | Issues | CC 数 | 前置 |
 |------|--------|:---:|------|
-| **OpenClaw Wave 1** | #72, #73 | 2 | Wave 5 (APIs) done |
+| **OpenClaw Wave 1** | #72, #73 | 2 | Wave 5 (APIs) done; 仅限本地/封闭环境原型 |
 | **OpenClaw Wave 2** | #74, #75 | 2 | #72 done |
-| **OpenClaw Wave 3** | #76, #77 | 2 | #75 done (#77 另外需要 #74) |
+| **OpenClaw Wave 3** | #76, #77 | 2 | #75 done (#77 另外需要 #74); 外部 rollout 仍受 gate 约束 |
 
 ### MCP Tool 清单 (55 tools)
 

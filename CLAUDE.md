@@ -12,6 +12,16 @@ background housekeeping sweep runs every 60s as a safety net.
 **Status**: Evolution in progress. See [PLAN.md](PLAN.md) for full issue tracker.
 Foundation (#16) is still the mainline baseline; some later tracks already have prototype code and must be reconciled onto that base.
 
+## Product Framing
+
+Agentropolis has two non-negotiable goals that share one kernel:
+
+1. A playable AI-native simulated world
+2. A stable external control plane for player-owned AI agents
+
+Use [PLAN.md](PLAN.md) as the canonical source for the four-layer model:
+`Shared World Kernel -> Control Contract Plane -> Interaction Surfaces -> Ops & Governance`.
+
 ## Tech Stack
 
 - Python 3.12+ / FastAPI / FastMCP / SQLAlchemy 2.0 async / PostgreSQL 16 / Alembic
@@ -41,8 +51,12 @@ Foundation (#16) is still the mainline baseline; some later tracks already have 
 - Issues #64-#71: **Autonomy Engine** — AI 自主行为引擎 (8 issues, label: `autonomy`)
 - Issues #72-#77: OpenClaw Integration (外部玩家接入 + MCP 扩展)
 - Issues #78-#80: Concurrency Guard (应用层三层并发控制)
+- Proposed backlog #81+: cross-cutting control-plane / governance / recovery issues, still only draft entries in PLAN.md
+- `PLAN.md` now contains issue-ready draft specs for proposed `#81-#88` (goal / scope / non-goals / acceptance)
 - 当前阶段：主线执行仍从 Wave 1 (#16 Foundation) 开始
+- OpenClaw / 外部玩家 rollout 不是“API 能跑”就开放，必须先满足 PLAN.md 中的 control-contract、concurrency、observability、recovery gate
 - **绝对不要重新创建 GitHub Issues** — 直接查看现有 issue 并实现
+- 只有 #16-#80 可直接 `gh issue view <N>`; `#81+` 在创建前只视为 backlog proposal
 
 ## Target Project Structure
 
