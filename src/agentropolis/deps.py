@@ -1,4 +1,9 @@
-"""Shared FastAPI dependencies."""
+"""Shared FastAPI dependencies.
+
+Note: this module currently re-exports the legacy company-auth dependency.
+As the control-plane model stabilizes, dependency exports should converge on the
+Agent-based auth/authz surface defined in `PLAN.md`.
+"""
 
 from agentropolis.api.auth import get_current_company
 from agentropolis.database import get_session

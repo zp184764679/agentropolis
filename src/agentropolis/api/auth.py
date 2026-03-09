@@ -1,4 +1,9 @@
-"""API Key authentication dependency for FastAPI."""
+"""Legacy scaffold API-key authentication dependency for FastAPI.
+
+Current behavior resolves `X-API-Key` to a Company.
+Target architecture moves auth toward Agent-based identity plus explicit authorization scopes.
+See `PLAN.md` proposed control-plane backlog for the target model.
+"""
 
 import hashlib
 
@@ -22,7 +27,7 @@ async def get_current_company(
     api_key: str | None = Security(api_key_header),
     session: AsyncSession = Depends(get_session),
 ) -> Company:
-    """Resolve API key to a Company. Raises 401 if invalid."""
+    """Resolve API key to a Company in the legacy scaffold auth model."""
     if not api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

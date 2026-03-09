@@ -1,16 +1,21 @@
 """FastAPI application entry point.
 
-- Mounts all REST API routers
-- Starts tick loop in lifespan
-- Mounts MCP server at /mcp
-- Seeds game data on first run
+Current runtime role:
+- mount the currently wired REST scaffold routers
+- seed scaffold game data on startup
+- expose a minimal health endpoint
+
+Target runtime direction:
+- start housekeeping/background orchestration in lifespan
+- mount the stabilized MCP surface once the control contract is frozen
 """
 
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from agentropolis.api.company import router as company_router
 from agentropolis.api.game import router as game_router
@@ -19,6 +24,7 @@ from agentropolis.api.market import router as market_router
 from agentropolis.api.production import router as production_router
 from agentropolis.config import settings
 from agentropolis.database import async_session, engine
+from agentropolis.runtime_meta import build_runtime_metadata
 from agentropolis.services.seed import seed_game_data
 
 logger = logging.getLogger(__name__)
@@ -26,18 +32,18 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan: seed data, start tick loop."""
+    """Application lifespan: seed initial data and manage long-lived runtime hooks."""
     # Seed game data
     async with async_session() as session:
         result = await seed_game_data(session)
         logger.info("Seed complete: %s", result)
 
-    # TODO (Issue #6): Start tick loop
-    # task = asyncio.create_task(run_tick_loop())
+    # TODO: replace the legacy tick-loop stub with housekeeping/background orchestration.
+    # task = asyncio.create_task(run_housekeeping_loop())
 
     yield
 
-    # TODO (Issue #6): Cancel tick loop
+    # TODO: cancel the housekeeping/background task on shutdown.
     # task.cancel()
 
     await engine.dispose()
@@ -45,7 +51,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Agentropolis",
-    description="AI Agent Economic Arena - competitive economy simulation for AI Agents",
+    description="AI-native simulated world and control plane for LLM agents",
     version="0.1.0",
     lifespan=lifespan,
     redirect_slashes=False,
@@ -59,14 +65,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount REST API routers
+# Mount only the current scaffold surface.
+# Newer route files may exist on disk but remain intentionally unmounted until
+# auth/contract/rollout expectations are explicit in the plan.
 app.include_router(market_router, prefix="/api")
 app.include_router(production_router, prefix="/api")
 app.include_router(inventory_router, prefix="/api")
 app.include_router(company_router, prefix="/api")
 app.include_router(game_router, prefix="/api")
 
-# TODO (Issue #13): Mount MCP server
+# TODO: mount the MCP surface after the transport and external contract are frozen.
 # from agentropolis.mcp.server import mcp
 # app.mount("/mcp", mcp.sse_app())
 
@@ -74,3 +82,21 @@ app.include_router(game_router, prefix="/api")
 @app.get("/health")
 async def health():
     return {"status": "ok", "version": "0.1.0"}
+
+
+@app.get("/meta/runtime")
+async def runtime_metadata():
+    """Machine-readable snapshot of the current scaffold/runtime surface."""
+    return build_runtime_metadata()
+
+
+@app.exception_handler(NotImplementedError)
+async def handle_not_implemented(_: Request, exc: NotImplementedError):
+    """Expose scaffold placeholders as HTTP 501 instead of generic 500s."""
+    return JSONResponse(
+        status_code=501,
+        content={
+            "detail": str(exc) or "This scaffold endpoint is not implemented yet.",
+            "status": "not_implemented",
+        },
+    )

@@ -51,6 +51,29 @@
 3. `game_engine.py`、`main.py`、`models/agent.py`、`config.py`、`mcp/*` 是高冲突热点文件，计划上应视为串行集成点，不应假设无限并行。
 4. “可玩世界”与“外部 AI 平台”必须共享同一份状态模型、同一套权限语义、同一套失败/重试语义。
 
+### Documentation Sync Rules
+
+当以下任一内容发生变化时，必须同步检查 `PLAN.md`、`CLAUDE.md`、`README.md` 与相关 `.github/issue_*.md` 草案，避免产品定义再次分叉：
+
+- auth entity / actor model
+- world simulation model（tick vs housekeeping / lazy settlement）
+- MCP transport / public integration contract
+- rollout gate / external access policy
+- issue ranges and roadmap phases
+- ownership rules for shared hotspot files
+- `/meta/runtime` 暴露的机器可读 runtime surface
+
+### API Mount Rules
+
+存在于 `src/agentropolis/api/` 的文件，不等于已经成为公开 runtime surface。
+新增或恢复挂载某个 route group 前，至少要确认：
+
+- 该 route group 的 auth model 与当前计划一致
+- 不会把仅供原型的接口误暴露给外部玩家或外部 AI
+- placeholder handlers 要么已实现，要么明确以 `501 Not Implemented` 形式暴露 scaffold 状态
+- README 的 runtime surface 描述已同步
+- 若涉及 MCP/REST parity、authz、budget/abuse guard，则不得绕过 control-plane backlog gate
+
 ### External Rollout Gate
 
 > 面向外部玩家或持续运行的 AI agent 接入，不以“API 能调用”为准，而以下列门槛为准:
@@ -283,6 +306,16 @@
 - 若 `#84` 未完成，所有 async/周期任务语义只能视为实验性，不应对外承诺稳定行为
 
 ### Draft Issue Specs
+
+Detailed draft files also exist under `.github/` for copy-paste into GitHub:
+- `issue_control_contract_baseline.md`
+- `issue_authorization_tool_scopes.md`
+- `issue_abuse_budget_guard.md`
+- `issue_execution_semantics_jobs.md`
+- `issue_observability_baseline.md`
+- `issue_economy_governance.md`
+- `issue_state_recovery.md`
+- `issue_contract_parity_tests.md`
 
 #### Draft `#81` — Control Contract Baseline
 

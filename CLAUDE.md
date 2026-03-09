@@ -22,6 +22,12 @@ Agentropolis has two non-negotiable goals that share one kernel:
 Use [PLAN.md](PLAN.md) as the canonical source for the four-layer model:
 `Shared World Kernel -> Control Contract Plane -> Interaction Surfaces -> Ops & Governance`.
 
+## Legacy Drift Rule
+
+If local code, comments, or examples still use legacy `company` / `tick` language, treat `PLAN.md` as the architectural source of truth.
+Do not promote legacy naming back into new roadmap, contract, or ownership decisions unless the plan explicitly keeps it.
+Likewise, do not treat an `api/*.py` file existing on disk as evidence that it should already be mounted in `main.py`; follow the mount rules in `PLAN.md`.
+
 ## Tech Stack
 
 - Python 3.12+ / FastAPI / FastMCP / SQLAlchemy 2.0 async / PostgreSQL 16 / Alembic
@@ -53,6 +59,8 @@ Use [PLAN.md](PLAN.md) as the canonical source for the four-layer model:
 - Issues #78-#80: Concurrency Guard (应用层三层并发控制)
 - Proposed backlog #81+: cross-cutting control-plane / governance / recovery issues, still only draft entries in PLAN.md
 - `PLAN.md` now contains issue-ready draft specs for proposed `#81-#88` (goal / scope / non-goals / acceptance)
+- `.github/README.md` indexes both created-issue briefs and proposed control-plane draft issues
+- `/meta/runtime` is the machine-readable snapshot of the currently mounted scaffold surface
 - 当前阶段：主线执行仍从 Wave 1 (#16 Foundation) 开始
 - OpenClaw / 外部玩家 rollout 不是“API 能跑”就开放，必须先满足 PLAN.md 中的 control-contract、concurrency、observability、recovery gate
 - **绝对不要重新创建 GitHub Issues** — 直接查看现有 issue 并实现

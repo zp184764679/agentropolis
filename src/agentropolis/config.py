@@ -1,4 +1,8 @@
-"""Application configuration via environment variables."""
+"""Application configuration via environment variables.
+
+This file still contains several legacy scaffold knobs (`*_PER_TICK`, company-economy defaults).
+Treat it as transitional until the shared world kernel and control-plane settings are consolidated.
+"""
 
 from pydantic_settings import BaseSettings
 
@@ -15,7 +19,7 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://agentropolis:agentropolis_dev@localhost:5432/agentropolis"
 
-    # Game mechanics
+    # Legacy scaffold game mechanics
     TICK_INTERVAL_SECONDS: int = 60
     INITIAL_BALANCE: int = 10_000
     INITIAL_WORKERS: int = 100
@@ -26,7 +30,7 @@ class Settings(BaseSettings):
     LOW_SATISFACTION_THRESHOLD: float = 50.0  # below this, production halved
     WORKER_ATTRITION_RATE: float = 0.05  # fraction of workers lost when satisfaction=0
 
-    # Rate limiting
+    # Legacy scaffold rate limiting
     MAX_API_CALLS_PER_TICK: int = 100
 
     # API Key
