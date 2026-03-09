@@ -6,6 +6,7 @@ See `PLAN.md` proposed control-plane backlog for the target model.
 """
 
 import hashlib
+from typing import Any
 
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import APIKeyHeader
@@ -23,17 +24,22 @@ def hash_api_key(api_key: str) -> str:
     return hashlib.sha256(api_key.encode()).hexdigest()
 
 
-async def get_current_company(
-    api_key: str | None = Security(api_key_header),
-    session: AsyncSession = Depends(get_session),
-) -> Company:
-    """Resolve API key to a Company in the legacy scaffold auth model."""
+def _require_api_key(api_key: str | None) -> str:
+    """Validate presence of the API key and return its hash."""
     if not api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing X-API-Key header",
         )
-    key_hash = hash_api_key(api_key)
+    return hash_api_key(api_key)
+
+
+async def get_current_company(
+    api_key: str | None = Security(api_key_header),
+    session: AsyncSession = Depends(get_session),
+) -> Company:
+    """Resolve API key to a Company in the legacy scaffold auth model."""
+    key_hash = _require_api_key(api_key)
     result = await session.execute(
         select(Company).where(Company.api_key_hash == key_hash, Company.is_active.is_(True))
     )
@@ -44,3 +50,43 @@ async def get_current_company(
             detail="Invalid or inactive API key",
         )
     return company
+
+
+async def get_current_agent(
+    api_key: str | None = Security(api_key_header),
+    session: AsyncSession = Depends(get_session),
+) -> Any:
+    """Migration-safe Agent auth entrypoint.
+
+    This function exists so target-agent route modules can import a stable symbol
+    during the migration from company-auth to agent-auth. In the current scaffold
+    runtime it may intentionally return 501 when the Agent auth surface is not yet
+    fully wired into models, schema, and database state.
+    """
+    key_hash = _require_api_key(api_key)
+
+    try:
+        from agentropolis.models.agent import Agent  # type: ignore
+    except Exception as exc:  # pragma: no cover - defensive migration guard
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Agent auth model is not wired into the current scaffold runtime yet.",
+        ) from exc
+
+    try:
+        result = await session.execute(
+            select(Agent).where(Agent.api_key_hash == key_hash, Agent.is_active.is_(True))
+        )
+    except Exception as exc:  # pragma: no cover - defensive migration guard
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Agent auth exists in the target design but is not active in this runtime yet.",
+        ) from exc
+
+    agent = result.scalar_one_or_none()
+    if not agent:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or inactive API key for agent auth",
+        )
+    return agent

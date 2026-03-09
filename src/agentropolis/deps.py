@@ -5,7 +5,7 @@ As the control-plane model stabilizes, dependency exports should converge on the
 Agent-based auth/authz surface defined in `PLAN.md`.
 """
 
-from agentropolis.api.auth import get_current_company
+from agentropolis.api.auth import get_current_agent, get_current_company
 from agentropolis.database import get_session
 
-__all__ = ["get_session", "get_current_company"]
+__all__ = ["get_session", "get_current_company", "get_current_agent"]

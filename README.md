@@ -49,6 +49,7 @@ curl http://localhost:8000/meta/runtime
 - `/health` and `/meta/runtime` are the two endpoints that should be treated as reliably available in the current scaffold
 - REST route modules for market/production/inventory/company/game are mounted, but many handlers are still placeholders during the migration and currently surface as `501 Not Implemented`
 - MCP transport and public contract are still being frozen in the control-plane backlog
+- Agent-auth dependency symbols now exist for migration compatibility, but target agent-auth routes may still surface `501` until the full runtime path is wired
 - Do not treat legacy company-auth or `/mcp/sse` examples as the final external integration contract
 - `/meta/runtime` is the machine-readable source for the current mounted-vs-unmounted runtime surface
 
