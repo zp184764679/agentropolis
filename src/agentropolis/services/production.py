@@ -1,25 +1,11 @@
-"""Production service - manages building construction and manufacturing.
+"""Legacy scaffold production stub.
 
-Called during the production phase of each tick.
+This module still assumes a tick-phased production loop and company-centric
+control surface. The target plan moves production toward the real-time world
+kernel with settlement integrated into housekeeping/lazy progression.
 
-Flow per tick:
-1. For each PRODUCING building:
-   a. Increment production_progress by 1 (or 0.5 if low satisfaction)
-   b. If progress >= recipe.duration_ticks:
-      - Consume inputs from inventory (already reserved at start)
-      - Add outputs to inventory
-      - Reset progress to 0
-      - If continuous, start next cycle; else set to IDLE
-
-Building construction:
-- Costs credits + materials (from cost_materials JSONB)
-- Instant construction (MVP simplification)
-- Future: construction time in ticks
-
-Implementation notes:
-- Inventory mutations must use SELECT ... FOR UPDATE
-- If inputs are insufficient at completion time, building pauses (set IDLE)
-- Production start validates recipe belongs to building type
+Keep signatures stable for the scaffold, but do not treat this docstring as the
+final production architecture.
 """
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 async def tick_production(
     session: AsyncSession, satisfaction_map: dict[int, float]
 ) -> dict:
-    """Advance all active productions by one tick step.
+    """Legacy scaffold production-step stub.
 
     Args:
         session: DB session
@@ -43,7 +29,7 @@ async def tick_production(
 async def start_production(
     session: AsyncSession, company_id: int, building_id: int, recipe_id: int
 ) -> dict:
-    """Start production on a building with given recipe.
+    """Legacy scaffold production-start stub.
 
     Validates:
     - Building belongs to company
@@ -58,7 +44,7 @@ async def start_production(
 
 
 async def stop_production(session: AsyncSession, company_id: int, building_id: int) -> bool:
-    """Stop production on a building. Sets to IDLE, resets progress.
+    """Legacy scaffold production-stop stub.
 
     Returns: True if stopped, False if not producing
     """
@@ -68,7 +54,7 @@ async def stop_production(session: AsyncSession, company_id: int, building_id: i
 async def build_building(
     session: AsyncSession, company_id: int, building_type_name: str
 ) -> dict:
-    """Construct a new building. Deducts credits and materials.
+    """Legacy scaffold building-construction stub.
 
     Returns: {"building_id", "building_type", "cost_credits", "cost_materials"}
     Raises: ValueError if insufficient funds/materials or invalid type
@@ -77,12 +63,12 @@ async def build_building(
 
 
 async def get_company_buildings(session: AsyncSession, company_id: int) -> list[dict]:
-    """Get all buildings owned by a company with their status."""
+    """Legacy scaffold company-building query stub."""
     raise NotImplementedError("Issue #2: Implement production service")
 
 
 async def get_recipes(
     session: AsyncSession, building_type_name: str | None = None
 ) -> list[dict]:
-    """Get available recipes, optionally filtered by building type."""
+    """Legacy scaffold recipe-query stub."""
     raise NotImplementedError("Issue #2: Implement production service")

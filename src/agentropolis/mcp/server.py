@@ -1,15 +1,14 @@
-"""FastMCP server setup - mounted on FastAPI ASGI app.
+"""FastMCP server scaffold.
 
-Architecture:
-- Single FastMCP instance with all 18 tools registered
-- Tools call the same service layer as REST API (no duplication)
-- MCP authentication: API key passed as tool parameter (first arg or context)
-- Mounted at /mcp on the FastAPI app via ASGI
+Current role:
+- define the shared MCP application object
+- document the intended REST/MCP service-layer parity
+- provide a registration point for tool modules
 
-Implementation:
-- Create FastMCP("agentropolis") instance
-- Import and register all tools from tools_*.py modules
-- Export `mcp_app` for mounting in main.py
+Important:
+- the external MCP transport and public contract are not frozen yet
+- authentication/authorization semantics are still migrating from legacy scaffold rules
+- this file should converge with the control-plane backlog before public rollout
 """
 
 from mcp.server.fastmcp import FastMCP
@@ -17,17 +16,14 @@ from mcp.server.fastmcp import FastMCP
 mcp = FastMCP(
     "agentropolis",
     instructions=(
-        "Agentropolis - AI Agent Economic Arena. "
-        "You control a company in a competitive economy. "
-        "Use market tools to trade resources, production tools to manufacture goods, "
-        "and intel tools to analyze the market. Your workers need RAT (rations) and "
-        "DW (drinking water) every tick or they'll become unhappy and leave."
+        "Agentropolis is an AI-native simulated world and control plane for LLM agents. "
+        "Use the same world state through MCP and REST, and expect the contract surface "
+        "to evolve toward agent-auth, regional actions, and shared service-layer parity."
     ),
 )
 
-# Tools are registered in tools_*.py modules via @mcp.tool() decorator.
-# Import them here to trigger registration.
-# Uncomment these imports after implementing the tool modules:
+# Tools are registered in tools_*.py modules via @mcp.tool() decorators.
+# Import them here to trigger registration once the corresponding contract surface is ready.
 # import agentropolis.mcp.tools_market  # noqa: F401
 # import agentropolis.mcp.tools_production  # noqa: F401
 # import agentropolis.mcp.tools_inventory  # noqa: F401

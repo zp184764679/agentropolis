@@ -1,29 +1,17 @@
-"""Consumption service - worker upkeep and satisfaction management.
+"""Legacy scaffold consumption stub.
 
-Called first in each tick, before production and matching.
+This module still documents worker upkeep in the older tick/company model.
+The target plan replaces the old Worker-centric assumptions with the newer
+company/agent/world model and housekeeping-friendly settlement semantics.
 
-Per tick, each company's workers consume:
-- RAT: count * WORKER_RAT_PER_TICK
-- DW:  count * WORKER_DW_PER_TICK
-
-Satisfaction rules:
-- If both RAT and DW are fully supplied: satisfaction recovers by RECOVERY_RATE (cap 100)
-- If either is insufficient: satisfaction drops by DECAY_RATE (floor 0)
-- Partial supply: proportional penalty
-- satisfaction < LOW_SATISFACTION_THRESHOLD (50%): production runs at 50% speed
-- satisfaction == 0: lose WORKER_ATTRITION_RATE fraction of workers (rounded down, min 1 lost)
-
-Implementation notes:
-- Inventory deductions use SELECT ... FOR UPDATE
-- If inventory has less than needed, consume all available (partial feeding)
-- Satisfaction is stored as float 0-100 on Worker model
+Do not treat the comments below as the final domain model.
 """
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def tick_consumption(session: AsyncSession) -> dict:
-    """Process worker consumption for all active companies.
+    """Legacy scaffold worker-consumption stub for active companies.
 
     Returns:
         {
