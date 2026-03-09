@@ -12,6 +12,7 @@ import asyncio
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
 from agentropolis.models import Base
 
@@ -26,7 +27,12 @@ def event_loop():
 @pytest.fixture(scope="session")
 async def engine():
     """Create async engine with SQLite for tests."""
-    eng = create_async_engine("sqlite+aiosqlite:///", echo=False)
+    eng = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        echo=False,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield eng

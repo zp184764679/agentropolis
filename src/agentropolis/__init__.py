@@ -1,3 +1,3 @@
-"""Agentropolis - AI Agent Economic Arena."""
+"""Agentropolis - AI-native simulated world and control plane."""
 
 __version__ = "0.1.0"

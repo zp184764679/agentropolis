@@ -22,6 +22,17 @@ Agentropolis has two non-negotiable goals that share one kernel:
 Use [PLAN.md](PLAN.md) as the canonical source for the four-layer model:
 `Shared World Kernel -> Control Contract Plane -> Interaction Surfaces -> Ops & Governance`.
 
+## Execution Priority
+
+Do not treat raw issue-number order as the only execution priority anymore.
+When issue order conflicts with current repo reality, follow the `Recommended Execution Program`
+in [PLAN.md](PLAN.md):
+
+- keep import / mapper / metadata / seed baseline green
+- finish shared world kernel services before widening mounted runtime surface
+- only mount preview-ready route groups with real schemas and tests
+- treat `models/agent.py`, `models/__init__.py`, `config.py`, `api/schemas.py`, `main.py`, and `mcp/*` as serial integration hotspots
+
 ## Legacy Drift Rule
 
 If local code, comments, or examples still use legacy `company` / `tick` language, treat `PLAN.md` as the architectural source of truth.

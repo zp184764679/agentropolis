@@ -19,6 +19,7 @@ class Trade(Base):
     resource_id: Mapped[int] = mapped_column(
         ForeignKey("resources.id"), nullable=False, index=True
     )
+    region_id: Mapped[int | None] = mapped_column(ForeignKey("regions.id"), index=True)
     price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     quantity: Mapped[float] = mapped_column(Numeric(16, 4), nullable=False)
     tick_executed: Mapped[int] = mapped_column(Integer, nullable=False, index=True)

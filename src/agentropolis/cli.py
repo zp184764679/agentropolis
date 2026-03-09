@@ -1,12 +1,12 @@
 """CLI management commands.
 
 Usage:
-    agentropolis seed     - Seed resources/recipes/building types
+    agentropolis seed     - Seed scaffold economy + target world baseline
     agentropolis reset    - Reset game state (dangerous!)
     agentropolis stats    - Show game statistics
     agentropolis run      - Start the game server
 
-Dependencies: services/seed.py, database.py
+Dependencies: services/seed.py, services/seed_world.py, database.py
 """
 
 import asyncio
@@ -19,20 +19,23 @@ console = Console()
 
 @click.group()
 def cli():
-    """Agentropolis - AI Agent Economic Arena."""
+    """Agentropolis - AI-native simulated world and control plane."""
     pass
 
 
 @cli.command()
 def seed():
-    """Seed game data (resources, recipes, building types)."""
+    """Seed scaffold economy data and the minimum target world graph."""
     from agentropolis.database import async_session
     from agentropolis.services.seed import seed_game_data
+    from agentropolis.services.seed_world import seed_world
 
     async def _seed():
         async with async_session() as session:
-            result = await seed_game_data(session)
-            console.print(f"[green]Seeded:[/green] {result}")
+            game_result = await seed_game_data(session)
+            world_result = await seed_world(session)
+            console.print(f"[green]Seeded game:[/green] {game_result}")
+            console.print(f"[green]Seeded world:[/green] {world_result}")
 
     asyncio.run(_seed())
 

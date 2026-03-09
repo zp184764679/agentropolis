@@ -49,10 +49,11 @@ curl http://localhost:8000/meta/runtime
 - `/health` and `/meta/runtime` are the two endpoints that should be treated as reliably available in the current scaffold
 - REST route modules for market/production/inventory/company/game are mounted, but many handlers are still placeholders during the migration and currently surface as `501 Not Implemented`
 - MCP transport and public contract are still being frozen in the control-plane backlog
-- Agent-auth dependency symbols now exist for migration compatibility, but target agent-auth routes may still surface `501` until the full runtime path is wired
+- Core target route groups for agent/world/skills/transport are now service-backed on disk, but they remain intentionally unmounted until the public rollout gate is satisfied
 - Do not treat legacy company-auth or `/mcp/sse` examples as the final external integration contract
 - `/meta/runtime` is the machine-readable source for the current mounted-vs-unmounted runtime surface
-- `/meta/runtime` also exposes the current auth split: `company_auth=active_legacy`, `agent_auth=migration_stub`
+- `/meta/runtime` also exposes the current auth split and ORM registry state: `company_auth=active_legacy`, `agent_auth=migration_compatible`
+- Fresh-database bootstrap now assumes `alembic upgrade head` followed by scaffold/world seed on startup
 
 ## Target Interface Direction
 
@@ -102,8 +103,9 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 | `/api/inventory` | Yes | Placeholder-heavy | Legacy inventory scaffold |
 | `/api/company` | Yes | Placeholder-heavy | Legacy company registration/status surface |
 | `/api/game` | Yes | Placeholder-heavy | Legacy tick/game-state terminology still present |
-| `api/agent.py`, `api/world.py`, `api/skills.py`, `api/guild.py`, `api/diplomacy.py`, `api/transport.py` | No | On disk only, mostly stubbed | Presence on disk does not mean runtime availability |
-| `api/strategy.py`, `api/decisions.py`, `api/warfare.py` | No | On disk, partially implemented | These have real handler logic but are still outside the mounted public surface |
+| `api/agent.py`, `api/world.py`, `api/skills.py`, `api/transport.py` | No | Importable, service-backed, unmounted | Core target route groups now call real services but remain outside the mounted public surface |
+| `api/guild.py`, `api/diplomacy.py` | No | Importable, mostly stubbed | Contract/types load, but these route groups still need service completion before mount review |
+| `api/strategy.py`, `api/decisions.py`, `api/warfare.py` | No | Importable, partially implemented | These have real handler logic but are still outside the mounted public surface |
 | MCP server | No public contract yet | Not frozen | Transport and rollout contract still under control-plane backlog |
 
 ### Route Mount Policy
@@ -164,7 +166,7 @@ FastMCP (MCP Tools) ─┘
 pip install -e ".[dev]"
 
 # Run tests
-pytest
+python -m pytest
 
 # Lint
 ruff check src/ tests/

@@ -1,4 +1,4 @@
-"""Seed data for resources, building types, and recipes.
+"""Seed data for the current scaffold and minimum target-world baseline.
 
 This defines the game's economic balance. Changes here affect all gameplay.
 The seed function is idempotent - safe to run multiple times.
@@ -8,7 +8,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.config import settings
-from agentropolis.models import BuildingType, GameState, Recipe, Resource, ResourceCategory
+from agentropolis.models import (
+    BuildingType,
+    GameState,
+    NexusCrystalState,
+    Recipe,
+    Resource,
+    ResourceCategory,
+    SkillCategory,
+    SkillDefinition,
+)
 
 # ─── Resource Definitions ────────────────────────────────────────────────────
 
@@ -28,14 +37,16 @@ RESOURCES = [
 # ─── Building Type Definitions ───────────────────────────────────────────────
 
 BUILDING_TYPES = [
-    {"name": "extractor", "display_name": "Resource Extractor", "cost_credits": 500, "cost_materials": {}, "max_workers": 10, "description": "Extracts raw resources from the ground."},
-    {"name": "farm", "display_name": "Farm", "cost_credits": 400, "cost_materials": {}, "max_workers": 8, "description": "Grows crops using water."},
-    {"name": "food_processor", "display_name": "Food Processor", "cost_credits": 600, "cost_materials": {}, "max_workers": 6, "description": "Converts crops and water into rations."},
-    {"name": "water_purifier", "display_name": "Water Purifier", "cost_credits": 500, "cost_materials": {}, "max_workers": 5, "description": "Purifies raw water into drinking water."},
-    {"name": "smelter", "display_name": "Smelter", "cost_credits": 1200, "cost_materials": {"BLD": 5}, "max_workers": 12, "description": "Smelts ore and carbon into iron."},
-    {"name": "foundry", "display_name": "Foundry", "cost_credits": 1800, "cost_materials": {"BLD": 8}, "max_workers": 15, "description": "Forges iron and carbon into steel."},
-    {"name": "assembly_plant", "display_name": "Assembly Plant", "cost_credits": 2500, "cost_materials": {"BLD": 12, "MCH": 2}, "max_workers": 20, "description": "Assembles iron and steel into machinery parts."},
-    {"name": "construction_yard", "display_name": "Construction Yard", "cost_credits": 1500, "cost_materials": {"BLD": 5}, "max_workers": 10, "description": "Produces building materials from steel and carbon."},
+    {"name": "extractor", "display_name": "Resource Extractor", "cost_credits": 500, "cost_materials": {}, "max_workers": 10, "storage_capacity": 250, "description": "Extracts raw resources from the ground."},
+    {"name": "farm", "display_name": "Farm", "cost_credits": 400, "cost_materials": {}, "max_workers": 8, "storage_capacity": 200, "description": "Grows crops using water."},
+    {"name": "food_processor", "display_name": "Food Processor", "cost_credits": 600, "cost_materials": {}, "max_workers": 6, "storage_capacity": 200, "description": "Converts crops and water into rations."},
+    {"name": "water_purifier", "display_name": "Water Purifier", "cost_credits": 500, "cost_materials": {}, "max_workers": 5, "storage_capacity": 200, "description": "Purifies raw water into drinking water."},
+    {"name": "smelter", "display_name": "Smelter", "cost_credits": 1200, "cost_materials": {"BLD": 5}, "max_workers": 12, "storage_capacity": 350, "description": "Smelts ore and carbon into iron."},
+    {"name": "foundry", "display_name": "Foundry", "cost_credits": 1800, "cost_materials": {"BLD": 8}, "max_workers": 15, "storage_capacity": 400, "description": "Forges iron and carbon into steel."},
+    {"name": "assembly_plant", "display_name": "Assembly Plant", "cost_credits": 2500, "cost_materials": {"BLD": 12, "MCH": 2}, "max_workers": 20, "storage_capacity": 500, "description": "Assembles iron and steel into machinery parts."},
+    {"name": "construction_yard", "display_name": "Construction Yard", "cost_credits": 1500, "cost_materials": {"BLD": 5}, "max_workers": 10, "storage_capacity": 450, "description": "Produces building materials from steel and carbon."},
+    {"name": "warehouse", "display_name": "Warehouse", "cost_credits": 900, "cost_materials": {"BLD": 3}, "max_workers": 4, "storage_capacity": 1000, "description": "Adds large regional storage capacity."},
+    {"name": "nexus_refinery", "display_name": "Nexus Refinery", "cost_credits": 5000, "cost_materials": {"BLD": 12, "MCH": 4, "STL": 6}, "max_workers": 6, "storage_capacity": 300, "description": "Processes Nexus Crystal cycles in the target-world economy."},
 ]
 
 # ─── Recipe Definitions ──────────────────────────────────────────────────────
@@ -67,6 +78,24 @@ RECIPES = [
 STARTER_BUILDINGS = ["extractor", "farm", "food_processor"]
 STARTER_INVENTORY = {"H2O": 100, "CRP": 50, "RAT": 200, "DW": 150}
 
+SKILL_DEFINITIONS = [
+    {"name": "Mining", "category": SkillCategory.GATHERING, "description": "Improves extraction output.", "prerequisites": {}, "xp_per_level": {"base": 100}},
+    {"name": "Woodcutting", "category": SkillCategory.GATHERING, "description": "Improves lumber and gathering efficiency.", "prerequisites": {}, "xp_per_level": {"base": 100}},
+    {"name": "Farming", "category": SkillCategory.GATHERING, "description": "Improves crop output.", "prerequisites": {}, "xp_per_level": {"base": 100}},
+    {"name": "Smithing", "category": SkillCategory.CRAFTING, "description": "Improves smelting and heavy industry.", "prerequisites": {}, "xp_per_level": {"base": 120}},
+    {"name": "Engineering", "category": SkillCategory.CRAFTING, "description": "Improves machinery and building upkeep.", "prerequisites": {}, "xp_per_level": {"base": 120}},
+    {"name": "Alchemy", "category": SkillCategory.CRAFTING, "description": "Improves specialty processing.", "prerequisites": {}, "xp_per_level": {"base": 120}},
+    {"name": "Trading", "category": SkillCategory.COMMERCE, "description": "Improves trade execution quality.", "prerequisites": {}, "xp_per_level": {"base": 110}},
+    {"name": "Logistics", "category": SkillCategory.COMMERCE, "description": "Improves transport and storage efficiency.", "prerequisites": {}, "xp_per_level": {"base": 110}},
+    {"name": "Negotiation", "category": SkillCategory.SOCIAL, "description": "Improves contract and diplomacy outcomes.", "prerequisites": {}, "xp_per_level": {"base": 110}},
+    {"name": "Diplomacy", "category": SkillCategory.SOCIAL, "description": "Improves trust and treaty outcomes.", "prerequisites": {}, "xp_per_level": {"base": 110}},
+    {"name": "Management", "category": SkillCategory.SOCIAL, "description": "Improves guild and workforce control.", "prerequisites": {}, "xp_per_level": {"base": 110}},
+    {"name": "Melee", "category": SkillCategory.COMBAT, "description": "Primary close-combat skill.", "prerequisites": {}, "xp_per_level": {"base": 130}},
+    {"name": "Tactics", "category": SkillCategory.COMBAT, "description": "Improves attack planning and defense.", "prerequisites": {}, "xp_per_level": {"base": 130}},
+    {"name": "Fortification", "category": SkillCategory.COMBAT, "description": "Improves defense and building resilience.", "prerequisites": {}, "xp_per_level": {"base": 130}},
+    {"name": "Command", "category": SkillCategory.SOCIAL, "description": "Improves leadership-driven bonuses.", "prerequisites": {}, "xp_per_level": {"base": 120}},
+]
+
 
 async def seed_game_data(session: AsyncSession) -> dict:
     """Seed resources, building types, and recipes. Idempotent.
@@ -74,7 +103,14 @@ async def seed_game_data(session: AsyncSession) -> dict:
     Returns:
         Summary dict with counts of created entities.
     """
-    created = {"resources": 0, "building_types": 0, "recipes": 0, "game_state": False}
+    created = {
+        "resources": 0,
+        "building_types": 0,
+        "recipes": 0,
+        "skill_definitions": 0,
+        "game_state": False,
+        "nexus_state": False,
+    }
 
     # Seed resources
     for rdata in RESOURCES:
@@ -132,6 +168,21 @@ async def seed_game_data(session: AsyncSession) -> dict:
             is_running=False,
         ))
         created["game_state"] = True
+
+    # Seed target skill catalog
+    for sdata in SKILL_DEFINITIONS:
+        result = await session.execute(
+            select(SkillDefinition).where(SkillDefinition.name == sdata["name"])
+        )
+        if result.scalar_one_or_none() is None:
+            session.add(SkillDefinition(**sdata))
+            created["skill_definitions"] += 1
+
+    # Seed NXC singleton for target-world services
+    result = await session.execute(select(NexusCrystalState).where(NexusCrystalState.id == 1))
+    if result.scalar_one_or_none() is None:
+        session.add(NexusCrystalState(id=1))
+        created["nexus_state"] = True
 
     await session.commit()
     return created
