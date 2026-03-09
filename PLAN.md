@@ -1,0 +1,668 @@
+# Agentropolis Evolution Plan — Issue Tracker
+
+> 从"公司经济竞技场"演化为"AI 版模拟人生" — 养成系虚拟社会模拟 + NXC 经济核心
+
+## Quick Stats
+
+- **Total Issues**: 60 (#16 - #80)
+- **Reserved / Intentionally Unused IDs**: #59-#63 (保留编号, 为保持历史链接稳定不复用)
+- **Old Issues**: #1-#15 (CLOSED, superseded)
+- **Design Gap Issues**: #39-#55 (17 issues, identified from PrUn/EVE analysis)
+- **Training System**: #56-#58 (3 issues, ✅ CODE COMPLETE)
+- **Autonomy Engine**: #64-#71 (8 issues, AI 自主行为引擎)
+- **OpenClaw Integration**: #72-#77 (6 issues, 面向外部玩家的 MCP + 部署)
+- **Concurrency Guard**: #78-#80 (3 issues, 并发排队系统)
+- **Layer 1 Shape**: 13 parallel service tracks + #23 orchestrator
+- **Repo**: https://github.com/zp184764679/agentropolis
+
+## Key Design Decisions
+
+| 决策 | 选择 |
+|------|------|
+| 认证实体 | Agent (不是 Company) |
+| Worker 模型 | 删除 → Company.npc_worker_count |
+| 货币单位 | BigInteger copper (1G = 100S = 10,000C) |
+| 资源数量 | Integer (无浮点) |
+| 库存 | 区域化 + 多态(company/agent) |
+| 市场 | 按 region_id 隔离 |
+| **NXC 经济** | **Bitcoin 式稀缺代币, 硬顶 21M, 减半, 难度调节** |
+
+---
+
+## Layer 0: Foundation (阻塞型, 1 CC)
+
+| Issue | Title | Status | Files |
+|-------|-------|--------|-------|
+| [#16](https://github.com/zp184764679/agentropolis/issues/16) | Model Layer Overhaul + Config + Schemas + Auth | ⬜ CREATED | 13 new + 10 modified + 4 non-model |
+
+> **必须先完成 #16，其余所有 issue 依赖它**
+
+---
+
+## Layer 1: Services (13 并行 tracks + #23 orchestrator)
+
+### Core Services (7)
+
+| Issue | Title | Status | Depends On | Key File |
+|-------|-------|--------|------------|----------|
+| [#17](https://github.com/zp184764679/agentropolis/issues/17) | Inventory Service | ⬜ CREATED | #16 | `services/inventory_svc.py` |
+| [#18](https://github.com/zp184764679/agentropolis/issues/18) | Company Service | ⬜ CREATED | #16, #17 | `services/company_svc.py` |
+| [#19](https://github.com/zp184764679/agentropolis/issues/19) | NPC Consumption | ⬜ CREATED | #16, #17 | `services/consumption.py` |
+| [#20](https://github.com/zp184764679/agentropolis/issues/20) | Production Service | ⬜ CREATED | #16, #17, #19 | `services/production.py` |
+| [#21](https://github.com/zp184764679/agentropolis/issues/21) | Market Engine | ⬜ CREATED | #16, #17, #18 | `services/market_engine.py` |
+| [#22](https://github.com/zp184764679/agentropolis/issues/22) | Leaderboard | ⬜ CREATED | #16 | `services/leaderboard.py` |
+| [#23](https://github.com/zp184764679/agentropolis/issues/23) | Game Engine | ⬜ CREATED | #16-#22 all | `services/game_engine.py` + `main.py` |
+
+### World Services (3)
+
+| Issue | Title | Status | Depends On | Key File |
+|-------|-------|--------|------------|----------|
+| [#24](https://github.com/zp184764679/agentropolis/issues/24) | Agent Service + Vitals | ⬜ CREATED | #16, #17 | `services/agent_svc.py` + `agent_vitals.py` |
+| [#25](https://github.com/zp184764679/agentropolis/issues/25) | World Service + Seed World | ⬜ CREATED | #16 | `services/world_svc.py` + `seed_world.py` |
+| [#26](https://github.com/zp184764679/agentropolis/issues/26) | Skill Service | ⬜ CREATED | #16 | `services/skill_svc.py` + `seed.py` |
+
+### Economy Services (1)
+
+| Issue | Title | Status | Depends On | Key File |
+|-------|-------|--------|------------|----------|
+| [#27](https://github.com/zp184764679/agentropolis/issues/27) | Transport + Tax + NPC Shop | ⬜ CREATED | #16, #17, #25 | `transport_svc.py` + `tax_svc.py` + `npc_shop_svc.py` |
+
+### Social Services (1)
+
+| Issue | Title | Status | Depends On | Key File |
+|-------|-------|--------|------------|----------|
+| [#28](https://github.com/zp184764679/agentropolis/issues/28) | Guild + Diplomacy | ⬜ CREATED | #16, #24 | `guild_svc.py` + `diplomacy_svc.py` |
+
+### Event Services (1)
+
+| Issue | Title | Status | Depends On | Key File |
+|-------|-------|--------|------------|----------|
+| [#29](https://github.com/zp184764679/agentropolis/issues/29) | World Events + Currency | ⬜ CREATED | #16 | `event_svc.py` + `currency_svc.py` |
+
+### NXC Services (1)
+
+| Issue | Title | Status | Depends On | Key File |
+|-------|-------|--------|------------|----------|
+| [#38](https://github.com/zp184764679/agentropolis/issues/38) | NXC Mining Service | ⬜ CREATED | #16, #20 | `services/nxc_mining_svc.py` |
+
+---
+
+## Layer 2: API Routes (并行, 5 CC)
+
+| Issue | Title | Status | Depends On | Key File |
+|-------|-------|--------|------------|----------|
+| [#30](https://github.com/zp184764679/agentropolis/issues/30) | Agent + World Endpoints | ⬜ CREATED | #24, #25, #26 | `api/agent.py` + `api/world.py` |
+| [#31](https://github.com/zp184764679/agentropolis/issues/31) | Market + Inventory Endpoints | ⬜ CREATED | #17, #21, #22 | `api/market.py` + `api/inventory.py` |
+| [#32](https://github.com/zp184764679/agentropolis/issues/32) | Production + Company Endpoints | ⬜ CREATED | #18, #20 | `api/production.py` + `api/company.py` |
+| [#33](https://github.com/zp184764679/agentropolis/issues/33) | Game + Leaderboard Endpoints | ⬜ CREATED | #22, #29 | `api/game.py` |
+| [#34](https://github.com/zp184764679/agentropolis/issues/34) | Skills + Transport + Guild + Diplomacy | ⬜ CREATED | #26, #27, #28 | 4 new API files |
+
+---
+
+## Layer 3: Integration (2-3 CC)
+
+| Issue | Title | Status | Depends On | Key File |
+|-------|-------|--------|------------|----------|
+| [#35](https://github.com/zp184764679/agentropolis/issues/35) | MCP Tools (~35 tools) | ⬜ CREATED | All services + APIs | `mcp/` |
+| [#36](https://github.com/zp184764679/agentropolis/issues/36) | Test Suite | ⬜ CREATED | All services | `tests/` |
+| [#37](https://github.com/zp184764679/agentropolis/issues/37) | CLI + Alembic Migrations | ⬜ CREATED | #16, #25 | `cli.py` + `alembic/` |
+
+---
+
+## Dependency Graph (Execution Order)
+
+```
+#16 Foundation ─────────────────────────────────────────────────┐
+  │                                                             │
+  ├─→ #17 inventory_svc ──┬─→ #18 company_svc ──┐              │
+  │                       ├─→ #19 consumption ───┤              │
+  │                       ├─→ #21 market_engine ─┤              │
+  │                       └─→ #24 agent_svc ─────┤              │
+  │                                              │              │
+  ├─→ #22 leaderboard ──────────────────────────┤              │
+  ├─→ #25 world_svc ─────────────────────────────┤              │
+  ├─→ #26 skill_svc ─────────────────────────────┤              │
+  ├─→ #29 events+currency ──────────────────────┤              │
+  │                                              │              │
+  │   #19 consumption ──→ #20 production ────────┤              │
+  │   #20 production ───→ #38 nxc_mining_svc ────┤              │
+  │   #25 world_svc ────→ #27 transport+tax+shop ┤              │
+  │   #24 agent_svc ────→ #28 guild+diplomacy ───┤              │
+  │                                              │              │
+  │                              #23 game_engine ←┘ (needs all) │
+  │                                                             │
+  │   ┌─ #30 API agent+world                                   │
+  │   ├─ #31 API market+inventory                               │
+  ├─→ ├─ #32 API production+company     (after their services) │
+  │   ├─ #33 API game+leaderboard                               │
+  │   └─ #34 API social+transport                               │
+  │                                                             │
+  │   ┌─ #35 MCP tools               (after service + API face) │
+  │   ├─ #36 Tests                   (after services)           │
+  └─→ └─ #37 CLI+Alembic             (after #16 + #25) ────────┘
+```
+
+## Optimal Execution Waves
+
+| Wave | Issues | CC Instances | 前置 |
+|------|--------|:---:|------|
+| **Wave 1** | #16 | 1 | None |
+| **Wave 2** | #17, #22, #25, #26, #29, #41 | 6 | #16 done |
+| **Wave 3** | #18, #19, #24, #42 | 4 | #17 done |
+| **Wave 4** | #20, #21, #27, #28, #39, #40, #45, #46 | 8 | Wave 3 done |
+| **Wave 5** | #23, #30-#34, #38, #43, #44, #48, #49, #51, #52, #53, #54, #55 | 14 | respective dependencies done |
+| **Wave 6** | #35, #36, #37, #47, #50 | 5 | respective dependencies done |
+| **Wave 6.5** | #78 → #79 → #80 | 3 (串行) | #16 done |
+| **Wave 7A** | #64, #65, #66, #67 | 4 | Wave 6 done |
+| **Wave 7B** | #68, #69, #71 | 3 | Wave 7A done (+ #35 for #69) |
+| **Wave 7C** | #70 | 1 | #64 + #68 done |
+
+---
+
+## File Ownership (防冲突)
+
+> 默认每个 issue 只修改自己的主文件。
+> 只有在下文明确标注 `extend` / `integration` / `upgrade` / `rewrite` / `shared owner` 的共享文件，才允许跨 issue 修改。
+> 未在 PLAN 中显式声明的跨文件改动，一律视为越界。
+
+| File | Owner Issue |
+|------|-------------|
+| `models/*` (all) | #16 |
+| `config.py` | #16 |
+| `api/schemas.py` | #16 |
+| `api/auth.py` | #16 |
+| `deps.py` | #16 |
+| `services/inventory_svc.py` | #17 |
+| `services/company_svc.py` | #18 |
+| `services/consumption.py` | #19 |
+| `services/production.py` | #20 |
+| `services/market_engine.py` | #21 |
+| `services/leaderboard.py` | #22 |
+| `services/game_engine.py` | #23 |
+| `services/agent_svc.py` | #24 |
+| `services/agent_vitals.py` | #24 |
+| `services/world_svc.py` | #25 |
+| `services/seed_world.py` | #25 |
+| `services/skill_svc.py` | #26 |
+| `services/seed.py` (skill defs) | #26 |
+| `services/transport_svc.py` | #27 |
+| `services/tax_svc.py` | #27 |
+| `services/npc_shop_svc.py` | #27 |
+| `services/guild_svc.py` | #28 |
+| `services/diplomacy_svc.py` | #28 |
+| `services/event_svc.py` | #29 |
+| `services/currency_svc.py` | #29 |
+| `models/nexus_state.py` | #16 |
+| `services/nxc_mining_svc.py` | #38 |
+| `api/agent.py` | #30 |
+| `api/world.py` | #30 |
+| `api/market.py` | #31 |
+| `api/inventory.py` | #31 |
+| `api/production.py` | #32 |
+| `api/company.py` | #32 |
+| `api/game.py` | #33 |
+| `api/skills.py` | #34 |
+| `api/transport.py` | #34 |
+| `api/guild.py` | #34 |
+| `api/diplomacy.py` | #34 |
+| `main.py` (routers) | #23, #30, #34 |
+| `mcp/*` | #35 |
+| `tests/*` | #36 |
+| `cli.py` + `alembic/` | #37 |
+
+### Shared / Explicit Exceptions
+
+| File | Shared Owner / Allowed Follow-up Issues |
+|------|-----------------------------------------|
+| `models/agent.py` | #16 base; #56, #64, #66 add relationships |
+| `models/__init__.py` | #16 base; #56, #64, #66 register new models/enums |
+| `config.py` | #16 base; #56, #64, #78 add scoped settings |
+| `api/schemas.py` | #16 base; #56 extend training-related schemas |
+| `services/game_engine.py` | #23 base; #39, #40, #41, #42, #43, #44, #50, #57, #58, #71 add housekeeping/training phases |
+| `main.py` | #23/#30/#34 base; #56, #65, #67, #68, #70, #80 add routers/middleware/handlers |
+| `deps.py` | #16 base; #78 add concurrency hooks |
+| `mcp/*` | #35 base; #69 upgrade AI core interface; #72 expand/rewrite agent-centric tool surface; #74 update `mcp/server.py` |
+
+---
+
+## NXC (Nexus Crystal) 经济系统
+
+> Bitcoin 式稀缺代币驱动一切经济行为。终极产业链输出。
+
+### 核心参数
+
+| 参数 | 值 |
+|------|-----|
+| 硬顶 | 21,000,000 NXC |
+| 精炼输入 | STL:3 + MCH:1 + C:5 |
+| 精炼周期 | 300 秒 (5 分钟) |
+| 初始基础产出 | 50 NXC/周期 (独自精炼时) |
+| 减半间隔 | 2016 周期 = 168h = 1 周 |
+| 精炼厂成本 | 50,000,000 copper + BLD:20 + MCH:10 |
+| 精炼厂技能要求 | Engineering Lv3 |
+| 目标排放/小时 | 100 NXC |
+
+### NXC 消耗池 (Sinks)
+
+| 场景 | NXC 数量 | 效果 |
+|------|---------|------|
+| 创建公会 | 50 NXC | 公会成立门槛 |
+| 解锁高级建筑 | 10-100 NXC | 精英建筑需要 NXC |
+| 解锁传奇技能(Lv5) | 25 NXC | 技能系统终极升级 |
+| 区域控制权(未来) | 100 NXC/周 | 地盘争夺 |
+
+### 对各 Issue 的影响
+
+| Issue | NXC 相关变更 |
+|-------|-------------|
+| **#16** | +NexusCrystalState 模型, +ResourceCategory.CURRENCY, +nxc_cost 字段, +NXC 种子数据 |
+| **#20** | settle_building 对 nexus_refinery 做特殊处理, 调用 nxc_mining_svc.calculate_nxc_yield |
+| **#22** | 新增 NXC 排行榜 (主排行榜按 NXC 持有量) |
+| **#23** | housekeeping 新增: 难度调节 + 减半检查 + active_refineries 更新 |
+| **#26** | Engineering Lv5 解锁需消耗 NXC (25 NXC) |
+| **#28** | 创建公会需消耗 NXC (50 NXC) |
+| **#38** | 产出计算, 难度调节, 减半, 硬顶, 全局状态查询 |
+
+---
+
+## Layer 1.5: Design Gap Issues (#39-#55)
+
+> 对比 PrUn、EVE Online 等经济模拟游戏审查后发现的 17 个设计缺口。代码 stub 已创建。
+
+### P0 — 经济循环完整性
+
+| Issue | Title | Status | Depends On | Key Files |
+|-------|-------|--------|------------|-----------|
+| [#39](https://github.com/zp184764679/agentropolis/issues/39) | Employment & Wages | ⬜ CREATED | #16,#17,#18,#24 | `services/employment_svc.py` |
+| [#40](https://github.com/zp184764679/agentropolis/issues/40) | Player Contract (Escrow) | ⬜ CREATED | #16,#17,#24 | `models/player_contract.py`, `services/contract_svc.py` |
+| [#41](https://github.com/zp184764679/agentropolis/issues/41) | Notification & Event Feed | ⬜ CREATED | #16 only | `models/notification.py`, `services/notification_svc.py` |
+| [#42](https://github.com/zp184764679/agentropolis/issues/42) | Perishable Goods Decay | ⬜ CREATED | #16,#17 | `services/decay_svc.py` |
+
+### P1 — 深度与平衡
+
+| Issue | Title | Status | Depends On | Key Files |
+|-------|-------|--------|------------|-----------|
+| [#43](https://github.com/zp184764679/agentropolis/issues/43) | Event Effects Application | ⬜ CREATED | #16,#29 | `services/event_svc.py` (extend) |
+| [#44](https://github.com/zp184764679/agentropolis/issues/44) | Building Natural Decay | ⬜ CREATED | #16,#20 | `services/maintenance_svc.py` |
+| [#45](https://github.com/zp184764679/agentropolis/issues/45) | Agent Direct Trade | ⬜ CREATED | #16,#17,#24 | `services/direct_trade_svc.py` |
+| [#46](https://github.com/zp184764679/agentropolis/issues/46) | Reputation Effects | ⬜ CREATED | #16,#24 | `services/reputation_svc.py` |
+| [#47](https://github.com/zp184764679/agentropolis/issues/47) | NPC Shop Dynamic Pricing | ⬜ CREATED | #16,#27,#46 | `services/npc_shop_svc.py` (extend) |
+
+### P2 — 丰富度
+
+| Issue | Title | Status | Depends On | Key Files |
+|-------|-------|--------|------------|-----------|
+| [#48](https://github.com/zp184764679/agentropolis/issues/48) | Agent Carry Capacity | ⬜ CREATED | #16,#25,#26 | `services/world_svc.py` (extend) |
+| [#49](https://github.com/zp184764679/agentropolis/issues/49) | Treaty Mechanical Effects | ⬜ CREATED | #16,#28 | `services/treaty_effects_svc.py` |
+| [#50](https://github.com/zp184764679/agentropolis/issues/50) | Regional Infrastructure | ⬜ CREATED | #16,#25,#27 | `models/regional_project.py`, `services/regional_project_svc.py` |
+| [#51](https://github.com/zp184764679/agentropolis/issues/51) | Multi-tier Workforce | ⬜ CREATED | #16,#17,#18,#19 | `models/company.py`, `services/consumption.py` (extend) |
+| [#52](https://github.com/zp184764679/agentropolis/issues/52) | Market Order Type | ⬜ CREATED | #16,#21 | `models/order.py`, `services/market_engine.py` (extend) |
+| [#53](https://github.com/zp184764679/agentropolis/issues/53) | Guild Level & Upgrade | ⬜ CREATED | #16,#28 | `services/guild_svc.py` (extend) |
+
+### P3 — 未来
+
+| Issue | Title | Status | Depends On | Key Files |
+|-------|-------|--------|------------|-----------|
+| [#54](https://github.com/zp184764679/agentropolis/issues/54) | Career Path Effects | ⬜ CREATED | #16,#24,#26 | `services/career_svc.py` |
+| [#55](https://github.com/zp184764679/agentropolis/issues/55) | Storage Capacity Limits | ⬜ CREATED | #16,#17 | `services/storage_svc.py` |
+
+### Design Gap 依赖图
+
+```
+#16 ─── #41 Notifications (无其他依赖，最早开始)
+  │
+  ├── #17 ─── #42 Perishable Decay
+  │     ├── #18 + #24 ─── #39 Employment
+  │     │            ├─── #40 Contracts
+  │     │            ├─── #45 Direct Trade
+  │     │            └─── #46 Reputation ──→ #47 NPC Dynamic Pricing
+  │     ├── #25 + #26 ─── #48 Carry Capacity
+  │     ├── #27 ──────── #47 NPC Dynamic Pricing
+  │     ├── #28 ──────── #49 Treaty Effects / #53 Guild Levels
+  │     ├── #29 ──────── #43 Event Effects
+  │     ├── #20 ──────── #44 Building Decay
+  │     ├── #19 ──────── #51 Multi-tier Workforce
+  │     └── #21 ──────── #52 Market Orders
+  ├── #25 + #27 ──── #50 Regional Projects
+  ├── #24 + #26 ──── #54 Career Paths
+  └── #17 ─────────── #55 Storage Capacity
+```
+
+### Design Gap 文件所有权
+
+| File | Owner Issue |
+|------|-------------|
+| `services/employment_svc.py` | #39 |
+| `models/player_contract.py` | #40 |
+| `services/contract_svc.py` | #40 |
+| `models/notification.py` | #41 |
+| `services/notification_svc.py` | #41 |
+| `services/decay_svc.py` | #42 |
+| `services/maintenance_svc.py` | #44 |
+| `services/direct_trade_svc.py` | #45 |
+| `services/reputation_svc.py` | #46 |
+| `services/treaty_effects_svc.py` | #49 |
+| `models/regional_project.py` | #50 |
+| `services/regional_project_svc.py` | #50 |
+| `services/career_svc.py` | #54 |
+| `services/storage_svc.py` | #55 |
+
+### Design Gap 共享扩展文件
+
+| File | Shared Owner / Allowed Follow-up Issues |
+|------|-----------------------------------------|
+| `services/event_svc.py` | #29 base; #43 extension |
+| `services/npc_shop_svc.py` | #27 base; #47 extension |
+| `services/world_svc.py` | #25 base; #48 extension |
+| `models/company.py` | #16 base; #51 extension |
+| `services/consumption.py` | #19 base; #51 extension |
+| `services/market_engine.py` | #21 base; #52 extension |
+| `services/guild_svc.py` | #28 base; #53 extension |
+| `services/game_engine.py` | #23 base; #39, #40, #41, #42, #43, #44, #50 integrate housekeeping hooks |
+
+### Housekeeping 新增步骤 (game_engine.py)
+
+现有 10 步 + 新增 7 步:
+
+| # | 函数 | Owner |
+|---|------|-------|
+| 11 | `settle_all_wages()` | #39 |
+| 12 | `expire_contracts()` | #40 |
+| 13 | `prune_old_notifications()` | #41 |
+| 14 | `settle_all_perishable_decay()` | #42 |
+| 15 | `apply_active_event_effects()` | #43 |
+| 16 | `settle_all_building_decay()` | #44 |
+| 17 | `settle_project_completions()` | #50 |
+
+---
+
+## Training System — 让"调教AI"成为核心玩法
+
+> 给 Agent 添加可配置策略、决策日志、行为特质三层系统，让同等级的 Agent 因玩家策略差异产生截然不同的表现。
+> 注: #56-#58 当前状态表示“原型代码已完成”; 若在主线重放执行，仍以 #16 Foundation 为集成基底。
+
+### Issues
+
+| Issue | Title | Status | Depends On | Key Files |
+|-------|-------|--------|------------|-----------|
+| [#56](https://github.com/zp184764679/agentropolis/issues/56) | Strategy Profile — 教条配置与机械效果 | ✅ DONE | #16 | `models/strategy_profile.py`, `services/strategy_svc.py`, `api/strategy.py` |
+| [#57](https://github.com/zp184764679/agentropolis/issues/57) | Decision Journal — 决策日志与复盘分析 | ✅ DONE | #16, #56 | `models/decision_log.py`, `services/decision_log_svc.py`, `services/training_hooks.py`, `api/decisions.py` |
+| [#58](https://github.com/zp184764679/agentropolis/issues/58) | Agent Traits — 行为特质与荣誉系统 | ✅ DONE | #16, #57 | `models/agent_trait.py`, `services/trait_svc.py` |
+
+### 执行顺序
+
+```
+#56 Strategy Profile → #57 Decision Journal → #58 Agent Traits
+(串行：B 依赖 A 的 model，C 依赖 B 的 decision_log)
+```
+
+### File Ownership (Training System)
+
+| File | Owner Issue |
+|------|-------------|
+| `models/strategy_profile.py` | #56 |
+| `services/strategy_svc.py` | #56 |
+| `api/strategy.py` | #56 |
+| `models/decision_log.py` | #57 |
+| `services/decision_log_svc.py` | #57 |
+| `services/training_hooks.py` | #57 |
+| `api/decisions.py` | #57 |
+| `models/agent_trait.py` | #58 |
+| `services/trait_svc.py` | #58 |
+
+### 集成点汇总
+
+- **models/agent.py**: `strategy_profile`, `decision_logs`, `traits` 三个 relationship
+- **models/__init__.py**: 注册 StrategyProfile, AgentDecisionLog, AgentTrait + 相关 enums
+- **services/warfare_svc.py**: `_gather_combat_modifiers()` 汇集教条+特质修正
+- **services/game_engine.py**: Phase E — `resolve_pending_decisions` (每轮) + `evaluate_agent_traits` (每10轮)
+- **api/schemas.py**: StrategyProfile*, DecisionLog*, AgentTrait*, AgentPublicProfile schemas
+- **config.py**: DECISION_RESOLVE_DELAY_SECONDS, DECISION_MAX_RESOLVE_BATCH, TRAIT_DECAY_DAYS
+- **main.py**: strategy_router, decisions_router
+
+---
+
+## Autonomy Engine — AI 自主行为引擎 (#64-#71)
+
+> 混合架构 (方案 C): 服务器做规则执行和数据聚合，所有"聪明的事"由玩家的 AI 完成。
+> 目标客群: OpenClaw 用户（有自己 Claude/GPT agent 的玩家）。
+> 核心体验: 玩家的 AI 通过 MCP tools 操控游戏中的 agent，24/7 自主决策。
+
+### 架构
+
+```
+┌─────────────────────────────┐
+│  玩家的 AI Agent (Claude)    │  ← 智能决策层 (客户端)
+│  - 分析市场、规划路线        │
+│  - 决定买卖、生产、旅行      │
+│  - 设定 standing orders      │
+└──────────┬──────────────────┘
+           │ MCP tools (~35) / REST API
+           ▼
+┌─────────────────────────────┐
+│    Agentropolis Server       │  ← 世界引擎 (服务器)
+│  - World Engine (经济/物理)   │
+│  - Autopilot (兜底生存)      │
+│  - Digest Service (事件汇总) │
+└─────────────────────────────┘
+```
+
+### Issues
+
+#### P0 — 核心
+
+| Issue | Title | Status | Depends On | Key Files |
+|-------|-------|--------|------------|-----------|
+| [#64](https://github.com/zp184764679/agentropolis/issues/64) | Server Autopilot — Reflex + Standing Orders | ⬜ CREATED | #16,#17,#24,#27 | `models/autonomy_state.py`, `services/autopilot.py` |
+| [#65](https://github.com/zp184764679/agentropolis/issues/65) | Rich Information APIs — AI Decision Data | ⬜ CREATED | #17,#21,#22,#25 | `services/market_analysis_svc.py`, `api/market_analysis.py` |
+| [#67](https://github.com/zp184764679/agentropolis/issues/67) | Activity Digest / Morning Briefing | ⬜ CREATED | #57,#41,#22,#29 | `services/digest_svc.py`, `api/digest.py` |
+| [#69](https://github.com/zp184764679/agentropolis/issues/69) | MCP Tool Suite — AI Agent Core Interface | ⬜ CREATED | #35, all services | `mcp/*` |
+
+#### P1 — 控制
+
+| Issue | Title | Status | Depends On | Key Files |
+|-------|-------|--------|------------|-----------|
+| [#66](https://github.com/zp184764679/agentropolis/issues/66) | Goal Tracking System | ⬜ CREATED | #16,#17,#26 | `models/agent_goal.py`, `services/goal_svc.py` |
+| [#68](https://github.com/zp184764679/agentropolis/issues/68) | Autonomy Config API | ⬜ CREATED | #64 | `api/autonomy.py` |
+| [#71](https://github.com/zp184764679/agentropolis/issues/71) | Housekeeping Integration | ⬜ CREATED | #23,#64,#66 | `services/game_engine.py` |
+
+#### P2 — 深度
+
+| Issue | Title | Status | Depends On | Key Files |
+|-------|-------|--------|------------|-----------|
+| [#70](https://github.com/zp184764679/agentropolis/issues/70) | Real-time Activity Dashboard API | ⬜ CREATED | #64,#68 | `api/dashboard.py` |
+
+### 执行波次
+
+| Wave | Issues | CC 数 | 前置 |
+|------|--------|:---:|------|
+| **Wave A** (基础) | #64 Autopilot + #65 Info APIs + #66 Goals + #67 Digest | 4 | 各自依赖的服务 |
+| **Wave B** (控制) | #68 Config API + #69 MCP Tools + #71 Integration | 3 | Wave A (+ #35 for #69) |
+| **Wave C** (深度) | #70 Dashboard | 1 | #64 + #68 |
+
+### 文件所有权
+
+| File | Owner Issue |
+|------|-------------|
+| `models/autonomy_state.py` | #64 |
+| `services/autopilot.py` | #64 |
+| `services/market_analysis_svc.py` | #65 |
+| `api/market_analysis.py` | #65 |
+| `models/agent_goal.py` | #66 |
+| `services/goal_svc.py` | #66 |
+| `services/digest_svc.py` | #67 |
+| `api/digest.py` | #67 |
+| `api/autonomy.py` | #68 |
+| `mcp/*` (升级) | #69 |
+| `api/dashboard.py` | #70 |
+| `services/game_engine.py` | #23 base; #71 autonomy integration |
+
+### Housekeeping 新增步骤 (#71)
+
+| Phase | 函数 | 频率 | Owner |
+|-------|------|------|-------|
+| A | `run_all_reflexes()` | 每轮 | #64 |
+| S | `run_all_standing_orders()` | 每5轮 | #64 |
+| G | `compute_all_goal_progress()` | 每30轮 | #66 |
+| D | Digest data aggregation | 每轮 | #67 |
+
+### 集成点
+
+- **models/agent.py**: `autonomy_state`, `goals` 两个 relationship
+- **models/__init__.py**: 注册 AutonomyState, AgentGoal, GoalType, GoalStatus
+- **config.py**: AUTOPILOT_* 配置项
+- **main.py**: autonomy_router, dashboard_router, digest_router, market_analysis_router
+
+---
+
+## Layer 4: OpenClaw Integration (3-4 CC)
+
+> 让 OpenClaw 代理能作为 Agentropolis Agent 完整参与世界。面向外部玩家，非自用。
+
+### Core Integration
+
+| Issue | Title | Status | Depends On | Key Files |
+|-------|-------|--------|------------|-----------|
+| [#72](https://github.com/zp184764679/agentropolis/issues/72) | MCP Tools Expansion — 55 Agent-Centric Tools | ⬜ CREATED | #30-#34 (all APIs) | `mcp/*` (14 tool modules) |
+| [#73](https://github.com/zp184764679/agentropolis/issues/73) | OpenClaw SKILL.md — REST API Fallback Integration | ⬜ CREATED | #30-#34 | `skills/agentropolis-world/SKILL.md` |
+| [#74](https://github.com/zp184764679/agentropolis/issues/74) | Agent Brain Decision Framework — System Prompt | ⬜ CREATED | #72 | `prompts/agent-brain.md`, `mcp/server.py` |
+| [#75](https://github.com/zp184764679/agentropolis/issues/75) | OpenClaw Configuration Templates & Registration Flow | ⬜ CREATED | #72 | `openclaw/*` |
+
+### Deployment & Testing
+
+| Issue | Title | Status | Depends On | Key Files |
+|-------|-------|--------|------------|-----------|
+| [#76](https://github.com/zp184764679/agentropolis/issues/76) | Multi-Agent Deployment Orchestration | ⬜ CREATED | #75 | `docker-compose.multi-agent.yml`, `scripts/*` |
+| [#77](https://github.com/zp184764679/agentropolis/issues/77) | End-to-End Integration Test — Full Agent Lifecycle | ⬜ CREATED | #72, #74 | `tests/e2e/*` |
+
+### File Ownership
+
+| File | Owner Issue |
+|------|-------------|
+| `mcp/tools_agent.py` | #72 |
+| `mcp/tools_world.py` | #72 |
+| `mcp/tools_market.py` | #72 (rewrite from #35) |
+| `mcp/tools_production.py` | #72 (rewrite from #35) |
+| `mcp/tools_inventory.py` | #72 (rewrite from #35) |
+| `mcp/tools_company.py` | #72 (rewrite from #35) |
+| `mcp/tools_intel.py` | #72 (rewrite from #35) |
+| `mcp/tools_npc.py` | #72 |
+| `mcp/tools_social.py` | #72 |
+| `mcp/tools_transport.py` | #72 |
+| `mcp/tools_warfare.py` | #72 |
+| `mcp/tools_strategy.py` | #72 |
+| `mcp/tools_notifications.py` | #72 |
+| `mcp/tools_skills.py` | #72 |
+| `mcp/server.py` | #72 + #74 |
+| `skills/agentropolis-world/SKILL.md` | #73 |
+| `prompts/agent-brain.md` | #74 |
+| `openclaw/*` | #75 |
+| `docker-compose.multi-agent.yml` | #76 |
+| `scripts/register_agents.py` | #76 |
+| `scripts/monitor_agents.py` | #76 |
+| `tests/e2e/*` | #77 |
+
+### Dependency Graph
+
+```
+#30-#34 APIs ──→ #72 MCP Tools (55 tools) ──→ #74 Agent Brain
+                  │                              │
+                  └──→ #73 SKILL.md              └──→ #75 OpenClaw Config ──→ #76 Multi-Agent Deploy
+                                                       │
+                                                       └──→ #77 E2E Tests
+```
+
+### Execution Waves (追加)
+
+| Wave | Issues | CC 数 | 前置 |
+|------|--------|:---:|------|
+| **OpenClaw Wave 1** | #72, #73 | 2 | Wave 5 (APIs) done |
+| **OpenClaw Wave 2** | #74, #75 | 2 | #72 done |
+| **OpenClaw Wave 3** | #76, #77 | 2 | #75 done (#77 另外需要 #74) |
+
+### MCP Tool 清单 (55 tools)
+
+| 模块 | Tool 数 | 需认证 | 说明 |
+|------|---------|--------|------|
+| `tools_agent.py` | 6 | 5 | Agent 生命周期: register, status, eat, drink, rest, respawn |
+| `tools_world.py` | 5 | 2 | 世界导航: map, region_info, look_around, travel_to, travel_status |
+| `tools_inventory.py` | 2 | 1 | 库存: my_inventory, resource_info |
+| `tools_market.py` | 7 | 5 | 交易: prices, order_book, history, buy, sell, cancel, my_orders |
+| `tools_npc.py` | 2 | 2 | NPC 商店: buy_from_npc, sell_to_npc |
+| `tools_production.py` | 5 | 2 | 生产建造: recipes, building_types, build, start, stop |
+| `tools_company.py` | 3 | 3 | 公司: create, list, buildings |
+| `tools_transport.py` | 3 | 3 | 运输: create, list, status |
+| `tools_skills.py` | 2 | 1 | 技能: definitions, my_skills |
+| `tools_social.py` | 8 | 5 | 社交: guild CRUD, treaty, relationships, agent_profile |
+| `tools_warfare.py` | 4 | 2 | 战争: mercenary_contract, enlist, garrison, region_threats |
+| `tools_strategy.py` | 3 | 3 | 策略: dashboard, update, decisions |
+| `tools_notifications.py` | 2 | 2 | 通知: get, mark_read |
+| `tools_intel.py` | 3 | 1 | 情报: leaderboard, game_status, market_analysis |
+| **总计** | **55** | **37** | 18 个无需认证 |
+
+### 验证方式
+
+1. `docker compose up -d` 启动 Agentropolis
+2. 配置 OpenClaw 连接 MCP server (streamable-http)
+3. OpenClaw agent 发现 55 tools
+4. 注册 → vitals → 旅行 → NPC 交易 → 创建公司 → 建造 → 生产 → 市场交易
+5. 2 个 OpenClaw agent 互相交易
+6. 10 agent 并发压测
+7. 用东莞服务器大模型做真实 LLM 决策测试
+
+---
+
+## Concurrency Guard — 并发排队系统 (#78-#80)
+
+> 应用层三层并发控制：Rate Limiter → Global Semaphore → Striped Entity Lock。
+> 解决连接池耗尽、死锁、无速率限制三大风险。
+
+### 架构
+
+```
+请求 → [Rate Limiter 中间件] → [Global Semaphore] → [Striped Entity Lock] → DB
+         每 Agent 限流              全局并发上限          每实体串行化
+         429 Too Many Requests      503 Service Unavail    防止同实体竞态
+```
+
+### Issues
+
+| Issue | Title | Status | Depends On | Key Files |
+|-------|-------|--------|------------|-----------|
+| [#78](https://github.com/zp184764679/agentropolis/issues/78) | Concurrency Guard Core — StripedLock + GlobalSemaphore | ⬜ CREATED | #16 | `services/concurrency.py`, `config.py`, `deps.py` |
+| [#79](https://github.com/zp184764679/agentropolis/issues/79) | Rate Limit Middleware — Sliding Window | ⬜ CREATED | #78 | `middleware/__init__.py`, `middleware/rate_limit.py` |
+| [#80](https://github.com/zp184764679/agentropolis/issues/80) | Concurrency Integration — main.py + Exception Handlers | ⬜ CREATED | #78, #79 | `main.py` |
+
+### 执行顺序
+
+```
+#78 (核心) → #79 (中间件) → #80 (集成)
+```
+
+### 文件所有权
+
+| File | Owner Issue |
+|------|-------------|
+| `services/concurrency.py` | #78 |
+| `middleware/__init__.py` | #79 |
+| `middleware/rate_limit.py` | #79 |
+| `tests/test_concurrency.py` | #78 |
+| `config.py` | #16 base; #78 concurrency settings |
+| `deps.py` | #16 base; #78 guard entry points |
+| `main.py` | base routing owners; #80 middleware + exception integration |
+
+### 配置新增 (config.py, #78)
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `CONCURRENCY_MAX_CONCURRENT` | 25 | 全局最大并发（< pool 30） |
+| `CONCURRENCY_STRIPE_COUNT` | 256 | Striped lock 桶数 |
+| `CONCURRENCY_LOCK_TIMEOUT` | 5.0s | 实体锁超时 → 429 |
+| `CONCURRENCY_SLOT_TIMEOUT` | 10.0s | 全局信号量超时 → 503 |
+| `HOUSEKEEPING_RESERVED_SLOTS` | 5 | Housekeeping 预留槽位 |
+| `RATE_LIMIT_WINDOW_SECONDS` | 60 | 滑动窗口大小 |
+
+### 测试 (tests/test_concurrency.py, 16 tests)
+
+**单元测试 (11)**: StripedLock/Semaphore/multi_lock/Guard/RateLimiter 纯 asyncio 测试
+**集成测试 (5)**: 并发扣款/并行验证/503/429 HTTP 级别测试
