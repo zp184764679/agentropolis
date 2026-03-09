@@ -1,4 +1,4 @@
-"""Order model - buy/sell orders on the market."""
+"""Order model - market orders owned by companies or agents."""
 
 import enum
 from datetime import datetime
@@ -25,7 +25,9 @@ class Order(Base):
     __tablename__ = "orders"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), nullable=False, index=True)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), index=True)
+    agent_id: Mapped[int | None] = mapped_column(ForeignKey("agents.id"), index=True)
+    region_id: Mapped[int | None] = mapped_column(ForeignKey("regions.id"), index=True)
     resource_id: Mapped[int] = mapped_column(
         ForeignKey("resources.id"), nullable=False, index=True
     )
@@ -49,6 +51,7 @@ class Order(Base):
 
     # Relationships
     company = relationship("Company", back_populates="orders")
+    agent = relationship("Agent", back_populates="orders")
     resource = relationship("Resource", back_populates="orders")
 
     def __repr__(self) -> str:

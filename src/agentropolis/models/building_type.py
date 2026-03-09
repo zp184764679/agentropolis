@@ -15,6 +15,7 @@ class BuildingType(Base):
     cost_credits: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     cost_materials: Mapped[dict] = mapped_column(JSON, default=dict)
     max_workers: Mapped[int] = mapped_column(default=10)
+    storage_capacity: Mapped[int] = mapped_column(default=250)
     description: Mapped[str] = mapped_column(Text, default="")
 
     # Relationships

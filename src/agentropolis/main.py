@@ -26,6 +26,7 @@ from agentropolis.config import settings
 from agentropolis.database import async_session, engine
 from agentropolis.runtime_meta import build_runtime_metadata
 from agentropolis.services.seed import seed_game_data
+from agentropolis.services.seed_world import seed_world
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +36,9 @@ async def lifespan(app: FastAPI):
     """Application lifespan: seed initial data and manage long-lived runtime hooks."""
     # Seed game data
     async with async_session() as session:
-        result = await seed_game_data(session)
-        logger.info("Seed complete: %s", result)
+        resource_result = await seed_game_data(session)
+        world_result = await seed_world(session)
+        logger.info("Seed complete: resources=%s world=%s", resource_result, world_result)
 
     # TODO: replace the legacy tick-loop stub with housekeeping/background orchestration.
     # task = asyncio.create_task(run_housekeeping_loop())

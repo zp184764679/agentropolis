@@ -1,6 +1,6 @@
-"""Inventory model - resource stockpiles per company."""
+"""Inventory model - regional stockpiles owned by companies or agents."""
 
-from sqlalchemy import ForeignKey, Numeric, UniqueConstraint
+from sqlalchemy import ForeignKey, Integer, Numeric, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from agentropolis.models.base import Base
@@ -8,10 +8,20 @@ from agentropolis.models.base import Base
 
 class Inventory(Base):
     __tablename__ = "inventories"
-    __table_args__ = (UniqueConstraint("company_id", "resource_id", name="uq_company_resource"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "company_id",
+            "agent_id",
+            "region_id",
+            "resource_id",
+            name="uq_inventory_owner_region_resource",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), nullable=False, index=True)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), index=True)
+    agent_id: Mapped[int | None] = mapped_column(ForeignKey("agents.id"), index=True)
+    region_id: Mapped[int | None] = mapped_column(ForeignKey("regions.id"), index=True)
     resource_id: Mapped[int] = mapped_column(
         ForeignKey("resources.id"), nullable=False, index=True
     )
@@ -20,6 +30,7 @@ class Inventory(Base):
 
     # Relationships
     company = relationship("Company", back_populates="inventories")
+    agent = relationship("Agent", back_populates="inventories")
     resource = relationship("Resource", back_populates="inventories")
 
     @property
@@ -28,4 +39,5 @@ class Inventory(Base):
         return float(self.quantity) - float(self.reserved)
 
     def __repr__(self) -> str:
-        return f"<Inventory company={self.company_id} resource={self.resource_id} qty={self.quantity}>"
+        owner = f"company={self.company_id}" if self.company_id else f"agent={self.agent_id}"
+        return f"<Inventory {owner} region={self.region_id} resource={self.resource_id} qty={self.quantity}>"

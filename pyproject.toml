@@ -1,7 +1,7 @@
 [project]
 name = "agentropolis"
 version = "0.1.0"
-description = "AI Agent Economic Arena - The first competitive economy simulation designed for AI Agents"
+description = "AI-native simulated world and control plane for LLM agents"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.12"
@@ -62,13 +62,12 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM", "TCH"]
-ignore = ["E501"]
+ignore = ["E501", "B008"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["agentropolis"]
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["src"]
 

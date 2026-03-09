@@ -86,6 +86,101 @@
 
 ---
 
+## Recommended Execution Program (Repo-State Aware)
+
+> 下列执行程序不是替代 issue tracker，而是给当前仓库状态加上一套“先修底座、再开功能、最后放外部流量”的完成路线。
+> 当 issue 编号顺序、波次表和当前仓库 reality 冲突时，以此执行程序为准。
+
+### Execution North Star
+
+在任何时点，仓库都应尽量同时满足这 4 条硬约束：
+
+1. 目标模型可被 `Base.metadata` 看见，`configure_mappers()` 不报错。
+2. 新增 route / service 至少能 import，不能停留在“文件存在但一导入就炸”。
+3. `/meta/runtime`、README、PLAN 对 runtime surface 的表述一致。
+4. 每往前推进一层，都要多拿下一条真实玩家路径，而不是只堆更多孤立模块。
+
+### Phase Program
+
+| Phase | Name | Primary Issues | 目标 | Exit Criteria |
+|------|------|----------------|------|---------------|
+| **P0** | Baseline Lock | #16 + migration baseline + runtime honesty | 让目标世界至少达到“可导入 / 可建表 / 可 seed / 可测试收集” | mapper graph 通过；metadata 注册目标表；最小 world seed 可用；测试可收集 |
+| **P1** | Shared World Kernel MVP | #24, #25, #26, #27, #28, #29, #38 | 完成 agent/world/skills/transport/social/NXC 的最小 service 真逻辑 | agent 能注册；world 能 seed；可查询 region/skills；transport/guild/event service 至少 happy path 可跑 |
+| **P2** | Agent Runtime Surface | #30, #34 | 让 agent/world/skills/guild/diplomacy/transport 路由从“未挂载 stub”升级为“可灰度挂载的 preview surface” | 目标 route 有稳定 schema；至少一组 preview mount + scenario tests；`501` 只剩未实现边角 |
+| **P3** | Economy Convergence | #17-#23, #31-#33 | 把 legacy company economy 和 target agent/world model 真正接起来 | agent 创建 company；区域库存/市场/生产/housekeeping 跑通；company 不再是孤立旧世界 |
+| **P4** | Control Plane Freeze | #78-#80, #81-#85, #88 | 冻结外部 AI 契约与安全层 | transport/versioning/authz/quota/concurrency/metrics/parity tests 到位 |
+| **P5** | Autonomy Core | #64-#71 | 让世界在没有外部 prompt 干预时也能维持基本自主行为与信息反馈 | autopilot/goals/digest/dashboard 形成闭环；housekeeping 可稳定驱动 autonomy |
+| **P6** | OpenClaw Rollout | #72-#77, #86, #87 | 把本地原型推进到真实外部接入 | OpenClaw local prototype 稳定；恢复/治理/回滚路径清楚；满足 rollout gate |
+
+### Phase Notes
+
+- **P0** 已基本进入完成态，但任何后续阶段如果打破 import / mapper / metadata / seed / test baseline，都视为回退。
+- **P1** 是接下来最高优先级。现在最缺的不是更多 route，而是能支撑 route 的真 service 逻辑。
+- **P2** 只允许挂载 preview-ready route。存在 `response_model`、schema、service、最小测试后，才允许进入 `main.py`。
+- **P3** 是最大风险段，因为这里要决定 `Agent -> Company` 的真实从属关系、区域库存的 owner 语义、以及 housekeeping 如何兼容 legacy tick 资产。
+- **P4** 完成前，所有外部 AI 接入都只能算“封闭环境原型”，不能把临时 transport 或权限假设对外承诺。
+- **P5/P6** 必须建立在前四阶段稳定之上；否则 autonomy 和外部接入只会把底层不一致放大。
+
+### Required Scenario Ladder
+
+每完成一个阶段，至少要把下面场景阶梯向上推进一格，而不是只增加代码量：
+
+1. **Agent Bootstrap**
+   `register agent -> get status -> inspect map -> start travel -> query travel status`
+2. **Single-Agent Economy**
+   `agent create company -> build -> start production -> inspect inventory -> place/cancel order`
+3. **Regional Logistics**
+   `move region -> create transport -> settle arrival -> storage capacity updates`
+4. **Social Layer**
+   `create guild -> join/leave -> propose treaty -> inspect relationships/notifications`
+5. **Conflict Loop**
+   `create contract -> enlist -> execute sabotage/raid -> repair/defense -> threat query`
+6. **External Control Plane**
+   `same scenario through REST and MCP/OpenClaw with parity checks`
+
+如果一个 phase 结束后没有让这些场景中的任何一条变得更完整，则说明这段工作还没有真正向产品前进。
+
+### Definition Of Done For Post-#16 Work
+
+从现在开始，任何 issue 若要视为“完成”，至少同时满足：
+
+- 相关 module import clean
+- `configure_mappers()` 和 SQLite `Base.metadata.create_all()` 不因该改动破坏
+- 如果改 runtime surface：同步更新 `README.md`、`PLAN.md`、`CLAUDE.md`、`/meta/runtime`
+- 如果改 route contract：有明确 schema / response_model，而不是 ad-hoc dict
+- 至少有 1 条 happy-path test 和 1 条 negative-path test
+- 如果改 seed / model / migration：fresh DB 启动路径可解释且可验证
+
+### Parallel Workstream Policy
+
+为了避免“表面并行、实则热点文件互相踩”：
+
+- **Stream A — Domain/DB**: `models/*`, `config.py`, `alembic/`, `seed*`
+- **Stream B — Kernel Services**: `services/*`
+- **Stream C — Runtime Surface**: `api/*`, `main.py`, `mcp/*`, `runtime_meta.py`
+- **Stream D — Proving/Ops**: `tests/*`, docs, rollout gate, observability
+
+建议任何一个时间窗口只同时开 2-3 个 stream，并且把 `models/agent.py`、`models/__init__.py`、`config.py`、`main.py`、`api/schemas.py`、`mcp/*` 当成串行集成点处理。
+
+### Immediate Next Program
+
+基于当前仓库状态，建议接下来连续完成这 6 个工作包：
+
+1. **Finish P1 Service Reality**
+   先把 `agent_svc.py`、`world_svc.py`、`skill_svc.py`、`transport_svc.py`、`guild_svc.py`、`diplomacy_svc.py`、`event_svc.py` 从 stub 拉到最小可用。
+2. **Mount Preview World Surface**
+   在 feature-flag 或 preview policy 下挂载 `agent/world/skills/transport/guild/diplomacy`，同时补 smoke tests。
+3. **Resolve Agent-Company Ownership**
+   明确 `founder_agent_id`、company lifecycle、company-region semantics，并把 legacy company API 调整为 target model 的一个子表面。
+4. **Unify Inventory/Market Region Semantics**
+   把 `company_id / agent_id / region_id` 三元 owner 语义贯穿 inventory、orders、trades、transport。
+5. **Freeze Contract Layer**
+   先完成 `#81/#82` 的最小版，不再让 auth、MCP transport、error shape 继续漂。
+6. **Open The Autonomy Path**
+   在 world kernel 稳定后再接 `#64-#71`，确保 autonomy 不是在 stub 世界里“自嗨”。
+
+---
+
 ## Layer 0: Foundation (阻塞型, 1 CC)
 
 | Issue | Title | Status | Files |

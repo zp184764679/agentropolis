@@ -7,6 +7,8 @@ file presence alone.
 
 from __future__ import annotations
 
+from agentropolis.models import Base
+
 
 MOUNTED_ROUTE_GROUPS = [
     {
@@ -45,55 +47,55 @@ UNMOUNTED_ROUTE_GROUPS = [
     {
         "module": "agent",
         "prefix": "/api/agent",
-        "state": "stubbed",
+        "state": "importable_service_backed_unmounted",
         "auth_model": "target_agent_auth",
     },
     {
         "module": "world",
         "prefix": "/api/world",
-        "state": "stubbed",
+        "state": "importable_service_backed_unmounted",
         "auth_model": "target_agent_auth",
     },
     {
         "module": "skills",
         "prefix": "/api/skills",
-        "state": "stubbed",
+        "state": "importable_service_backed_unmounted",
         "auth_model": "target_agent_auth",
     },
     {
         "module": "guild",
         "prefix": "/api/guild",
-        "state": "stubbed",
+        "state": "importable_stubbed",
         "auth_model": "target_agent_auth",
     },
     {
         "module": "diplomacy",
         "prefix": "/api/diplomacy",
-        "state": "stubbed",
+        "state": "importable_stubbed",
         "auth_model": "target_agent_auth",
     },
     {
         "module": "transport",
         "prefix": "/api/transport",
-        "state": "stubbed",
+        "state": "importable_service_backed_unmounted",
         "auth_model": "target_agent_auth",
     },
     {
         "module": "strategy",
         "prefix": "/api/strategy",
-        "state": "partially_implemented",
+        "state": "importable_partially_implemented",
         "auth_model": "target_agent_auth",
     },
     {
         "module": "decisions",
         "prefix": "/api/agent/decisions",
-        "state": "partially_implemented",
+        "state": "importable_partially_implemented",
         "auth_model": "target_agent_auth",
     },
     {
         "module": "warfare",
         "prefix": "/api/warfare",
-        "state": "partially_implemented",
+        "state": "importable_partially_implemented",
         "auth_model": "target_agent_auth",
     },
 ]
@@ -111,9 +113,14 @@ def build_runtime_metadata() -> dict:
                 "entrypoint": "get_current_company",
             },
             "agent_auth": {
-                "status": "migration_stub",
+                "status": "migration_compatible",
                 "entrypoint": "get_current_agent",
             },
+        },
+        "orm_surface": {
+            "metadata_table_count": len(Base.metadata.tables),
+            "target_models_registered": True,
+            "mapper_graph_state": "configured_in_tests",
         },
         "rest_surface": {
             "mounted_route_groups": MOUNTED_ROUTE_GROUPS,
@@ -124,6 +131,10 @@ def build_runtime_metadata() -> dict:
             "mounted": False,
             "transport_frozen": False,
             "public_rollout_ready": False,
+        },
+        "migration_surface": {
+            "alembic_baseline_present": True,
+            "fresh_db_bootstrap": "alembic_then_seed_game_data_then_seed_world",
         },
         "target_direction": {
             "auth_model": "agent_based",

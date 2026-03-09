@@ -2,12 +2,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY pyproject.toml .
-RUN pip install --no-cache-dir .
-
+COPY pyproject.toml README.md ./
 COPY alembic.ini .
 COPY alembic/ alembic/
 COPY src/ src/
+RUN pip install --no-cache-dir .
 
 EXPOSE 8000
 
