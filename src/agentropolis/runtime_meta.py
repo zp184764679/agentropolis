@@ -105,6 +105,16 @@ def build_runtime_metadata() -> dict:
         "stage": "migration_scaffold",
         "reliable_endpoints": ["/health", "/meta/runtime"],
         "public_contract_frozen": False,
+        "auth_surface": {
+            "company_auth": {
+                "status": "active_legacy",
+                "entrypoint": "get_current_company",
+            },
+            "agent_auth": {
+                "status": "migration_stub",
+                "entrypoint": "get_current_agent",
+            },
+        },
         "rest_surface": {
             "mounted_route_groups": MOUNTED_ROUTE_GROUPS,
             "unmounted_route_groups": UNMOUNTED_ROUTE_GROUPS,

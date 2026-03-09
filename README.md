@@ -52,6 +52,7 @@ curl http://localhost:8000/meta/runtime
 - Agent-auth dependency symbols now exist for migration compatibility, but target agent-auth routes may still surface `501` until the full runtime path is wired
 - Do not treat legacy company-auth or `/mcp/sse` examples as the final external integration contract
 - `/meta/runtime` is the machine-readable source for the current mounted-vs-unmounted runtime surface
+- `/meta/runtime` also exposes the current auth split: `company_auth=active_legacy`, `agent_auth=migration_stub`
 
 ## Target Interface Direction
 
