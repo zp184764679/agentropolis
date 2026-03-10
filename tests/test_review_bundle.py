@@ -18,6 +18,7 @@ from scripts.build_review_bundle import build_review_bundle
 from scripts.export_alert_snapshot import build_alert_export
 from scripts.export_contract_snapshot import build_contract_snapshot
 from scripts.export_execution_snapshot import build_execution_export
+from scripts.export_issue_sync_manifest import build_issue_sync_manifest
 from scripts.export_observability_snapshot import build_observability_export
 from scripts.export_rollout_readiness import build_rollout_readiness_export
 
@@ -27,6 +28,7 @@ def test_operator_bundle_surface_is_exposed_in_runtime_meta() -> None:
     assert meta["operator_bundle_surface"]["alerts_script"] == "scripts/export_alert_snapshot.py"
     assert meta["operator_bundle_surface"]["execution_script"] == "scripts/export_execution_snapshot.py"
     assert meta["operator_bundle_surface"]["governance_script"] == "scripts/export_governance_snapshot.py"
+    assert meta["operator_bundle_surface"]["issue_sync_script"] == "scripts/export_issue_sync_manifest.py"
     assert meta["operator_bundle_surface"]["observability_script"] == "scripts/export_observability_snapshot.py"
     assert meta["operator_bundle_surface"]["recovery_plan_script"] == "scripts/export_recovery_plan.py"
     assert meta["operator_bundle_surface"]["rollout_readiness_script"] == "scripts/export_rollout_readiness.py"
@@ -40,6 +42,7 @@ def test_operator_bundle_surface_is_exposed_in_runtime_meta() -> None:
     ]
     assert "agentropolis check-rollout-gate" in meta["operator_bundle_surface"]["cli_commands"]
     assert "agentropolis execution-snapshot" in meta["operator_bundle_surface"]["cli_commands"]
+    assert "agentropolis issue-sync-manifest" in meta["operator_bundle_surface"]["cli_commands"]
     assert "agentropolis governance-snapshot" in meta["operator_bundle_surface"]["cli_commands"]
     assert "agentropolis observability-snapshot" in meta["operator_bundle_surface"]["cli_commands"]
     assert "agentropolis recovery-plan" in meta["operator_bundle_surface"]["cli_commands"]
@@ -71,10 +74,12 @@ def test_rollout_export_and_review_bundle_build_files() -> None:
             alerts = await build_alert_export(session_factory=session_factory)
             observability = await build_observability_export(session_factory=session_factory)
             execution = await build_execution_export(session_factory=session_factory)
+            issue_sync = build_issue_sync_manifest()
             assert "rollout_readiness" in readiness
             assert "alerts" in alerts
             assert "observability" in observability
             assert "execution" in execution
+            assert issue_sync["issues"]
             assert "mcp" in observability["observability"]
             assert "lag" in observability["observability"]["execution"]
             bundle = await build_review_bundle(bundle_root, session_factory=session_factory)
@@ -85,6 +90,7 @@ def test_rollout_export_and_review_bundle_build_files() -> None:
             observability_path = Path(bundle["artifacts"]["observability"])
             execution_path = Path(bundle["artifacts"]["execution"])
             recovery_plan_path = Path(bundle["artifacts"]["recovery_plan"])
+            issue_sync_path = Path(bundle["artifacts"]["issue_sync_manifest"])
             world_path = Path(bundle["artifacts"]["world_snapshot"])
             gate_check_path = Path(bundle["artifacts"]["gate_check"])
 
@@ -95,6 +101,7 @@ def test_rollout_export_and_review_bundle_build_files() -> None:
             assert observability_path.exists()
             assert execution_path.exists()
             assert recovery_plan_path.exists()
+            assert issue_sync_path.exists()
             assert world_path.exists()
             assert gate_check_path.exists()
 
@@ -107,6 +114,7 @@ def test_rollout_export_and_review_bundle_build_files() -> None:
             assert summary["artifacts"]["observability"].endswith("observability.json")
             assert summary["artifacts"]["execution"].endswith("execution.json")
             assert summary["artifacts"]["recovery_plan"].endswith("recovery-plan.json")
+            assert summary["artifacts"]["issue_sync_manifest"].endswith("issue-sync-manifest.json")
             gate_check = json.loads(gate_check_path.read_text(encoding="utf-8"))
             assert gate_check["tool_count"] >= 60
         finally:

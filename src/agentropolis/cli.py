@@ -307,6 +307,26 @@ def execution_snapshot(output: str):
     asyncio.run(_snapshot())
 
 
+@cli.command("issue-sync-manifest")
+@click.option(
+    "--output",
+    default="openclaw/runtime/issue-sync-manifest.json",
+    show_default=True,
+    help="Issue-sync manifest output path.",
+)
+def issue_sync_manifest(output: str):
+    """Export repo-complete issue state for later GitHub synchronization."""
+    from pathlib import Path
+
+    from scripts.export_issue_sync_manifest import build_issue_sync_manifest
+
+    payload = build_issue_sync_manifest()
+    target = Path(output)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    console.print_json(json.dumps(payload))
+
+
 @cli.command("build-review-bundle")
 @click.option(
     "--output-dir",

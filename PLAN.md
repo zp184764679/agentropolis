@@ -985,6 +985,7 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 - 当前 repo 已具备 proposed `#85` 的 baseline：`/meta/observability` 暴露进程内 request/MCP metrics、economy health、agent behavior、execution lag、latest housekeeping snapshot；这仍不是完整生产级 telemetry
 - 当前 repo 也允许把 rollout gate 进一步具体化为 `/meta/rollout-readiness`、contract snapshot、gate-check 脚本和 operator runbook；这样每一轮外部接入原型都能自检而不是凭记忆判断
 - 当前 repo 也允许继续把这些资产打包成 review bundle，作为封闭环境验收和后续 GitHub 审查输入；bundle 至少应包含 contract snapshot、alerts snapshot、observability snapshot、rollout readiness、gate summary、world snapshot；这属于 rollout scaffolding，不改变玩法面
+- 对已经 repo-complete 但 GitHub 仍可能 open 的 created issues，当前 repo 也允许导出 `issue-sync-manifest`，把本地完成态与后续 GitHub close/update 流程解耦
 
 ### MCP Tool 清单 (60 tools, repo-truthful local preview)
 

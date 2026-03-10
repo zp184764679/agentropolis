@@ -157,6 +157,7 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["operator_bundle_surface"]["alerts_script"] == "scripts/export_alert_snapshot.py"
     assert meta["operator_bundle_surface"]["execution_script"] == "scripts/export_execution_snapshot.py"
     assert meta["operator_bundle_surface"]["governance_script"] == "scripts/export_governance_snapshot.py"
+    assert meta["operator_bundle_surface"]["issue_sync_script"] == "scripts/export_issue_sync_manifest.py"
     assert meta["operator_bundle_surface"]["observability_script"] == "scripts/export_observability_snapshot.py"
     assert meta["operator_bundle_surface"]["recovery_plan_script"] == "scripts/export_recovery_plan.py"
     assert meta["operator_bundle_surface"]["rollout_readiness_script"] == "scripts/export_rollout_readiness.py"
@@ -171,6 +172,7 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert "agentropolis check-rollout-gate" in meta["operator_bundle_surface"]["cli_commands"]
     assert "agentropolis alerts-snapshot" in meta["operator_bundle_surface"]["cli_commands"]
     assert "agentropolis execution-snapshot" in meta["operator_bundle_surface"]["cli_commands"]
+    assert "agentropolis issue-sync-manifest" in meta["operator_bundle_surface"]["cli_commands"]
     assert "agentropolis observability-snapshot" in meta["operator_bundle_surface"]["cli_commands"]
     assert "registry" in meta["economy_governance_surface"]["registry_snapshot"]
     assert "staged_rollout_flags" in meta["economy_governance_surface"]["registry_snapshot"]

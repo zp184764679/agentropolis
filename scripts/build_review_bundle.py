@@ -14,6 +14,7 @@ from scripts.check_rollout_gate import build_rollout_gate_summary
 from scripts.export_alert_snapshot import build_alert_export
 from scripts.export_contract_snapshot import build_contract_snapshot
 from scripts.export_execution_snapshot import build_execution_export
+from scripts.export_issue_sync_manifest import build_issue_sync_manifest
 from scripts.export_recovery_plan import build_recovery_plan_export
 from scripts.export_observability_snapshot import build_observability_export
 from scripts.export_rollout_readiness import build_rollout_readiness_export
@@ -99,6 +100,13 @@ async def build_review_bundle(
         encoding="utf-8",
     )
 
+    issue_sync_payload = build_issue_sync_manifest()
+    issue_sync_path = target_dir / "issue-sync-manifest.json"
+    issue_sync_path.write_text(
+        json.dumps(issue_sync_payload, indent=2, ensure_ascii=True),
+        encoding="utf-8",
+    )
+
     world_snapshot_path = await export_world_snapshot_run(
         str(target_dir / "world-snapshot.json"),
         housekeeping_limit,
@@ -127,6 +135,7 @@ async def build_review_bundle(
             "execution": execution_path.as_posix(),
             "alerts": alerts_path.as_posix(),
             "recovery_plan": recovery_plan_path.as_posix(),
+            "issue_sync_manifest": issue_sync_path.as_posix(),
             "world_snapshot": world_snapshot_path.as_posix(),
             "gate_check": gate_summary_path.as_posix(),
             "manifest_present": manifest_path.exists(),

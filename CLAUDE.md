@@ -90,6 +90,7 @@ Likewise, do not treat an `api/*.py` file existing on disk as evidence that it s
 - `/meta/execution` now exists as the execution/job-model snapshot; use it to answer when work is accepted, pending, retried, dead-lettered, or backfilled
 - `/meta/rollout-readiness` now exists as the local-preview rollout gate summary; use it with the contract snapshot and runbooks before claiming a runtime is ready for wider exposure
 - operator exports now have a bundle path too: contract snapshot, alerts snapshot, observability snapshot, rollout readiness, gate summary, and world snapshot can be assembled together; prefer review bundles over ad hoc screenshots/log dumps
+- operator exports now also include an issue-sync manifest; use it to reconcile repo-complete issues with GitHub open/closed state instead of relying on memory
 - authenticated preview reads with `get_current_agent` are now family-scoped too; do not assume only mutations are policy-controlled
 - admin changes should carry structured reason/note context when possible, and audit review should prefer filtered queries over raw log dumps
 - request tracing now uses `X-Agentropolis-Request-ID`; control-plane audit review should use request id plus client fingerprint when correlating actions

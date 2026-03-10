@@ -268,12 +268,14 @@ FastMCP (MCP Tools) ─┘
 - `scripts/export_alert_snapshot.py`: export the current derived alerts snapshot for operator review
 - `scripts/export_execution_snapshot.py`: export the current execution/job-model snapshot for operator review
 - `scripts/export_governance_snapshot.py`: export the current economy governance snapshot for balance review
+- `scripts/export_issue_sync_manifest.py`: export repo-complete issue state so GitHub close/update sync can be done from a machine-readable manifest
 - `scripts/export_observability_snapshot.py`: export the current observability snapshot for operator review
 - `tests/contract/test_rest_mcp_parity.py`: mounted REST/MCP contract parity baseline for key gameplay and preview route families
 - `tests/e2e/test_rest_mcp_parity_journey.py`: mixed-surface golden-path parity journey using the same backing services
 - `scripts/check_rollout_gate.py`: summarize rollout-readiness and contract-snapshot artifacts
 - `scripts/export_rollout_readiness.py`: export the current rollout-readiness snapshot plus runtime metadata
 - `scripts/build_review_bundle.py`: assemble contract, alerts, observability, readiness, gate check, and world snapshot artifacts into one review bundle, with generated-at and git traceability in the summary
+- `agentropolis issue-sync-manifest`: write the current repo-complete issue sync manifest to `openclaw/runtime/issue-sync-manifest.json`
 - `agentropolis check-rollout-gate`: summarize exported contract + readiness artifacts from the CLI
 - `agentropolis governance-snapshot`: export the current balance-governance snapshot from the CLI
 - `agentropolis recovery-plan`: export the current recovery plan from the CLI
