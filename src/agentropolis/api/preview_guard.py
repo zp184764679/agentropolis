@@ -474,6 +474,55 @@ async def require_warfare_preview_write(
     )
 
 
+async def allow_internal_preview_family_mutation(
+    session: AsyncSession,
+    agent_id: int,
+    family: str,
+    *,
+    allow_in_degraded_mode: bool = False,
+) -> None:
+    """Apply preview policy semantics to non-HTTP internal mutations.
+
+    This is used by housekeeping/autonomy flows that should respect the same
+    durable per-agent family policy and budget semantics as preview REST writes,
+    without relying on request-scoped rate-limit windows.
+    """
+    await _require_preview_surface_enabled(session)
+    await _require_preview_writes_enabled(session)
+    await _require_family_degraded_policy(
+        session,
+        family,
+        allow_in_degraded_mode=allow_in_degraded_mode,
+    )
+    await _apply_agent_policy_gate(
+        session,
+        agent_id=agent_id,
+        family=family,
+        consume_budget=False,
+    )
+    await _apply_agent_policy_gate(
+        session,
+        agent_id=agent_id,
+        family=family,
+        consume_budget=True,
+    )
+
+
+async def allow_internal_preview_family_access(
+    session: AsyncSession,
+    agent_id: int,
+    family: str,
+) -> None:
+    """Apply preview read semantics to non-HTTP internal reads."""
+    await _require_preview_surface_enabled(session)
+    await _apply_agent_policy_gate(
+        session,
+        agent_id=agent_id,
+        family=family,
+        consume_budget=False,
+    )
+
+
 async def require_control_plane_admin(
     admin_token: str | None = Security(admin_token_header),
 ) -> str:

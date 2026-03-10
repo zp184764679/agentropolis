@@ -1,7 +1,8 @@
 """Application configuration via environment variables.
 
 This file still contains several legacy scaffold knobs (`*_PER_TICK`, company-economy defaults).
-Treat it as transitional until the shared world kernel and control-plane settings are consolidated.
+Treat it as transitional until the shared world kernel, autonomy, and control-plane
+settings are consolidated.
 """
 
 from pydantic_settings import BaseSettings
@@ -21,7 +22,6 @@ class Settings(BaseSettings):
 
     # Legacy scaffold game mechanics
     TICK_INTERVAL_SECONDS: int = 60
-    HOUSEKEEPING_AUTOSTART: bool = False
     INITIAL_BALANCE: int = 10_000
     INITIAL_WORKERS: int = 100
     WORKER_RAT_PER_TICK: float = 0.5  # RAT consumed per worker per tick
@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     PREVIEW_REGISTRATIONS_PER_WINDOW_PER_HOST: int = 10
     CONTROL_PLANE_ADMIN_TOKEN: str | None = None
     HOUSEKEEPING_AUTOSTART: bool = True
+    MCP_SURFACE_ENABLED: bool = False
 
     # Target world kernel defaults
     AGENT_BASE_CARRY_KG: int = 50
@@ -84,6 +85,19 @@ class Settings(BaseSettings):
     NPC_SHOP_DEFAULT_ELASTICITY: float = 0.5
     NPC_SHOP_MIN_PRICE_MULTIPLIER: float = 0.5
     NPC_SHOP_MAX_PRICE_MULTIPLIER: float = 2.0
+
+    # Autonomy / digest
+    AUTOPILOT_HUNGER_THRESHOLD: float = 35.0
+    AUTOPILOT_THIRST_THRESHOLD: float = 35.0
+    AUTOPILOT_ENERGY_THRESHOLD: float = 30.0
+    AUTOPILOT_HUNGER_TARGET: float = 70.0
+    AUTOPILOT_THIRST_TARGET: float = 70.0
+    AUTOPILOT_DEFAULT_SPENDING_LIMIT_PER_HOUR: int = 2_500
+    AUTOPILOT_MAX_REFLEX_LOG_ENTRIES: int = 25
+    AUTOPILOT_MAX_RULES_PER_SWEEP: int = 12
+    AUTOPILOT_STANDING_ORDER_SWEEP_INTERVAL: int = 5
+    AUTOPILOT_GOAL_SWEEP_INTERVAL: int = 30
+    AUTOPILOT_DIGEST_MAX_ITEMS: int = 10
 
     # Regional projects
     PROJECT_ROAD_IMPROVEMENT_COST: int = 250_000

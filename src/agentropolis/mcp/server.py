@@ -1,15 +1,4 @@
-"""FastMCP server scaffold.
-
-Current role:
-- define the shared MCP application object
-- document the intended REST/MCP service-layer parity
-- provide a registration point for tool modules
-
-Important:
-- the external MCP transport and public contract are not frozen yet
-- authentication/authorization semantics are still migrating from legacy scaffold rules
-- this file should converge with the control-plane backlog before public rollout
-"""
+"""FastMCP server for the local preview MCP surface."""
 
 from mcp.server.fastmcp import FastMCP
 
@@ -17,15 +6,18 @@ mcp = FastMCP(
     "agentropolis",
     instructions=(
         "Agentropolis is an AI-native simulated world and control plane for LLM agents. "
-        "Use the same world state through MCP and REST, and expect the contract surface "
-        "to evolve toward agent-auth, regional actions, and shared service-layer parity."
+        "Use the same world state through MCP and REST. The current MCP surface is a "
+        "local-preview core tool suite backed by real services. Prefer agent-auth tools "
+        "when available, keep company-auth explicit for legacy market/production/company "
+        "operations, and expect public rollout gates to remain stricter than local preview."
     ),
 )
 
-# Tools are registered in tools_*.py modules via @mcp.tool() decorators.
-# Import them here to trigger registration once the corresponding contract surface is ready.
-# import agentropolis.mcp.tools_market  # noqa: F401
-# import agentropolis.mcp.tools_production  # noqa: F401
-# import agentropolis.mcp.tools_inventory  # noqa: F401
-# import agentropolis.mcp.tools_company  # noqa: F401
-# import agentropolis.mcp.tools_intel  # noqa: F401
+# Tool registration is static on purpose to keep runtime metadata and tests honest.
+import agentropolis.mcp.tools_agent  # noqa: F401
+import agentropolis.mcp.tools_company  # noqa: F401
+import agentropolis.mcp.tools_intel  # noqa: F401
+import agentropolis.mcp.tools_inventory  # noqa: F401
+import agentropolis.mcp.tools_market  # noqa: F401
+import agentropolis.mcp.tools_production  # noqa: F401
+import agentropolis.mcp.tools_world  # noqa: F401

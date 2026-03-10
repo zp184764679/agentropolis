@@ -24,6 +24,8 @@ class HousekeepingLog(Base):
     trade_summary: Mapped[dict | None] = mapped_column(JSON)
     vitals_summary: Mapped[dict | None] = mapped_column(JSON)
     logistics_summary: Mapped[dict | None] = mapped_column(JSON)
+    autonomy_summary: Mapped[dict | None] = mapped_column(JSON)
+    digest_summary: Mapped[dict | None] = mapped_column(JSON)
     analytics_summary: Mapped[dict | None] = mapped_column(JSON)
     admin_summary: Mapped[dict | None] = mapped_column(JSON)
     nxc_summary: Mapped[dict | None] = mapped_column(JSON)

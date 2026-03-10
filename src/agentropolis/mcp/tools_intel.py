@@ -1,14 +1,38 @@
-"""MCP tools for intelligence/analytics (4 tools).
+"""Core MCP tools for intelligence endpoints."""
 
-Tools:
-- get_leaderboard(metric="net_worth") — Rankings
-- get_game_status() — Current tick / timing / player count (no auth)
-- get_trade_history(resource?, ticks=10) — Recent transactions
-- get_market_analysis(resource) — Supply/demand/trend analysis
+from __future__ import annotations
 
-These are the KEY tools for AI decision-making.
+from agentropolis.mcp._shared import agent_tool_context, handle_tool_error
+from agentropolis.mcp.server import mcp
+from agentropolis.services.market_analysis_svc import (
+    get_market_intel,
+    get_opportunities,
+    get_route_intel,
+)
 
-Dependencies: services/leaderboard.py
-"""
 
-# from agentropolis.mcp.server import mcp
+@mcp.tool()
+async def get_market_intel_tool(agent_api_key: str, resource: str) -> dict:
+    try:
+        async with agent_tool_context(agent_api_key, family="strategy") as (session, agent):
+            return {"ok": True, "intel": await get_market_intel(session, agent.id, resource)}
+    except Exception as exc:
+        return handle_tool_error(exc)
+
+
+@mcp.tool()
+async def get_route_intel_tool(agent_api_key: str, to_region_id: int) -> dict:
+    try:
+        async with agent_tool_context(agent_api_key, family="strategy") as (session, agent):
+            return {"ok": True, "route": await get_route_intel(session, agent.id, to_region_id)}
+    except Exception as exc:
+        return handle_tool_error(exc)
+
+
+@mcp.tool()
+async def get_opportunities_tool(agent_api_key: str) -> dict:
+    try:
+        async with agent_tool_context(agent_api_key, family="strategy") as (session, agent):
+            return {"ok": True, "opportunities": await get_opportunities(session, agent.id)}
+    except Exception as exc:
+        return handle_tool_error(exc)

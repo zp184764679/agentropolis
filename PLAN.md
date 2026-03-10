@@ -62,7 +62,7 @@
 - issue ranges and roadmap phases
 - ownership rules for shared hotspot files
 - `/meta/runtime` 暴露的机器可读 runtime surface
-- `/meta/control-plane` 暴露的 admin-only process-local preview policy surface
+- `/meta/control-plane` 暴露的 admin-only DB-backed preview policy surface（短窗限流仍可保持 process-local）
 
 ### API Mount Rules
 
@@ -84,10 +84,10 @@
 - Abuse/Budget Guard ready: per-agent/per-tool 配额、spending caps、kill switch
 - Observability baseline ready: request/job metrics、经济健康指标、告警、结构化日志
 - Recovery baseline ready: snapshot/backup/restore 或最小可用修复工具
-- 迁移期允许存在 process-local preview policy admin surface 作为安全阀，但它不能替代最终的分布式 authz/quota/budget 控制面
-- 迁移期的 process-local preview policy 若扩展到 per-agent authz / budget / audit，也必须在 README、CLAUDE、`/meta/runtime`、`/meta/control-plane` 中同步声明其非持久化性质
-- 若 process-local preview policy 已覆盖 authenticated reads，也必须明确区分 “authenticated family-scoped reads” 与 “public intel/public world reads”，避免把公共查询误当私有面
-- 若 process-local preview policy 支持 admin overrides / budget refill，必须要求结构化 reason/note，并允许按 action / target / reason 过滤 audit，避免无上下文操作
+- 迁移期允许存在 DB-backed preview policy admin surface 作为安全阀，但它不能替代最终更细粒度的分布式 authz/quota/budget 控制面
+- 迁移期的 preview policy 若扩展到 per-agent authz / budget / audit，也必须在 README、CLAUDE、`/meta/runtime`、`/meta/control-plane` 中同步声明“策略/预算/审计持久化，短窗限流仍 process-local”的分层事实
+- 若 preview policy 已覆盖 authenticated reads，也必须明确区分 “authenticated family-scoped reads” 与 “public intel/public world reads”，避免把公共查询误当私有面
+- 若 preview policy 支持 admin overrides / budget refill，必须要求结构化 reason/note，并允许按 action / target / reason / request_id 过滤 audit，避免无上下文操作
 - 若 control-plane 已暴露 request-id / client fingerprint traceability，也必须把 header 名和审计字段写入 runtime metadata 与 README，避免客户端各自猜测
 - 若 preview/control-plane 已对外暴露错误语义，必须提供稳定 `error_code`，并在 header/body 中可机器消费，避免客户端解析自然语言 `detail`
 - 若 migration-phase error taxonomy 已存在，也必须通过 `/meta/runtime` 或 `/meta/control-plane` 暴露机器可读 error-code catalog，避免客户端文档漂移
@@ -792,7 +792,7 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 │  - 决定买卖、生产、旅行      │
 │  - 设定 standing orders      │
 └──────────┬──────────────────┘
-           │ MCP tools (~35) / REST API
+           │ MCP core tools (38) / REST API
            ▼
 ┌─────────────────────────────┐
 │    Agentropolis Server       │  ← 世界引擎 (服务器)
@@ -808,7 +808,7 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 
 | Issue | Title | Status | Depends On | Key Files |
 |-------|-------|--------|------------|-----------|
-| [#64](https://github.com/zp184764679/agentropolis/issues/64) | Server Autopilot — Reflex + Standing Orders | ⬜ CREATED | #16,#17,#24,#27 | `models/autonomy_state.py`, `services/autopilot.py` |
+| [#64](https://github.com/zp184764679/agentropolis/issues/64) | Server Autopilot — Reflex + Standing Orders | ⬜ CREATED | #16,#17,#24,#27 | `models/autonomy.py`, `services/autopilot.py` |
 | [#65](https://github.com/zp184764679/agentropolis/issues/65) | Rich Information APIs — AI Decision Data | ⬜ CREATED | #17,#21,#22,#25 | `services/market_analysis_svc.py`, `api/market_analysis.py` |
 | [#67](https://github.com/zp184764679/agentropolis/issues/67) | Activity Digest / Morning Briefing | ⬜ CREATED | #57,#41,#22,#29 | `services/digest_svc.py`, `api/digest.py` |
 | [#69](https://github.com/zp184764679/agentropolis/issues/69) | MCP Tool Suite — AI Agent Core Interface | ⬜ CREATED | #35, all services | `mcp/*` |
@@ -817,7 +817,7 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 
 | Issue | Title | Status | Depends On | Key Files |
 |-------|-------|--------|------------|-----------|
-| [#66](https://github.com/zp184764679/agentropolis/issues/66) | Goal Tracking System | ⬜ CREATED | #16,#17,#26 | `models/agent_goal.py`, `services/goal_svc.py` |
+| [#66](https://github.com/zp184764679/agentropolis/issues/66) | Goal Tracking System | ⬜ CREATED | #16,#17,#26 | `models/autonomy.py`, `services/goal_svc.py` |
 | [#68](https://github.com/zp184764679/agentropolis/issues/68) | Autonomy Config API | ⬜ CREATED | #64 | `api/autonomy.py` |
 | [#71](https://github.com/zp184764679/agentropolis/issues/71) | Housekeeping Integration | ⬜ CREATED | #23,#64,#66 | `services/game_engine.py` |
 
@@ -839,11 +839,11 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 
 | File | Owner Issue |
 |------|-------------|
-| `models/autonomy_state.py` | #64 |
+| `models/autonomy.py` | #64, #66 |
 | `services/autopilot.py` | #64 |
 | `services/market_analysis_svc.py` | #65 |
 | `api/market_analysis.py` | #65 |
-| `models/agent_goal.py` | #66 |
+| `models/autonomy.py` (goals) | #66 |
 | `services/goal_svc.py` | #66 |
 | `services/digest_svc.py` | #67 |
 | `api/digest.py` | #67 |
@@ -860,6 +860,13 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 | S | `run_all_standing_orders()` | 每5轮 | #64 |
 | G | `compute_all_goal_progress()` | 每30轮 | #66 |
 | D | Digest data aggregation | 每轮 | #67 |
+
+### 当前实现口径（P5 本地预览）
+
+- `AutonomyState.standing_orders` 是唯一真源；`StrategyProfile.standing_orders` 仅保留为公开 scouting mirror
+- Standing orders 当前只支持 `buy_rules` / `sell_rules`
+- `source="npc"` 等未支持规则必须稳定失败，不能静默降级
+- `#69` 当前先落 38 个本地预览 MCP core tools，并固定 `streamable-http`；`#72+` 再做更大规模的外部工具面扩展
 
 ### 集成点
 

@@ -1,10 +1,25 @@
-"""MCP tools for inventory operations (2 tools).
+"""Core MCP tools for inventory reads."""
 
-Tools:
-- get_inventory(api_key) — Full inventory with values
-- get_resource_info(resource) — Static resource details (no auth)
+from __future__ import annotations
 
-Dependencies: services/inventory_svc.py
-"""
+from agentropolis.mcp._shared import company_tool_context, handle_tool_error
+from agentropolis.mcp.server import mcp
+from agentropolis.services.inventory_svc import get_inventory, get_resource_quantity
 
-# from agentropolis.mcp.server import mcp
+
+@mcp.tool()
+async def get_inventory_tool(company_api_key: str) -> dict:
+    try:
+        async with company_tool_context(company_api_key) as (session, company):
+            return {"ok": True, "items": await get_inventory(session, company.id)}
+    except Exception as exc:
+        return handle_tool_error(exc)
+
+
+@mcp.tool()
+async def get_inventory_item_tool(company_api_key: str, resource: str) -> dict:
+    try:
+        async with company_tool_context(company_api_key) as (session, company):
+            return {"ok": True, "item": await get_resource_quantity(session, company.id, resource)}
+    except Exception as exc:
+        return handle_tool_error(exc)

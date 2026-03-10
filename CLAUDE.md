@@ -72,9 +72,11 @@ Likewise, do not treat an `api/*.py` file existing on disk as evidence that it s
 - `PLAN.md` now contains issue-ready draft specs for proposed `#81-#88` (goal / scope / non-goals / acceptance)
 - `.github/README.md` indexes both created-issue briefs and proposed control-plane draft issues
 - `/meta/runtime` is the machine-readable snapshot of the currently mounted scaffold surface
-- `/meta/control-plane` is the admin-only process-local preview policy surface when `CONTROL_PLANE_ADMIN_TOKEN` is configured
+- `/meta/control-plane` is the admin-only DB-backed preview policy surface when `CONTROL_PLANE_ADMIN_TOKEN` is configured
 - legacy scaffold `market` / `inventory` / `game` routes are no longer all-placeholder: core read paths are live, but most legacy writes are still scaffold-only
-- process-local preview policy now includes per-agent family authz, family budgets, and admin action audit entries
+- preview policy now includes per-agent family authz, family budgets, budget refill, and admin action audit entries
+- preview policy state is durable in the database; only short-window mutation throttling remains process-local
+- local-preview MCP now uses `streamable-http` only and mounts at `/mcp` when `MCP_SURFACE_ENABLED` is enabled
 - authenticated preview reads with `get_current_agent` are now family-scoped too; do not assume only mutations are policy-controlled
 - admin changes should carry structured reason/note context when possible, and audit review should prefer filtered queries over raw log dumps
 - request tracing now uses `X-Agentropolis-Request-ID`; control-plane audit review should use request id plus client fingerprint when correlating actions
@@ -113,8 +115,7 @@ src/agentropolis/
 │   ├── world_event.py
 │   ├── tax_record.py
 │   ├── nexus_state.py   # NexusCrystalState (singleton, NXC mining global state)
-│   ├── autonomy_state.py # Autopilot config + reflex state (#64)
-│   ├── agent_goal.py    # Goal tracking with auto-progress (#66)
+│   ├── autonomy.py      # Autopilot config + goals (#64/#66)
 │   ├── company.py       # Modified: +founder_agent_id, +region_id, +npc_*
 │   ├── building.py      # Modified: +region_id, +agent_id
 │   ├── inventory.py     # Modified: +agent_id, +region_id (polymorphic)
@@ -143,7 +144,7 @@ src/agentropolis/
 │   ├── event_svc.py     # Dynamic world events
 │   ├── currency_svc.py  # Inflation monitoring
 │   ├── nxc_mining_svc.py # NXC yield calc, difficulty, halving
-│   ├── autopilot.py     # Reflex survival + standing orders (#64)
+│   ├── autopilot.py     # Reflex survival + canonical standing orders (#64)
 │   ├── market_analysis_svc.py # Aggregated market intelligence (#65)
 │   ├── goal_svc.py      # Goal CRUD + progress computation (#66)
 │   └── digest_svc.py    # Morning briefing / activity digest (#67)
@@ -163,7 +164,7 @@ src/agentropolis/
 │   ├── diplomacy.py     # Diplomacy endpoints
 │   ├── market_analysis.py # Rich market intelligence (#65)
 │   ├── digest.py        # Morning briefing endpoint (#67)
-│   ├── autonomy.py      # Autopilot config API (#68)
+│   ├── autonomy.py      # Autopilot config + standing orders + goals API (#68)
 │   └── dashboard.py     # Real-time activity dashboard (#70)
 ├── mcp/                 # MCP tools (~35 tools)
 └── cli.py               # Management commands
@@ -244,7 +245,7 @@ When `settle_building()` processes a `nexus_refinery`:
 | **Goals** | #66 | 目标追踪 + 自动进度计算 (AI 设目标, 服务器算进度) |
 | **Digest** | #67 | Morning Briefing — AI 连接后获取离线期间摘要 |
 | **Config API** | #68 | Autopilot 配置管理 |
-| **MCP Tools** | #69 | ~35 MCP 工具 — AI agent 的核心交互接口 |
+| **MCP Tools** | #69 | 38 个本地预览 MCP core tools — AI agent 的核心交互接口 |
 | **Dashboard** | #70 | 实时聚合状态端点 |
 | **Housekeeping** | #71 | game_engine 新增 Phase A/S/G/D |
 
@@ -262,9 +263,11 @@ spending_this_hour, reflex_log (JSONB)
 {
   "buy_rules": [{"resource": "ORE", "below_price": 700, "max_qty": 50}],
   "sell_rules": [{"resource": "FE", "above_price": 3000, "min_qty": 10}],
-  "supply_rules": [{"resource": "RAT", "maintain_stock": 200, "source": "npc"}]
+  "sell_rules": [{"resource": "FE", "above_price": 3000, "min_qty": 10}]
 }
 ```
+
+`AutonomyState.standing_orders` 是唯一真源；`StrategyProfile.standing_orders` 仅保留为公开 scouting mirror。
 
 ### AgentGoal 模型
 

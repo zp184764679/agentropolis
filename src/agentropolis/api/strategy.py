@@ -83,7 +83,6 @@ async def update_profile(
             primary_focus=req.primary_focus,
             secondary_focus=req.secondary_focus,
             default_stance=req.default_stance,
-            standing_orders=req.standing_orders,
         )
         await session.commit()
         return result
@@ -190,10 +189,11 @@ async def list_standing_orders(
     agent: Agent = Depends(get_current_agent),
     session: AsyncSession = Depends(get_session),
 ):
-    """List all agents' standing orders (public intelligence).
+    """List all agents' standing orders (public intelligence mirror).
 
-    Standing orders are publicly declared rules that other players can read.
-    Use this to scout the market before trading.
+    Canonical standing-order writes live under `/api/autonomy/standing-orders`.
+    This route exposes the mirrored public scouting view that other players can
+    read before trading.
     """
     from agentropolis.models.agent import Agent as AgentModel
 

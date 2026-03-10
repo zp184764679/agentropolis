@@ -51,9 +51,19 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert mounted["transport"] == "preview_service_backed"
     assert mounted["strategy"] == "preview_service_backed"
     assert mounted["warfare"] == "preview_service_backed"
+    assert mounted["autonomy"] == "preview_service_backed"
+    assert mounted["digest"] == "preview_service_backed"
+    assert mounted["dashboard"] == "preview_service_backed"
+    assert mounted["intel"] == "preview_service_backed"
     assert meta["rest_surface"]["unmounted_route_groups"] == []
     assert meta["rest_surface"]["validation_error_status"] == 422
     assert meta["rest_surface"]["error_code_header"] == "X-Agentropolis-Error-Code"
+    assert meta["mcp_surface"]["transport"] == "streamable-http"
+    assert meta["mcp_surface"]["transport_frozen"] is True
+    assert meta["mcp_surface"]["local_preview_only"] is True
+    assert meta["mcp_surface"]["public_rollout_ready"] is False
+    assert meta["mcp_surface"]["tool_count"] == 38
+    assert meta["mcp_surface"]["tool_groups"]["agent_autonomy"] == 13
 
 
 def test_sqlalchemy_mappers_and_metadata_create_on_sqlite() -> None:

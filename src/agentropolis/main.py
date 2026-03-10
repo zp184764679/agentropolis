@@ -7,7 +7,7 @@ Current runtime role:
 
 Target runtime direction:
 - start housekeeping/background orchestration in lifespan when enabled
-- mount the stabilized MCP surface once the control contract is frozen
+- mount the local-preview MCP core surface only when explicitly enabled
 """
 
 import asyncio
@@ -20,13 +20,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from agentropolis.api.agent import router as agent_router
+from agentropolis.api.autonomy import router as autonomy_router
 from agentropolis.api.company import router as company_router
 from agentropolis.api.control_plane import router as control_plane_router
+from agentropolis.api.dashboard import router as dashboard_router
+from agentropolis.api.digest import router as digest_router
 from agentropolis.api.diplomacy import router as diplomacy_router
 from agentropolis.api.decisions import router as decisions_router
 from agentropolis.api.game import router as game_router
 from agentropolis.api.guild import router as guild_router
 from agentropolis.api.inventory import router as inventory_router
+from agentropolis.api.market_analysis import router as market_analysis_router
 from agentropolis.api.market import router as market_router
 from agentropolis.api.production import router as production_router
 from agentropolis.api.skills import router as skills_router
@@ -116,10 +120,15 @@ app.include_router(diplomacy_router, prefix="/api")
 app.include_router(strategy_router, prefix="/api")
 app.include_router(decisions_router, prefix="/api")
 app.include_router(warfare_router, prefix="/api")
+app.include_router(autonomy_router, prefix="/api")
+app.include_router(digest_router, prefix="/api")
+app.include_router(dashboard_router, prefix="/api")
+app.include_router(market_analysis_router, prefix="/api")
 
-# TODO: mount the MCP surface after the transport and external contract are frozen.
-# from agentropolis.mcp.server import mcp
-# app.mount("/mcp", mcp.sse_app())
+if settings.MCP_SURFACE_ENABLED:
+    from agentropolis.mcp.server import mcp
+
+    app.mount("/mcp", mcp.streamable_http_app())
 
 
 @app.get("/health")

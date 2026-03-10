@@ -16,8 +16,10 @@ from agentropolis.models import Agent, Company, GameState, HousekeepingLog
 from agentropolis.services.company_svc import check_bankruptcies, recalculate_all_net_worths
 from agentropolis.services.consumption import tick_consumption
 from agentropolis.services.currency_svc import update_game_state_economics
+from agentropolis.services.digest_svc import build_digest_housekeeping_summary
 from agentropolis.services.employment_svc import settle_all_wages
 from agentropolis.services.event_svc import expire_events
+from agentropolis.services.goal_svc import compute_all_goal_progress
 from agentropolis.services.market_engine import match_all_resources
 from agentropolis.services.nxc_mining_svc import adjust_difficulty, check_halving, update_active_refineries
 from agentropolis.services.production import settle_all_buildings
@@ -26,6 +28,7 @@ from agentropolis.services.transport_svc import settle_transport_arrivals
 from agentropolis.services.trait_svc import evaluate_agent_traits
 from agentropolis.services.world_svc import settle_travel_arrivals
 from agentropolis.services.agent_vitals import settle_all_agent_vitals
+from agentropolis.services.autopilot import run_all_reflexes, run_all_standing_orders
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +181,22 @@ async def _execute_housekeeping_sweep(
     if error:
         errors.append(error)
 
+    autonomy_summary, timing, error = await _run_phase(
+        "autonomy",
+        _autonomy_phase(session, now, current_tick),
+    )
+    phase_timings["autonomy"] = round(timing, 6)
+    if error:
+        errors.append(error)
+
+    digest_summary, timing, error = await _run_phase(
+        "digest",
+        _digest_phase(session, now),
+    )
+    phase_timings["digest"] = round(timing, 6)
+    if error:
+        errors.append(error)
+
     logistics_summary, timing, error = await _run_phase(
         "logistics",
         _logistics_phase(session, now),
@@ -229,6 +248,8 @@ async def _execute_housekeeping_sweep(
         trade_summary=trade_summary,
         vitals_summary=vitals_summary,
         logistics_summary=logistics_summary,
+        autonomy_summary=autonomy_summary,
+        digest_summary=digest_summary,
         analytics_summary=analytics_summary,
         admin_summary=admin_summary,
         nxc_summary=nxc_summary,
@@ -248,6 +269,8 @@ async def _execute_housekeeping_sweep(
         "production": production_summary,
         "trade": trade_summary,
         "vitals": vitals_summary,
+        "autonomy": autonomy_summary,
+        "digest": digest_summary,
         "logistics": logistics_summary,
         "analytics": analytics_summary,
         "admin": admin_summary,
@@ -264,6 +287,44 @@ def _logistics_phase(session: AsyncSession, now: datetime):
             "transport_arrivals": transport_arrivals,
             "travel_arrivals": travel_arrivals,
         }
+
+    return runner
+
+
+def _autonomy_phase(session: AsyncSession, now: datetime, current_tick: int):
+    async def runner() -> dict:
+        reflex = await run_all_reflexes(session, now=now)
+        standing_orders: dict = {
+            "skipped": True,
+            "reason": "interval_not_reached",
+        }
+        goals: dict = {
+            "skipped": True,
+            "reason": "interval_not_reached",
+        }
+
+        if current_tick % settings.AUTOPILOT_STANDING_ORDER_SWEEP_INTERVAL == 0:
+            standing_orders = await run_all_standing_orders(
+                session,
+                now=now,
+                current_tick=current_tick,
+            )
+
+        if current_tick % settings.AUTOPILOT_GOAL_SWEEP_INTERVAL == 0:
+            goals = await compute_all_goal_progress(session, now=now)
+
+        return {
+            "reflex": reflex,
+            "standing_orders": standing_orders,
+            "goals": goals,
+        }
+
+    return runner
+
+
+def _digest_phase(session: AsyncSession, now: datetime):
+    async def runner() -> dict:
+        return await build_digest_housekeeping_summary(session, now=now)
 
     return runner
 

@@ -11,6 +11,7 @@ from agentropolis.api.preview_guard import (
     ERROR_CODE_CATALOG,
     ERROR_CODE_HEADER,
 )
+from agentropolis.config import settings
 from agentropolis.middleware import REQUEST_ID_HEADER
 from agentropolis.models import Base
 
@@ -97,6 +98,30 @@ MOUNTED_ROUTE_GROUPS = [
     {
         "module": "warfare",
         "prefix": "/api/warfare",
+        "state": "preview_service_backed",
+        "auth_model": "target_agent_auth",
+    },
+    {
+        "module": "autonomy",
+        "prefix": "/api/autonomy",
+        "state": "preview_service_backed",
+        "auth_model": "target_agent_auth",
+    },
+    {
+        "module": "digest",
+        "prefix": "/api/digest",
+        "state": "preview_service_backed",
+        "auth_model": "target_agent_auth",
+    },
+    {
+        "module": "dashboard",
+        "prefix": "/api/dashboard",
+        "state": "preview_service_backed",
+        "auth_model": "target_agent_auth",
+    },
+    {
+        "module": "intel",
+        "prefix": "/api/intel",
         "state": "preview_service_backed",
         "auth_model": "target_agent_auth",
     },
@@ -190,9 +215,22 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
             "error_code_header": ERROR_CODE_HEADER,
         },
         "mcp_surface": {
-            "mounted": False,
-            "transport_frozen": False,
+            "mounted": bool(settings.MCP_SURFACE_ENABLED),
+            "mount_path": "/mcp",
+            "transport": "streamable-http",
+            "transport_frozen": True,
+            "local_preview_only": True,
             "public_rollout_ready": False,
+            "tool_count": 38,
+            "tool_groups": {
+                "agent_autonomy": 13,
+                "company": 2,
+                "intel": 3,
+                "inventory": 2,
+                "market": 7,
+                "production": 6,
+                "world": 4,
+            },
         },
         "migration_surface": {
             "alembic_baseline_present": True,

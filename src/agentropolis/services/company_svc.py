@@ -329,16 +329,26 @@ async def get_company_workers(session: AsyncSession, company_id: int) -> dict[st
 
 async def get_agent_company(session: AsyncSession, agent_id: int) -> dict | None:
     """Get the active company owned by an agent, if any."""
+    company = await get_active_company_model(session, agent_id)
+    if company is None:
+        return None
+    return await get_company_status(session, company.id)
+
+
+async def get_active_company_model(
+    session: AsyncSession,
+    agent_id: int,
+) -> Company | None:
+    """Get the active company model owned by an agent, if any."""
     company = (
         await session.execute(
             select(Company)
             .where(Company.founder_agent_id == agent_id, Company.is_active.is_(True))
             .order_by(Company.id.desc())
+            .limit(1)
         )
     ).scalar_one_or_none()
-    if company is None:
-        return None
-    return await get_company_status(session, company.id)
+    return company
 
 
 async def check_bankruptcies(session: AsyncSession) -> list[int]:

@@ -43,7 +43,7 @@ curl http://localhost:8000/health
 # Inspect the current runtime/scaffold surface
 curl http://localhost:8000/meta/runtime
 
-# Inspect the process-local preview policy (requires CONTROL_PLANE_ADMIN_TOKEN)
+# Inspect the DB-backed preview policy (requires CONTROL_PLANE_ADMIN_TOKEN)
 curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:8000/meta/control-plane
 ```
 
@@ -51,15 +51,16 @@ curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:800
 
 - `/health` and `/meta/runtime` are the two endpoints that should be treated as reliably available in the current scaffold
 - REST route modules for market/production/inventory/company/game are mounted; `market`, `inventory`, and `game` now have real read paths, while many legacy write paths still surface as `501 Not Implemented`
-- Agent/world/skills/transport/guild/diplomacy/strategy/decisions/warfare are now mounted as a preview target surface backed by real services, but the public contract is still not frozen
+- Agent/world/skills/transport/guild/diplomacy/strategy/decisions/warfare plus autonomy/digest/dashboard/intel are now mounted as a preview target surface backed by real services, but the public contract is still not frozen
 - Preview routes are now behind a minimal control-plane guard: global preview kill switch, preview write gate, warfare mutation gate, and best-effort process-local mutation throttling
-- An admin-only process-local preview policy surface exists at `/meta/control-plane` when `CONTROL_PLANE_ADMIN_TOKEN` is configured
-- The process-local preview policy now supports per-agent route-family allowlists, per-family mutation budgets, and an admin action audit trail
-- MCP transport and public contract are still being frozen in the control-plane backlog
+- An admin-only DB-backed preview policy surface exists at `/meta/control-plane` when `CONTROL_PLANE_ADMIN_TOKEN` is configured
+- The preview policy now supports per-agent route-family allowlists, per-family mutation budgets, budget refill, and an admin action audit trail
+- Preview policy is durable in the database; only short-window mutation throttling remains process-local
+- MCP transport is frozen to `streamable-http`, and the local-preview MCP surface mounts at `/mcp` only when `MCP_SURFACE_ENABLED=true`
 - Do not treat legacy company-auth or `/mcp/sse` examples as the final external integration contract
 - `/meta/runtime` is the machine-readable source for the current mounted-vs-unmounted runtime surface
 - `/meta/runtime` also exposes the current auth split, preview guard posture, and ORM registry state: `company_auth=active_legacy`, `agent_auth=migration_compatible`
-- `/meta/control-plane` is the admin-only machine-readable surface for current process-local preview policy
+- `/meta/control-plane` is the admin-only machine-readable surface for the current DB-backed preview policy
 - Error responses now carry both `X-Agentropolis-Request-ID` and `X-Agentropolis-Error-Code`; JSON error bodies mirror them as `request_id` and `error_code`
 - FastAPI validation failures (`422`) now use the same contract instead of the framework default body shape
 - `/meta/runtime` and `/meta/control-plane` now expose the current migration-phase preview/control-plane error code catalog
@@ -108,6 +109,10 @@ These route modules are mounted in the current FastAPI app:
 - `/api/strategy`
 - `/api/agent/decisions`
 - `/api/warfare`
+- `/api/autonomy`
+- `/api/digest`
+- `/api/dashboard`
+- `/api/intel`
 
 Treat them as scaffold surface, not as a frozen or fully implemented public API.
 Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque `500` errors.
@@ -130,10 +135,14 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 | `/api/transport` | Yes | Preview, service-backed | Inter-region transport is mounted for agent-owned shipments |
 | `/api/guild` | Yes | Preview, service-backed | Guild create/join/leave/promotion/treasury flows are mounted |
 | `/api/diplomacy` | Yes | Preview, service-backed | Relationship and treaty flows are mounted |
-| `/api/strategy` | Yes | Preview, service-backed | Strategy profile, dashboard, and standing-order scouting are mounted |
+| `/api/strategy` | Yes | Preview, service-backed | Strategy profile and public standing-order mirror are mounted; standing-order writes now live under `/api/autonomy` |
 | `/api/agent/decisions` | Yes | Preview, service-backed | Decision journal and analysis are mounted |
 | `/api/warfare` | Yes | Preview, service-backed | Contract lifecycle, garrison, repair, and regional threat queries are mounted |
-| MCP server | No public contract yet | Not frozen | Transport and rollout contract still under control-plane backlog |
+| `/api/autonomy` | Yes | Preview, service-backed | Canonical autonomy config, standing orders, and goal tracking |
+| `/api/digest` | Yes | Preview, service-backed | Agent digest and watermark acknowledgement |
+| `/api/dashboard` | Yes | Preview, service-backed | Real-time agent/company/autonomy aggregate |
+| `/api/intel` | Yes | Preview, service-backed | Market intel, route intel, and machine-readable opportunity summaries |
+| MCP server (`/mcp`) | Conditional | Local preview only | `streamable-http` only; mounts when `MCP_SURFACE_ENABLED=true`; core suite currently exposes 38 tools |
 
 ### Preview Guardrails
 
@@ -141,17 +150,17 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 - `PREVIEW_WRITES_ENABLED`: puts preview mutations into read-only mode while keeping preview reads available
 - `WARFARE_MUTATIONS_ENABLED`: independently freezes warfare mutations without disabling preview read APIs
 - `PREVIEW_DEGRADED_MODE`: keeps preview reads available while blocking non-survival preview mutations
-- `/meta/control-plane`: admin-only process-local endpoint for inspecting and changing preview runtime policy during migration
+- `/meta/control-plane`: admin-only DB-backed endpoint for inspecting and changing preview runtime policy during migration
 - Preview mutation quotas are split by route family: `agent_self`, `world`, `transport`, `social`, `strategy`, `warfare`
-- Preview authz is now process-local and per-agent by route family; preview budgets are decremented per allowed family mutation
+- Preview authz is per-agent by route family; preview budgets are decremented per allowed family mutation and persisted in the database
 - Authenticated preview reads now follow family-scoped policy as well; public intel / public world reads still stay behind only the preview surface gate
-- `/meta/control-plane/audit` exposes the in-memory admin action trail for preview policy changes
+- `/meta/control-plane/audit` exposes the DB-backed admin action trail for preview policy changes
 - Admin mutations now support structured `reason_code` / `note`; audit queries can filter by action, target agent, and reason code
 - Audit queries can also filter by `request_id` for direct correlation with client-visible failures
-- `/meta/control-plane/agents/{agent_id}/refill-budget` provides process-local family budget refill semantics for preview testing and staged rollout
+- `/meta/control-plane/agents/{agent_id}/refill-budget` provides durable family budget refill semantics for preview testing and staged rollout
 - `X-Agentropolis-Request-ID` is propagated/generated per request and attached to admin audit entries for traceability
 - `X-Agentropolis-Error-Code` is the stable migration-phase header for preview/control-plane failures; clients should not parse human `detail` strings
-- Preview mutation throttling is currently process-local and best-effort; it is a migration safety valve, not the final distributed quota model
+- Preview mutation throttling is still process-local and best-effort; it is a migration safety valve on top of the DB-backed preview policy, not the final distributed quota model
 
 ### Route Mount Policy
 
@@ -192,7 +201,7 @@ FastMCP (MCP Tools) ─┘
 
 - Auth terminology in code still mixes legacy company-auth and target agent-auth
 - Tick-oriented names remain in schemas, services, and model fields even where the target runtime is housekeeping/lazy-settlement based
-- MCP transport wording is not frozen across code, docs, and roadmap yet
+- MCP transport is locally frozen to `streamable-http`, but public rollout policy is still gated
 - Some route files exist on disk but are not mounted in `main.py`
 - Preview route groups now include strategy/decisions/warfare; they are mounted but still not contract-frozen for external rollout
 - Resource/seed examples still reflect the older scaffold economy, not the full target-world design

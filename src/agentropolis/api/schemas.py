@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Pydantic schemas for request/response validation.
 
 This module defines the API contract. All REST endpoints and MCP tools
@@ -385,7 +387,171 @@ class StrategyProfileUpdateRequest(BaseModel):
     primary_focus: str | None = None
     secondary_focus: str | None = None
     default_stance: str | None = None
-    standing_orders: dict | None = None
+
+
+class StandingOrderBuyRule(BaseModel):
+    resource: str
+    below_price: float = Field(..., gt=0)
+    max_qty: float = Field(..., gt=0)
+    source: str | None = None
+
+
+class StandingOrderSellRule(BaseModel):
+    resource: str
+    above_price: float = Field(..., gt=0)
+    min_qty: float = Field(..., gt=0)
+
+
+class AutonomyStandingOrders(BaseModel):
+    buy_rules: list[StandingOrderBuyRule] = Field(default_factory=list)
+    sell_rules: list[StandingOrderSellRule] = Field(default_factory=list)
+
+
+class AutonomyConfigResponse(BaseModel):
+    agent_id: int
+    autopilot_enabled: bool
+    mode: str
+    spending_limit_per_hour: int
+    spending_this_hour: int
+    hour_window_started_at: str | None = None
+    last_reflex_at: str | None = None
+    last_standing_orders_at: str | None = None
+    last_digest_at: str | None = None
+
+
+class AutonomyConfigUpdateRequest(BaseModel):
+    autopilot_enabled: bool | None = None
+    mode: str | None = None
+    spending_limit_per_hour: int | None = Field(default=None, ge=0)
+
+
+class StandingOrdersUpdateRequest(BaseModel):
+    standing_orders: AutonomyStandingOrders
+
+
+class GoalResponse(BaseModel):
+    goal_id: int
+    goal_type: str
+    status: str
+    priority: int
+    target: dict = Field(default_factory=dict)
+    progress: dict = Field(default_factory=dict)
+    notes: str | None = None
+    completed_at: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class GoalCreateRequest(BaseModel):
+    goal_type: str
+    priority: int = Field(default=100, ge=0, le=1000)
+    target: dict = Field(default_factory=dict)
+    notes: str | None = None
+
+
+class GoalUpdateRequest(BaseModel):
+    status: str | None = None
+    priority: int | None = Field(default=None, ge=0, le=1000)
+    target: dict | None = None
+    progress: dict | None = None
+    notes: str | None = None
+
+
+class GoalListResponse(BaseModel):
+    goals: list[GoalResponse] = Field(default_factory=list)
+
+
+class DigestNotificationEntry(BaseModel):
+    notification_id: int
+    event_type: str
+    title: str
+    body: str = ""
+    is_read: bool
+    created_at: str
+
+
+class DigestDecisionEntry(BaseModel):
+    id: int
+    decision_type: str
+    summary: str
+    created_at: str
+    resolved_at: str | None = None
+    outcome_summary: str | None = None
+
+
+class DigestGoalEntry(BaseModel):
+    goal_id: int
+    goal_type: str
+    status: str
+    progress: dict = Field(default_factory=dict)
+    completed_at: str | None = None
+
+
+class MarketMoverEntry(BaseModel):
+    ticker: str
+    previous_close: float | None = None
+    current_close: float | None = None
+    delta_pct: float | None = None
+
+
+class DigestResponse(BaseModel):
+    agent_id: int
+    generated_at: str
+    since: str | None = None
+    unread_count: int
+    notifications: list[DigestNotificationEntry] = Field(default_factory=list)
+    recent_decisions: list[DigestDecisionEntry] = Field(default_factory=list)
+    goal_updates: list[DigestGoalEntry] = Field(default_factory=list)
+    market_movers: list[MarketMoverEntry] = Field(default_factory=list)
+
+
+class DigestAckResponse(BaseModel):
+    agent_id: int
+    acknowledged_at: str
+    unread_count: int
+
+
+class DashboardResponse(BaseModel):
+    generated_at: str
+    agent: AgentStatus
+    company: CompanyStatus | None = None
+    travel: TravelStatus | None = None
+    autonomy: AutonomyConfigResponse
+    goals: list[GoalResponse] = Field(default_factory=list)
+    digest_unread_count: int = 0
+    latest_digest_at: str | None = None
+    decision_summary: DecisionAnalysisResponse | dict
+
+
+class MarketIntelResponse(BaseModel):
+    agent_id: int
+    region_id: int
+    ticker: str
+    analysis: MarketAnalysis
+    order_book: OrderBookResponse
+    recent_trades: list[TradeRecord] = Field(default_factory=list)
+
+
+class RouteIntelResponse(BaseModel):
+    agent_id: int
+    from_region_id: int
+    to_region_id: int
+    path: list[int] = Field(default_factory=list)
+    total_time_seconds: int
+
+
+class OpportunityEntry(BaseModel):
+    category: str
+    ticker: str | None = None
+    region_id: int | None = None
+    score: float = 0.0
+    summary: str
+    data: dict = Field(default_factory=dict)
+
+
+class OpportunityResponse(BaseModel):
+    agent_id: int
+    opportunities: list[OpportunityEntry] = Field(default_factory=list)
 
 
 class AgentPublicProfile(BaseModel):
@@ -625,6 +791,11 @@ class StandingOrderEntry(BaseModel):
 
 class StandingOrdersResponse(BaseModel):
     standing_orders: list[StandingOrderEntry] = Field(default_factory=list)
+
+
+class AutonomyStandingOrdersResponse(BaseModel):
+    agent_id: int
+    standing_orders: AutonomyStandingOrders
 
 
 class ContractCreateRequest(BaseModel):

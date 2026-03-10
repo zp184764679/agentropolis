@@ -5,6 +5,9 @@ The strategy profile determines real mechanical differences between agents:
 - Risk tolerance → trade profit/damage modifiers
 - Primary focus → XP gain rate bonuses
 - Diplomatic stance → initial trust values
+
+`StrategyProfile.standing_orders` is now treated as a public compatibility
+mirror. Canonical standing-order writes live in `AutonomyState`.
 """
 
 import logging
@@ -71,6 +74,10 @@ async def create_or_update_profile(
 ) -> dict:
     """Create or update an agent's strategy profile.
 
+    `standing_orders` is retained only as a compatibility bridge for older
+    internal callers. Canonical standing-order writes should go through
+    `services.autopilot.update_standing_orders()` / `/api/autonomy/standing-orders`.
+
     Returns the updated profile as a dict.
     """
     profile = await get_profile(session, agent_id)
@@ -98,8 +105,22 @@ async def create_or_update_profile(
     if default_stance is not None:
         profile.default_stance = DiplomaticStance(default_stance)
     if standing_orders is not None:
-        profile.standing_orders = standing_orders
+        from agentropolis.services.autopilot import (
+            _normalize_standing_orders,
+            ensure_autonomy_state,
+        )
 
+        profile.standing_orders = standing_orders
+        normalized = None
+        if set(standing_orders).issubset({"buy_rules", "sell_rules"}):
+            try:
+                normalized = _normalize_standing_orders(standing_orders)
+            except ValueError:
+                normalized = None
+        if normalized is not None:
+            profile.standing_orders = normalized if any(normalized.values()) else None
+            autonomy_state = await ensure_autonomy_state(session, agent_id)
+            autonomy_state.standing_orders = normalized
     profile.version += 1
     await session.flush()
 
@@ -109,7 +130,8 @@ async def create_or_update_profile(
 async def get_public_profile(session: AsyncSession, agent_id: int) -> dict | None:
     """Get the public view of an agent's strategy (visible to other players).
 
-    Includes doctrine, stance, standing_orders — but NOT risk_tolerance.
+    Includes doctrine, stance, and the public standing-order mirror — but NOT
+    risk_tolerance.
     """
     profile = await get_profile(session, agent_id)
     if profile is None:

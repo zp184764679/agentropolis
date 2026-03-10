@@ -4,7 +4,13 @@ from agentropolis.models.agent import Agent
 from agentropolis.models.agent_employment import AgentEmployment, EmploymentRole
 from agentropolis.models.agent_skill import AgentSkill
 from agentropolis.models.agent_trait import AgentTrait, TraitId, TraitTier
-from agentropolis.models.autonomy import AgentGoal, AutonomyState
+from agentropolis.models.autonomy import (
+    AgentGoal,
+    AutonomyMode,
+    AutonomyState,
+    GoalStatus,
+    GoalType,
+)
 from agentropolis.models.base import Base, TimestampMixin
 from agentropolis.models.building import Building, BuildingStatus
 from agentropolis.models.building_type import BuildingType
@@ -62,6 +68,7 @@ __all__ = [
     "AgentRelationship",
     "AgentSkill",
     "AgentTrait",
+    "AutonomyMode",
     "AutonomyState",
     "Base",
     "TimestampMixin",
@@ -78,6 +85,8 @@ __all__ = [
     "DiplomaticStance",
     "EmploymentRole",
     "GameState",
+    "GoalStatus",
+    "GoalType",
     "Guild",
     "GuildMember",
     "GuildRank",

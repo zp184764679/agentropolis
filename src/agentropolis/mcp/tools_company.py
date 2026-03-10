@@ -1,10 +1,25 @@
-"""MCP tools for company operations (2 tools).
+"""Core MCP tools for company operations."""
 
-Tools:
-- get_company_status(api_key) — Balance / net worth / workers / satisfaction
-- get_workers(api_key) — Labor force details + consumption rates
+from __future__ import annotations
 
-Dependencies: services/company_svc.py
-"""
+from agentropolis.mcp._shared import company_tool_context, handle_tool_error
+from agentropolis.mcp.server import mcp
+from agentropolis.services.company_svc import get_company_status, get_company_workers
 
-# from agentropolis.mcp.server import mcp
+
+@mcp.tool()
+async def get_company_status_tool(company_api_key: str) -> dict:
+    try:
+        async with company_tool_context(company_api_key) as (session, company):
+            return {"ok": True, "company": await get_company_status(session, company.id)}
+    except Exception as exc:
+        return handle_tool_error(exc)
+
+
+@mcp.tool()
+async def get_company_workers_tool(company_api_key: str) -> dict:
+    try:
+        async with company_tool_context(company_api_key) as (session, company):
+            return {"ok": True, "workers": await get_company_workers(session, company.id)}
+    except Exception as exc:
+        return handle_tool_error(exc)

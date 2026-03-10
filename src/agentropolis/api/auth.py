@@ -39,17 +39,7 @@ async def get_current_company(
     session: AsyncSession = Depends(get_session),
 ) -> Company:
     """Resolve API key to a Company in the legacy scaffold auth model."""
-    key_hash = _require_api_key(api_key)
-    result = await session.execute(
-        select(Company).where(Company.api_key_hash == key_hash, Company.is_active.is_(True))
-    )
-    company = result.scalar_one_or_none()
-    if not company:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or inactive API key",
-        )
-    return company
+    return await resolve_company_from_api_key(session, api_key)
 
 
 async def get_optional_current_company(
@@ -60,17 +50,7 @@ async def get_optional_current_company(
     if not api_key:
         return None
 
-    key_hash = hash_api_key(api_key)
-    result = await session.execute(
-        select(Company).where(Company.api_key_hash == key_hash, Company.is_active.is_(True))
-    )
-    company = result.scalar_one_or_none()
-    if not company:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or inactive API key",
-        )
-    return company
+    return await resolve_company_from_api_key(session, api_key)
 
 
 async def get_current_agent(
@@ -84,6 +64,32 @@ async def get_current_agent(
     runtime it may intentionally return 501 when the Agent auth surface is not yet
     fully wired into models, schema, and database state.
     """
+    return await resolve_agent_from_api_key(session, api_key)
+
+
+async def resolve_company_from_api_key(
+    session: AsyncSession,
+    api_key: str | None,
+) -> Company:
+    """Resolve an API key to an active company without FastAPI dependency wiring."""
+    key_hash = _require_api_key(api_key)
+    result = await session.execute(
+        select(Company).where(Company.api_key_hash == key_hash, Company.is_active.is_(True))
+    )
+    company = result.scalar_one_or_none()
+    if not company:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or inactive API key",
+        )
+    return company
+
+
+async def resolve_agent_from_api_key(
+    session: AsyncSession,
+    api_key: str | None,
+) -> Any:
+    """Resolve an API key to an active agent without FastAPI dependency wiring."""
     key_hash = _require_api_key(api_key)
 
     try:
