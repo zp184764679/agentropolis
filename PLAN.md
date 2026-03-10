@@ -88,6 +88,7 @@
 - 迁移期的 process-local preview policy 若扩展到 per-agent authz / budget / audit，也必须在 README、CLAUDE、`/meta/runtime`、`/meta/control-plane` 中同步声明其非持久化性质
 - 若 process-local preview policy 已覆盖 authenticated reads，也必须明确区分 “authenticated family-scoped reads” 与 “public intel/public world reads”，避免把公共查询误当私有面
 - 若 process-local preview policy 支持 admin overrides / budget refill，必须要求结构化 reason/note，并允许按 action / target / reason 过滤 audit，避免无上下文操作
+- 若 control-plane 已暴露 request-id / client fingerprint traceability，也必须把 header 名和审计字段写入 runtime metadata 与 README，避免客户端各自猜测
 
 ---
 

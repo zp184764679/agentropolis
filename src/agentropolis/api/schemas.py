@@ -285,6 +285,8 @@ class ControlPlaneAuditEntry(BaseModel):
     action: str
     actor: str
     target_agent_id: int | None = None
+    request_id: str | None = None
+    client_fingerprint: str | None = None
     reason_code: str | None = None
     note: str | None = None
     payload: dict = Field(default_factory=dict)

@@ -1,6 +1,6 @@
 """Admin-only preview control-plane endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from agentropolis.api.preview_guard import (
     clear_agent_preview_policy,
@@ -27,6 +27,12 @@ from agentropolis.api.schemas import (
 router = APIRouter(prefix="/meta/control-plane", tags=["control-plane"])
 
 
+def _request_context(request: Request) -> tuple[str | None, str | None]:
+    request_id = getattr(request.state, "request_id", None)
+    client_fingerprint = getattr(request.state, "client_fingerprint", None)
+    return request_id, client_fingerprint
+
+
 @router.get("", response_model=PreviewControlPlaneResponse)
 async def get_control_plane_state(
     _admin_actor: str = Depends(require_control_plane_admin),
@@ -37,16 +43,20 @@ async def get_control_plane_state(
 
 @router.put("", response_model=PreviewControlPlaneResponse)
 async def update_control_plane_state(
+    request: Request,
     req: PreviewControlPlaneUpdateRequest,
     admin_actor: str = Depends(require_control_plane_admin),
 ):
     """Apply process-local runtime overrides for preview policy."""
+    request_id, client_fingerprint = _request_context(request)
     return update_preview_guard_state(
         surface_enabled=req.surface_enabled,
         writes_enabled=req.writes_enabled,
         warfare_mutations_enabled=req.warfare_mutations_enabled,
         degraded_mode=req.degraded_mode,
         audit_actor=admin_actor,
+        request_id=request_id,
+        client_fingerprint=client_fingerprint,
         reason_code=req.reason_code,
         note=req.note,
     )
@@ -63,17 +73,21 @@ async def list_agent_policies(
 
 @router.put("/agents/{agent_id}/policy", response_model=PreviewAgentPolicyResponse)
 async def upsert_agent_policy(
+    request: Request,
     agent_id: int,
     req: PreviewAgentPolicyRequest,
     admin_actor: str = Depends(require_control_plane_admin),
 ):
     """Create or replace a process-local per-agent preview policy."""
     try:
+        request_id, client_fingerprint = _request_context(request)
         return upsert_agent_preview_policy(
             agent_id,
             allowed_families=req.allowed_families,
             family_budgets=req.family_budgets,
             audit_actor=admin_actor,
+            request_id=request_id,
+            client_fingerprint=client_fingerprint,
             reason_code=req.reason_code,
             note=req.note,
         )
@@ -83,16 +97,20 @@ async def upsert_agent_policy(
 
 @router.post("/agents/{agent_id}/refill-budget", response_model=PreviewAgentPolicyResponse)
 async def refill_agent_budget(
+    request: Request,
     agent_id: int,
     req: PreviewAgentBudgetRefillRequest,
     admin_actor: str = Depends(require_control_plane_admin),
 ):
     """Increment process-local per-agent preview family budgets."""
     try:
+        request_id, client_fingerprint = _request_context(request)
         return refill_agent_preview_budget(
             agent_id,
             increments=req.increments,
             audit_actor=admin_actor,
+            request_id=request_id,
+            client_fingerprint=client_fingerprint,
             reason_code=req.reason_code,
             note=req.note,
         )
@@ -102,15 +120,19 @@ async def refill_agent_budget(
 
 @router.delete("/agents/{agent_id}/policy", response_model=SuccessResponse)
 async def delete_agent_policy(
+    request: Request,
     agent_id: int,
     reason_code: str | None = Query(default=None, min_length=2, max_length=64),
     note: str | None = Query(default=None, min_length=2, max_length=280),
     admin_actor: str = Depends(require_control_plane_admin),
 ):
     """Remove a process-local per-agent preview policy."""
+    request_id, client_fingerprint = _request_context(request)
     existed = clear_agent_preview_policy(
         agent_id,
         audit_actor=admin_actor,
+        request_id=request_id,
+        client_fingerprint=client_fingerprint,
         reason_code=reason_code,
         note=note,
     )
@@ -140,12 +162,16 @@ async def get_control_plane_audit(
 
 @router.post("/reset-rate-limits", response_model=SuccessResponse)
 async def reset_control_plane_rate_limits(
+    request: Request,
     req: ControlPlaneActionRequest,
     admin_actor: str = Depends(require_control_plane_admin),
 ):
     """Clear process-local preview runtime counters and overrides."""
+    request_id, client_fingerprint = _request_context(request)
     reset_preview_guard_runtime(
         audit_actor=admin_actor,
+        request_id=request_id,
+        client_fingerprint=client_fingerprint,
         reason_code=req.reason_code,
         note=req.note,
     )
