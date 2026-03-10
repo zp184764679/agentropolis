@@ -237,7 +237,7 @@ FastMCP (MCP Tools) ─┘
 - `scripts/export_observability_snapshot.py`: export the current observability snapshot for operator review
 - `scripts/check_rollout_gate.py`: summarize rollout-readiness and contract-snapshot artifacts
 - `scripts/export_rollout_readiness.py`: export the current rollout-readiness snapshot plus runtime metadata
-- `scripts/build_review_bundle.py`: assemble contract, alerts, observability, readiness, gate check, and world snapshot artifacts into one review bundle
+- `scripts/build_review_bundle.py`: assemble contract, alerts, observability, readiness, gate check, and world snapshot artifacts into one review bundle, with generated-at and git traceability in the summary
 - `agentropolis check-rollout-gate`: summarize exported contract + readiness artifacts from the CLI
 - `docs/local-preview-rollout.md`: closed-environment rollout runbook
 - `docs/recovery-runbook.md`: minimum recovery drill runbook

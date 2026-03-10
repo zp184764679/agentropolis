@@ -341,6 +341,12 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
             "rollout_readiness_script": "scripts/export_rollout_readiness.py",
             "review_bundle_script": "scripts/build_review_bundle.py",
             "gate_check_script": "scripts/check_rollout_gate.py",
+            "summary_metadata": [
+                "generated_at",
+                "git.branch",
+                "git.commit",
+                "git.dirty",
+            ],
             "cli_commands": [
                 "agentropolis contract-snapshot",
                 "agentropolis check-rollout-gate",

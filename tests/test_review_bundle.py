@@ -28,6 +28,12 @@ def test_operator_bundle_surface_is_exposed_in_runtime_meta() -> None:
     assert meta["operator_bundle_surface"]["rollout_readiness_script"] == "scripts/export_rollout_readiness.py"
     assert meta["operator_bundle_surface"]["review_bundle_script"] == "scripts/build_review_bundle.py"
     assert meta["operator_bundle_surface"]["gate_check_script"] == "scripts/check_rollout_gate.py"
+    assert meta["operator_bundle_surface"]["summary_metadata"] == [
+        "generated_at",
+        "git.branch",
+        "git.commit",
+        "git.dirty",
+    ]
     assert "agentropolis check-rollout-gate" in meta["operator_bundle_surface"]["cli_commands"]
     assert "agentropolis observability-snapshot" in meta["operator_bundle_surface"]["cli_commands"]
     assert "agentropolis build-review-bundle" in meta["operator_bundle_surface"]["cli_commands"]
@@ -78,6 +84,9 @@ def test_rollout_export_and_review_bundle_build_files() -> None:
             assert gate_check_path.exists()
 
             summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            assert summary["generated_at"]
+            assert summary["git"]["commit"]
+            assert isinstance(summary["git"]["dirty"], bool)
             assert summary["artifacts"]["contract_snapshot"].endswith("contract-snapshot.json")
             assert summary["artifacts"]["alerts"].endswith("alerts.json")
             assert summary["artifacts"]["observability"].endswith("observability.json")

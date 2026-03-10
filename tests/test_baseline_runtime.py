@@ -94,6 +94,12 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["operator_bundle_surface"]["rollout_readiness_script"] == "scripts/export_rollout_readiness.py"
     assert meta["operator_bundle_surface"]["review_bundle_script"] == "scripts/build_review_bundle.py"
     assert meta["operator_bundle_surface"]["gate_check_script"] == "scripts/check_rollout_gate.py"
+    assert meta["operator_bundle_surface"]["summary_metadata"] == [
+        "generated_at",
+        "git.branch",
+        "git.commit",
+        "git.dirty",
+    ]
     assert "agentropolis check-rollout-gate" in meta["operator_bundle_surface"]["cli_commands"]
     assert "agentropolis alerts-snapshot" in meta["operator_bundle_surface"]["cli_commands"]
     assert "agentropolis observability-snapshot" in meta["operator_bundle_surface"]["cli_commands"]

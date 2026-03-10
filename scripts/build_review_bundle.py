@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Callable
 
@@ -17,6 +19,32 @@ from scripts.export_world_snapshot import _run as export_world_snapshot_run
 
 
 SessionFactory = Callable[[], object]
+
+
+def _build_git_metadata() -> dict:
+    repo_root = Path(__file__).resolve().parent.parent
+
+    def _run_git(*args: str) -> str | None:
+        completed = subprocess.run(
+            ["git", *args],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if completed.returncode != 0:
+            return None
+        return completed.stdout.strip()
+
+    commit = _run_git("rev-parse", "--short", "HEAD")
+    branch = _run_git("branch", "--show-current")
+    dirty_output = _run_git("status", "--porcelain")
+    return {
+        "branch": branch or "unknown",
+        "commit": commit or "unknown",
+        "dirty": bool(dirty_output),
+    }
+
 
 async def build_review_bundle(
     output_dir: str | Path,
@@ -74,6 +102,8 @@ async def build_review_bundle(
     manifest_path = Path("openclaw/runtime/agents.json")
     bundle = {
         "output_dir": target_dir.as_posix(),
+        "generated_at": datetime.now(UTC).isoformat(),
+        "git": _build_git_metadata(),
         "artifacts": {
             "contract_snapshot": contract_path.as_posix(),
             "rollout_readiness": readiness_path.as_posix(),
