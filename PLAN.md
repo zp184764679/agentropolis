@@ -91,6 +91,7 @@
 - 若 control-plane 已暴露 request-id / client fingerprint traceability，也必须把 header 名和审计字段写入 runtime metadata 与 README，避免客户端各自猜测
 - 若 preview/control-plane 已对外暴露错误语义，必须提供稳定 `error_code`，并在 header/body 中可机器消费，避免客户端解析自然语言 `detail`
 - 若 migration-phase error taxonomy 已存在，也必须通过 `/meta/runtime` 或 `/meta/control-plane` 暴露机器可读 error-code catalog，避免客户端文档漂移
+- HTTP 422 校验失败也必须纳入同一套错误契约，不能保留框架默认 shape 混入外部接口
 - 若审计已记录 request-id，则 `/meta/control-plane/audit` 必须支持按 request-id 过滤，才能把客户端失败与管理动作真正串起来
 
 ---

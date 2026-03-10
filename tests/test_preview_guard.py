@@ -619,6 +619,24 @@ def test_placeholder_routes_expose_not_implemented_error_code() -> None:
     asyncio.run(scenario())
 
 
+def test_request_validation_errors_expose_stable_error_contract() -> None:
+    reset_preview_guard_state()
+
+    async def scenario() -> None:
+        async with _preview_client() as client:
+            response = await client.post("/api/agent/register", json={})
+
+        assert response.status_code == 422
+        assert response.json()["error_code"] == "request_validation_failed"
+        assert response.headers[ERROR_CODE_HEADER] == "request_validation_failed"
+        assert response.headers[REQUEST_ID_HEADER]
+        assert response.json()["request_id"] == response.headers[REQUEST_ID_HEADER]
+        assert isinstance(response.json()["detail"], list)
+        assert response.json()["detail"]
+
+    asyncio.run(scenario())
+
+
 def test_control_plane_policy_validation_returns_stable_error_code(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

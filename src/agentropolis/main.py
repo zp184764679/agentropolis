@@ -14,6 +14,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -134,6 +135,25 @@ async def handle_http_exception(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
         content=content,
+        headers=headers,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def handle_validation_exception(request: Request, exc: RequestValidationError):
+    """Expose request validation failures through the same error contract."""
+    request_id = getattr(request.state, "request_id", None)
+    headers = {ERROR_CODE_HEADER: "request_validation_failed"}
+    if request_id:
+        headers[REQUEST_ID_HEADER] = request_id
+
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": exc.errors(),
+            "error_code": "request_validation_failed",
+            **({"request_id": request_id} if request_id else {}),
+        },
         headers=headers,
     )
 
