@@ -67,7 +67,24 @@ async def place_buy_order(
     session: AsyncSession = Depends(get_session),
 ):
     """Place a buy order on the market."""
-    raise NotImplementedError("Issue #8: Implement market API endpoints")
+    try:
+        order_id = await market_engine.place_buy_order(
+            session,
+            company.id,
+            req.resource,
+            req.quantity,
+            req.price,
+        )
+        await session.commit()
+        orders = await market_engine.get_my_orders(session, company.id, status="ALL")
+        return next(order for order in orders if order["order_id"] == order_id)
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+            headers={ERROR_CODE_HEADER: "market_buy_invalid"},
+        ) from None
 
 
 @router.post("/sell", response_model=OrderResponse)
@@ -77,7 +94,24 @@ async def place_sell_order(
     session: AsyncSession = Depends(get_session),
 ):
     """Place a sell order on the market."""
-    raise NotImplementedError("Issue #8: Implement market API endpoints")
+    try:
+        order_id = await market_engine.place_sell_order(
+            session,
+            company.id,
+            req.resource,
+            req.quantity,
+            req.price,
+        )
+        await session.commit()
+        orders = await market_engine.get_my_orders(session, company.id, status="ALL")
+        return next(order for order in orders if order["order_id"] == order_id)
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+            headers={ERROR_CODE_HEADER: "market_sell_invalid"},
+        ) from None
 
 
 @router.post("/cancel", response_model=OrderResponse)
@@ -87,7 +121,16 @@ async def cancel_order(
     session: AsyncSession = Depends(get_session),
 ):
     """Cancel an open order."""
-    raise NotImplementedError("Issue #8: Implement market API endpoints")
+    cancelled = await market_engine.cancel_order(session, company.id, req.order_id)
+    await session.commit()
+    if not cancelled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found or no longer cancellable.",
+            headers={ERROR_CODE_HEADER: "market_order_not_cancellable"},
+        )
+    orders = await market_engine.get_my_orders(session, company.id, status="ALL")
+    return next(order for order in orders if order["order_id"] == req.order_id)
 
 
 @router.get("/orders", response_model=list[OrderResponse])

@@ -1,12 +1,10 @@
-"""Company REST API endpoints.
+"""Company REST API endpoints."""
 
-Dependencies: services/company_svc.py
-"""
-
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agentropolis.api.auth import get_current_company
+from agentropolis.api.auth import get_current_agent, get_current_company
+from agentropolis.api.preview_guard import ERROR_CODE_HEADER
 from agentropolis.api.schemas import (
     CompanyStatus,
     RegisterRequest,
@@ -14,17 +12,38 @@ from agentropolis.api.schemas import (
     WorkerInfo,
 )
 from agentropolis.database import get_session
-from agentropolis.models import Company
+from agentropolis.models import Agent, Company
+from agentropolis.services.company_svc import (
+    get_company_status,
+    get_company_workers,
+    register_company as register_company_svc,
+)
 
 router = APIRouter(prefix="/company", tags=["company"])
 
 
 @router.post("/register", response_model=RegisterResponse)
 async def register_company(
-    req: RegisterRequest, session: AsyncSession = Depends(get_session)
+    req: RegisterRequest,
+    agent: Agent = Depends(get_current_agent),
+    session: AsyncSession = Depends(get_session),
 ):
     """Register a new company and get your API key."""
-    raise NotImplementedError("Issue #11: Implement company API endpoints")
+    try:
+        result = await register_company_svc(
+            session,
+            req.company_name,
+            founder_agent_id=agent.id,
+        )
+        await session.commit()
+        return result
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+            headers={ERROR_CODE_HEADER: "company_register_invalid"},
+        ) from None
 
 
 @router.get("/status", response_model=CompanyStatus)
@@ -33,7 +52,14 @@ async def get_status(
     session: AsyncSession = Depends(get_session),
 ):
     """Get your company's current status."""
-    raise NotImplementedError("Issue #11: Implement company API endpoints")
+    try:
+        return await get_company_status(session, company.id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+            headers={ERROR_CODE_HEADER: "company_not_found"},
+        ) from None
 
 
 @router.get("/workers", response_model=WorkerInfo)
@@ -42,4 +68,11 @@ async def get_workers(
     session: AsyncSession = Depends(get_session),
 ):
     """Get your workforce details."""
-    raise NotImplementedError("Issue #11: Implement company API endpoints")
+    try:
+        return await get_company_workers(session, company.id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+            headers={ERROR_CODE_HEADER: "company_not_found"},
+        ) from None

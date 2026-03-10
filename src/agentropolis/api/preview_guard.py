@@ -1,13 +1,7 @@
-"""Best-effort control-plane guardrails for mounted preview routes.
+"""Preview/control-plane guardrails with DB-backed policy state.
 
-This module is intentionally process-local and lightweight. It provides:
-- a global preview-surface kill switch
-- a preview write gate
-- a warfare-specific write gate
-- a degraded-mode policy toggle
-- simple in-memory mutation throttling for preview actors by route family
-
-It is not a replacement for the planned distributed authz/quota/budget system.
+Short-lived mutation windows remain process-local best effort.
+Durable policy, budgets, and audit trail are stored in the database.
 """
 
 from __future__ import annotations
@@ -15,17 +9,24 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from datetime import UTC, datetime
 import hashlib
-from itertools import count
 from threading import Lock
 from time import monotonic
 from typing import Any
 
 from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import APIKeyHeader
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
 from agentropolis.config import settings
+from agentropolis.database import get_session
 from agentropolis.middleware import REQUEST_ID_HEADER
+from agentropolis.models import (
+    ControlPlaneAuditLog,
+    PreviewAgentPolicy,
+    PreviewControlPlaneState,
+)
 
 ERROR_CODE_HEADER = "X-Agentropolis-Error-Code"
 ERROR_CODE_CATALOG = {
@@ -46,20 +47,12 @@ ERROR_CODE_CATALOG = {
     "control_plane_policy_not_found": "Requested preview agent policy does not exist.",
     "not_implemented": "Legacy scaffold handler is mounted but not implemented yet.",
 }
-_mutation_windows: dict[str, deque[float]] = defaultdict(deque)
-_mutation_lock = Lock()
-_policy_lock = Lock()
-_policy_overrides: dict[str, bool | None] = {
-    "surface_enabled": None,
-    "writes_enabled": None,
-    "warfare_mutations_enabled": None,
-    "degraded_mode": None,
-}
-_agent_policy_overrides: dict[int, dict[str, Any]] = {}
-_audit_log: deque[dict[str, Any]] = deque(maxlen=200)
-_audit_counter = count(1)
 
 admin_token_header = APIKeyHeader(name="X-Control-Plane-Token", auto_error=False)
+
+_mutation_windows: dict[str, deque[float]] = defaultdict(deque)
+_mutation_lock = Lock()
+
 _FAMILY_LIMIT_ATTRS = {
     "agent_self": "PREVIEW_AGENT_SELF_MUTATIONS_PER_WINDOW",
     "world": "PREVIEW_WORLD_MUTATIONS_PER_WINDOW",
@@ -70,8 +63,16 @@ _FAMILY_LIMIT_ATTRS = {
 }
 
 
-def _utc_now() -> str:
-    return datetime.now(UTC).isoformat()
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
+def _isoformat(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.isoformat()
 
 
 def _record_window_event(
@@ -87,7 +88,6 @@ def _record_window_event(
 
     now = monotonic()
     cutoff = now - window_seconds
-
     with _mutation_lock:
         bucket = _mutation_windows[key]
         while bucket and bucket[0] <= cutoff:
@@ -113,12 +113,6 @@ def _client_fingerprint(request: Request) -> str:
     return f"{client.host}:{client.port}"
 
 
-def _policy_value(name: str, default: bool) -> bool:
-    with _policy_lock:
-        override = _policy_overrides[name]
-    return default if override is None else override
-
-
 def _guard_exception(
     *,
     status_code: int,
@@ -133,25 +127,6 @@ def _guard_exception(
         detail=detail,
         headers=merged_headers,
     )
-
-
-def _preview_surface_enabled() -> bool:
-    return _policy_value("surface_enabled", settings.PREVIEW_SURFACE_ENABLED)
-
-
-def _preview_writes_enabled() -> bool:
-    return _policy_value("writes_enabled", settings.PREVIEW_WRITES_ENABLED)
-
-
-def _warfare_mutations_enabled() -> bool:
-    return _policy_value(
-        "warfare_mutations_enabled",
-        settings.WARFARE_MUTATIONS_ENABLED,
-    )
-
-
-def _preview_degraded_mode() -> bool:
-    return _policy_value("degraded_mode", settings.PREVIEW_DEGRADED_MODE)
 
 
 def _family_limit(family: str) -> int:
@@ -177,28 +152,71 @@ def _normalize_family_budgets(family_budgets: dict[str, int] | None) -> dict[str
     normalized: dict[str, int] = {}
     for family, budget in family_budgets.items():
         _validate_family(family)
-        if budget < 0:
+        amount = int(budget)
+        if amount < 0:
             raise ValueError(f"Preview budget for {family} must be >= 0")
-        normalized[family] = int(budget)
+        normalized[family] = amount
     return normalized
 
 
-def _policy_entry(agent_id: int) -> dict[str, Any] | None:
-    with _policy_lock:
-        policy = _agent_policy_overrides.get(agent_id)
-        if policy is None:
-            return None
-        return {
-            "agent_id": policy["agent_id"],
-            "allowed_families": list(policy["allowed_families"])
-            if policy["allowed_families"] is not None
-            else None,
-            "family_budgets": dict(policy["family_budgets"]),
-            "updated_at": policy["updated_at"],
-        }
+def _policy_value(override: bool | None, default: bool) -> bool:
+    return default if override is None else bool(override)
 
 
-def _record_admin_action(
+def _serialize_agent_policy(policy: PreviewAgentPolicy) -> dict[str, Any]:
+    updated_at = policy.__dict__.get("updated_at")
+    return {
+        "agent_id": policy.agent_id,
+        "allowed_families": list(policy.allowed_families)
+        if policy.allowed_families is not None
+        else None,
+        "family_budgets": dict(policy.family_budgets or {}),
+        "updated_at": _isoformat(updated_at) or _utc_now().isoformat(),
+    }
+
+
+def _serialize_audit_entry(entry: ControlPlaneAuditLog) -> dict[str, Any]:
+    occurred_at = entry.__dict__.get("occurred_at")
+    return {
+        "event_id": entry.id,
+        "action": entry.action,
+        "actor": entry.actor,
+        "target_agent_id": entry.target_agent_id,
+        "request_id": entry.request_id,
+        "client_fingerprint": entry.client_fingerprint,
+        "reason_code": entry.reason_code,
+        "note": entry.note,
+        "payload": dict(entry.payload or {}),
+        "occurred_at": _isoformat(occurred_at) or _utc_now().isoformat(),
+    }
+
+
+async def _get_or_create_control_plane_state(
+    session: AsyncSession,
+) -> PreviewControlPlaneState:
+    state = await session.get(PreviewControlPlaneState, 1)
+    if state is None:
+        state = PreviewControlPlaneState(id=1)
+        session.add(state)
+        await session.flush()
+    return state
+
+
+async def _get_agent_policy(
+    session: AsyncSession,
+    agent_id: int,
+    *,
+    for_update: bool = False,
+) -> PreviewAgentPolicy | None:
+    stmt = select(PreviewAgentPolicy).where(PreviewAgentPolicy.agent_id == agent_id)
+    if for_update:
+        stmt = stmt.with_for_update()
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def _record_admin_action(
+    session: AsyncSession,
     action: str,
     *,
     actor: str,
@@ -209,86 +227,81 @@ def _record_admin_action(
     note: str | None = None,
     payload: dict[str, Any] | None = None,
 ) -> None:
-    entry = {
-        "event_id": next(_audit_counter),
-        "action": action,
-        "actor": actor,
-        "target_agent_id": target_agent_id,
-        "request_id": request_id,
-        "client_fingerprint": client_fingerprint,
-        "reason_code": reason_code,
-        "note": note,
-        "payload": payload or {},
-        "occurred_at": _utc_now(),
+    session.add(
+        ControlPlaneAuditLog(
+            action=action,
+            actor=actor,
+            target_agent_id=target_agent_id,
+            request_id=request_id,
+            client_fingerprint=client_fingerprint,
+            reason_code=reason_code,
+            note=note,
+            payload=payload or {},
+        )
+    )
+    await session.flush()
+
+
+async def _get_effective_global_policy(session: AsyncSession) -> dict[str, bool]:
+    state = await _get_or_create_control_plane_state(session)
+    return {
+        "surface_enabled": _policy_value(
+            state.surface_enabled_override,
+            settings.PREVIEW_SURFACE_ENABLED,
+        ),
+        "writes_enabled": _policy_value(
+            state.writes_enabled_override,
+            settings.PREVIEW_WRITES_ENABLED,
+        ),
+        "warfare_mutations_enabled": _policy_value(
+            state.warfare_mutations_enabled_override,
+            settings.WARFARE_MUTATIONS_ENABLED,
+        ),
+        "degraded_mode": _policy_value(
+            state.degraded_mode_override,
+            settings.PREVIEW_DEGRADED_MODE,
+        ),
     }
-    with _policy_lock:
-        _audit_log.appendleft(entry)
 
 
-def _require_agent_family_authorized(agent_id: int, family: str) -> None:
-    policy = _policy_entry(agent_id)
-    if policy is None or policy["allowed_families"] is None:
+async def _apply_agent_policy_gate(
+    session: AsyncSession,
+    *,
+    agent_id: int,
+    family: str,
+    consume_budget: bool,
+) -> None:
+    policy = await _get_agent_policy(session, agent_id, for_update=consume_budget)
+    if policy is None:
         return
-    if family not in policy["allowed_families"]:
+
+    allowed_families = policy.allowed_families
+    if allowed_families is not None and family not in allowed_families:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Preview {family} access is not allowed for agent {agent_id}.",
-            headers={
-                ERROR_CODE_HEADER: f"preview_{family}_access_denied",
-            },
+            headers={ERROR_CODE_HEADER: f"preview_{family}_access_denied"},
         )
 
-
-def make_agent_preview_access_guard(family: str):
-    """Build a dependency that guards authenticated preview reads for one route family."""
-
-    async def dependency(agent: Any = Depends(get_current_agent)) -> None:
-        _require_preview_surface_enabled()
-        _require_agent_family_authorized(agent.id, family)
-
-    return dependency
-
-
-def _consume_agent_budget(agent_id: int, family: str) -> None:
-    with _policy_lock:
-        policy = _agent_policy_overrides.get(agent_id)
-        if policy is None:
-            return
-        family_budgets = policy["family_budgets"]
-        if family not in family_budgets:
-            return
-        remaining = family_budgets[family]
-        if remaining <= 0:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Preview {family} budget exhausted for agent {agent_id}.",
-                headers={
-                    ERROR_CODE_HEADER: f"preview_{family}_budget_exhausted",
-                },
-            )
-        family_budgets[family] = remaining - 1
-        policy["updated_at"] = _utc_now()
-
-
-def _require_agent_budget_available(agent_id: int, family: str) -> None:
-    policy = _policy_entry(agent_id)
-    if policy is None:
-        return
-    remaining = policy["family_budgets"].get(family)
+    family_budgets = dict(policy.family_budgets or {})
+    remaining = family_budgets.get(family)
     if remaining is None:
         return
-    if remaining <= 0:
+    if int(remaining) <= 0:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Preview {family} budget exhausted for agent {agent_id}.",
-            headers={
-                ERROR_CODE_HEADER: f"preview_{family}_budget_exhausted",
-            },
+            headers={ERROR_CODE_HEADER: f"preview_{family}_budget_exhausted"},
         )
+    if consume_budget:
+        family_budgets[family] = int(remaining) - 1
+        policy.family_budgets = family_budgets
+        await session.flush()
 
 
-def _require_preview_surface_enabled() -> None:
-    if not _preview_surface_enabled():
+async def _require_preview_surface_enabled(session: AsyncSession) -> None:
+    state = await _get_effective_global_policy(session)
+    if not state["surface_enabled"]:
         raise _guard_exception(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Preview surface is disabled by runtime policy.",
@@ -296,8 +309,9 @@ def _require_preview_surface_enabled() -> None:
         )
 
 
-def _require_preview_writes_enabled() -> None:
-    if not _preview_writes_enabled():
+async def _require_preview_writes_enabled(session: AsyncSession) -> None:
+    state = await _get_effective_global_policy(session)
+    if not state["writes_enabled"]:
         raise _guard_exception(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Preview write operations are disabled by runtime policy.",
@@ -305,8 +319,9 @@ def _require_preview_writes_enabled() -> None:
         )
 
 
-def _require_warfare_mutations_enabled() -> None:
-    if not _warfare_mutations_enabled():
+async def _require_warfare_mutations_enabled(session: AsyncSession) -> None:
+    state = await _get_effective_global_policy(session)
+    if not state["warfare_mutations_enabled"]:
         raise _guard_exception(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Warfare preview mutations are disabled by runtime policy.",
@@ -314,12 +329,14 @@ def _require_warfare_mutations_enabled() -> None:
         )
 
 
-def _require_family_degraded_policy(
+async def _require_family_degraded_policy(
+    session: AsyncSession,
     family: str,
     *,
     allow_in_degraded_mode: bool,
 ) -> None:
-    if _preview_degraded_mode() and not allow_in_degraded_mode:
+    state = await _get_effective_global_policy(session)
+    if state["degraded_mode"] and not allow_in_degraded_mode:
         raise _guard_exception(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Preview {family} mutations are disabled in degraded mode.",
@@ -337,15 +354,20 @@ def _record_agent_mutation(agent_id: Any, family: str) -> None:
     )
 
 
-async def require_preview_surface() -> None:
-    """Block all mounted preview routes behind a global runtime switch."""
-    _require_preview_surface_enabled()
+async def require_preview_surface(
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """Block all mounted preview routes behind the global runtime switch."""
+    await _require_preview_surface_enabled(session)
 
 
-async def require_preview_registration_write(request: Request) -> None:
+async def require_preview_registration_write(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> None:
     """Guard unauthenticated agent registration on the preview surface."""
-    _require_preview_surface_enabled()
-    _require_preview_writes_enabled()
+    await _require_preview_surface_enabled(session)
+    await _require_preview_writes_enabled(session)
     _record_window_event(
         f"preview-registration:{_client_fingerprint(request)}",
         limit=settings.PREVIEW_REGISTRATIONS_PER_WINDOW_PER_HOST,
@@ -355,6 +377,24 @@ async def require_preview_registration_write(request: Request) -> None:
     )
 
 
+def make_agent_preview_access_guard(family: str):
+    """Build a dependency that guards authenticated preview reads for one route family."""
+
+    async def dependency(
+        agent: Any = Depends(get_current_agent),
+        session: AsyncSession = Depends(get_session),
+    ) -> None:
+        await _require_preview_surface_enabled(session)
+        await _apply_agent_policy_gate(
+            session,
+            agent_id=agent.id,
+            family=family,
+            consume_budget=False,
+        )
+
+    return dependency
+
+
 def make_agent_preview_write_guard(
     family: str,
     *,
@@ -362,25 +402,41 @@ def make_agent_preview_write_guard(
 ):
     """Build a dependency that guards preview mutations for one route family."""
 
-    async def dependency(agent: Any = Depends(get_current_agent)) -> None:
-        _require_preview_surface_enabled()
-        _require_preview_writes_enabled()
-        _require_family_degraded_policy(
+    async def dependency(
+        agent: Any = Depends(get_current_agent),
+        session: AsyncSession = Depends(get_session),
+    ) -> None:
+        await _require_preview_surface_enabled(session)
+        await _require_preview_writes_enabled(session)
+        await _require_family_degraded_policy(
+            session,
             family,
             allow_in_degraded_mode=allow_in_degraded_mode,
         )
-        _require_agent_family_authorized(agent.id, family)
-        _require_agent_budget_available(agent.id, family)
+        await _apply_agent_policy_gate(
+            session,
+            agent_id=agent.id,
+            family=family,
+            consume_budget=False,
+        )
         _record_agent_mutation(agent.id, family)
-        _consume_agent_budget(agent.id, family)
+        await _apply_agent_policy_gate(
+            session,
+            agent_id=agent.id,
+            family=family,
+            consume_budget=True,
+        )
 
     return dependency
 
 
-async def require_agent_preview_write(agent: Any = Depends(get_current_agent)) -> None:
+async def require_agent_preview_write(
+    agent: Any = Depends(get_current_agent),
+    session: AsyncSession = Depends(get_session),
+) -> None:
     """Backward-compatible generic preview mutation guard."""
-    _require_preview_surface_enabled()
-    _require_preview_writes_enabled()
+    await _require_preview_surface_enabled(session)
+    await _require_preview_writes_enabled(session)
     _record_window_event(
         f"preview-agent:{agent.id}",
         limit=settings.PREVIEW_AGENT_MUTATIONS_PER_WINDOW,
@@ -390,16 +446,32 @@ async def require_agent_preview_write(agent: Any = Depends(get_current_agent)) -
     )
 
 
-async def require_warfare_preview_write(agent: Any = Depends(get_current_agent)) -> None:
-    """Guard warfare preview mutations behind an extra kill switch."""
-    _require_preview_surface_enabled()
-    _require_preview_writes_enabled()
-    _require_warfare_mutations_enabled()
-    _require_family_degraded_policy("warfare", allow_in_degraded_mode=False)
-    _require_agent_family_authorized(agent.id, "warfare")
-    _require_agent_budget_available(agent.id, "warfare")
+async def require_warfare_preview_write(
+    agent: Any = Depends(get_current_agent),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """Guard warfare preview mutations behind the extra warfare toggle."""
+    await _require_preview_surface_enabled(session)
+    await _require_preview_writes_enabled(session)
+    await _require_warfare_mutations_enabled(session)
+    await _require_family_degraded_policy(
+        session,
+        "warfare",
+        allow_in_degraded_mode=False,
+    )
+    await _apply_agent_policy_gate(
+        session,
+        agent_id=agent.id,
+        family="warfare",
+        consume_budget=False,
+    )
     _record_agent_mutation(agent.id, "warfare")
-    _consume_agent_budget(agent.id, "warfare")
+    await _apply_agent_policy_gate(
+        session,
+        agent_id=agent.id,
+        family="warfare",
+        consume_budget=True,
+    )
 
 
 async def require_control_plane_admin(
@@ -423,16 +495,27 @@ async def require_control_plane_admin(
     return f"control-plane-admin:{token_fingerprint}"
 
 
-def get_preview_guard_state() -> dict[str, Any]:
+async def get_preview_guard_state(session: AsyncSession) -> dict[str, Any]:
     """Return the currently effective preview control-plane state."""
-    with _policy_lock:
-        agent_policy_count = len(_agent_policy_overrides)
-        audit_log_size = len(_audit_log)
+    effective = await _get_effective_global_policy(session)
+    agent_policy_count = int(
+        (
+            await session.execute(
+                select(func.count(PreviewAgentPolicy.agent_id))
+            )
+        ).scalar_one()
+        or 0
+    )
+    audit_log_size = int(
+        (
+            await session.execute(
+                select(func.count(ControlPlaneAuditLog.id))
+            )
+        ).scalar_one()
+        or 0
+    )
     return {
-        "surface_enabled": _preview_surface_enabled(),
-        "writes_enabled": _preview_writes_enabled(),
-        "warfare_mutations_enabled": _warfare_mutations_enabled(),
-        "degraded_mode": _preview_degraded_mode(),
+        **effective,
         "mutation_window_seconds": settings.PREVIEW_MUTATION_WINDOW_SECONDS,
         "agent_mutations_per_window": settings.PREVIEW_AGENT_MUTATIONS_PER_WINDOW,
         "registrations_per_window_per_host": settings.PREVIEW_REGISTRATIONS_PER_WINDOW_PER_HOST,
@@ -451,8 +534,10 @@ def get_preview_guard_state() -> dict[str, Any]:
             "audit_filter_support": True,
             "audit_request_id_filtering": True,
             "stable_error_codes": True,
+            "persistent_policy_store": True,
         },
         "rate_limit_store": "process_local_best_effort",
+        "persistent_policy_store": "database",
         "error_codes": dict(ERROR_CODE_CATALOG),
         "admin_api": {
             "path": "/meta/control-plane",
@@ -464,31 +549,34 @@ def get_preview_guard_state() -> dict[str, Any]:
     }
 
 
-def get_control_plane_admin_snapshot(*, audit_limit: int = 20) -> dict[str, Any]:
+async def get_control_plane_admin_snapshot(
+    session: AsyncSession,
+    *,
+    audit_limit: int = 20,
+) -> dict[str, Any]:
     """Return the admin-facing snapshot including actor policy and audit detail."""
-    state = get_preview_guard_state()
-    with _policy_lock:
-        policies = [
-            {
-                "agent_id": policy["agent_id"],
-                "allowed_families": list(policy["allowed_families"])
-                if policy["allowed_families"] is not None
-                else None,
-                "family_budgets": dict(policy["family_budgets"]),
-                "updated_at": policy["updated_at"],
-            }
-            for policy in sorted(
-                _agent_policy_overrides.values(),
-                key=lambda item: item["agent_id"],
-            )
-        ]
-        recent_audit_entries = list(_audit_log)[: max(audit_limit, 0)]
-    state["agent_policies"] = policies
-    state["recent_audit_entries"] = recent_audit_entries
+    state = await get_preview_guard_state(session)
+    policy_result = await session.execute(
+        select(PreviewAgentPolicy).order_by(PreviewAgentPolicy.agent_id.asc())
+    )
+    audit_result = await session.execute(
+        select(ControlPlaneAuditLog)
+        .order_by(ControlPlaneAuditLog.id.desc())
+        .limit(max(audit_limit, 0))
+    )
+    state["agent_policies"] = [
+        _serialize_agent_policy(policy)
+        for policy in policy_result.scalars().all()
+    ]
+    state["recent_audit_entries"] = [
+        _serialize_audit_entry(entry)
+        for entry in audit_result.scalars().all()
+    ]
     return state
 
 
-def update_preview_guard_state(
+async def update_preview_guard_state(
+    session: AsyncSession,
     *,
     surface_enabled: bool | None = None,
     writes_enabled: bool | None = None,
@@ -500,19 +588,22 @@ def update_preview_guard_state(
     reason_code: str | None = None,
     note: str | None = None,
 ) -> dict[str, Any]:
-    """Apply runtime overrides to the process-local preview policy."""
+    """Apply durable runtime overrides to the preview policy."""
+    state = await _get_or_create_control_plane_state(session)
     updates = {
-        "surface_enabled": surface_enabled,
-        "writes_enabled": writes_enabled,
-        "warfare_mutations_enabled": warfare_mutations_enabled,
-        "degraded_mode": degraded_mode,
+        "surface_enabled_override": surface_enabled,
+        "writes_enabled_override": writes_enabled,
+        "warfare_mutations_enabled_override": warfare_mutations_enabled,
+        "degraded_mode_override": degraded_mode,
     }
-    with _policy_lock:
-        for key, value in updates.items():
-            if value is not None:
-                _policy_overrides[key] = value
+    for key, value in updates.items():
+        if value is not None:
+            setattr(state, key, value)
+    await session.flush()
+
     if audit_actor and any(value is not None for value in updates.values()):
-        _record_admin_action(
+        await _record_admin_action(
+            session,
             "update_preview_runtime_policy",
             actor=audit_actor,
             request_id=request_id,
@@ -521,10 +612,11 @@ def update_preview_guard_state(
             note=note,
             payload={key: value for key, value in updates.items() if value is not None},
         )
-    return get_preview_guard_state()
+    return await get_preview_guard_state(session)
 
 
-def upsert_agent_preview_policy(
+async def upsert_agent_preview_policy(
+    session: AsyncSession,
     agent_id: int,
     *,
     allowed_families: list[str] | None = None,
@@ -535,19 +627,25 @@ def upsert_agent_preview_policy(
     reason_code: str | None = None,
     note: str | None = None,
 ) -> dict[str, Any]:
-    """Upsert a process-local per-agent preview policy."""
+    """Upsert a durable per-agent preview policy."""
     normalized_families = _normalize_allowed_families(allowed_families)
     normalized_budgets = _normalize_family_budgets(family_budgets)
-    policy = {
-        "agent_id": agent_id,
-        "allowed_families": normalized_families,
-        "family_budgets": normalized_budgets,
-        "updated_at": _utc_now(),
-    }
-    with _policy_lock:
-        _agent_policy_overrides[agent_id] = policy
+    policy = await _get_agent_policy(session, agent_id, for_update=True)
+    if policy is None:
+        policy = PreviewAgentPolicy(
+            agent_id=agent_id,
+            allowed_families=normalized_families,
+            family_budgets=normalized_budgets,
+        )
+        session.add(policy)
+    else:
+        policy.allowed_families = normalized_families
+        policy.family_budgets = normalized_budgets
+    await session.flush()
+
     if audit_actor:
-        _record_admin_action(
+        await _record_admin_action(
+            session,
             "upsert_agent_preview_policy",
             actor=audit_actor,
             target_agent_id=agent_id,
@@ -560,10 +658,11 @@ def upsert_agent_preview_policy(
                 "family_budgets": normalized_budgets,
             },
         )
-    return _policy_entry(agent_id) or policy
+    return _serialize_agent_policy(policy)
 
 
-def clear_agent_preview_policy(
+async def clear_agent_preview_policy(
+    session: AsyncSession,
     agent_id: int,
     *,
     audit_actor: str | None = None,
@@ -572,11 +671,15 @@ def clear_agent_preview_policy(
     reason_code: str | None = None,
     note: str | None = None,
 ) -> bool:
-    """Delete a process-local per-agent preview policy."""
-    with _policy_lock:
-        existed = _agent_policy_overrides.pop(agent_id, None) is not None
-    if existed and audit_actor:
-        _record_admin_action(
+    """Delete a durable per-agent preview policy."""
+    policy = await _get_agent_policy(session, agent_id, for_update=True)
+    if policy is None:
+        return False
+    await session.delete(policy)
+    await session.flush()
+    if audit_actor:
+        await _record_admin_action(
+            session,
             "clear_agent_preview_policy",
             actor=audit_actor,
             target_agent_id=agent_id,
@@ -585,10 +688,11 @@ def clear_agent_preview_policy(
             reason_code=reason_code,
             note=note,
         )
-    return existed
+    return True
 
 
-def refill_agent_preview_budget(
+async def refill_agent_preview_budget(
+    session: AsyncSession,
     agent_id: int,
     *,
     increments: dict[str, int],
@@ -598,7 +702,7 @@ def refill_agent_preview_budget(
     reason_code: str | None = None,
     note: str | None = None,
 ) -> dict[str, Any]:
-    """Increment process-local per-agent family budgets."""
+    """Increment durable per-agent family budgets."""
     normalized = _normalize_family_budgets(increments)
     if not normalized:
         raise ValueError("At least one preview family budget increment is required.")
@@ -606,23 +710,25 @@ def refill_agent_preview_budget(
         if amount <= 0:
             raise ValueError(f"Preview budget refill for {family} must be > 0")
 
-    with _policy_lock:
-        policy = _agent_policy_overrides.get(agent_id)
-        if policy is None:
-            policy = {
-                "agent_id": agent_id,
-                "allowed_families": None,
-                "family_budgets": {},
-                "updated_at": _utc_now(),
-            }
-            _agent_policy_overrides[agent_id] = policy
+    policy = await _get_agent_policy(session, agent_id, for_update=True)
+    if policy is None:
+        policy = PreviewAgentPolicy(
+            agent_id=agent_id,
+            allowed_families=None,
+            family_budgets={},
+        )
+        session.add(policy)
+        await session.flush()
 
-        for family, amount in normalized.items():
-            policy["family_budgets"][family] = policy["family_budgets"].get(family, 0) + amount
-        policy["updated_at"] = _utc_now()
+    budgets = dict(policy.family_budgets or {})
+    for family, amount in normalized.items():
+        budgets[family] = int(budgets.get(family, 0)) + amount
+    policy.family_budgets = budgets
+    await session.flush()
 
     if audit_actor:
-        _record_admin_action(
+        await _record_admin_action(
+            session,
             "refill_agent_preview_budget",
             actor=audit_actor,
             target_agent_id=agent_id,
@@ -632,10 +738,11 @@ def refill_agent_preview_budget(
             note=note,
             payload={"increments": normalized},
         )
-    return _policy_entry(agent_id) or policy
+    return _serialize_agent_policy(policy)
 
 
-def reset_preview_guard_runtime(
+async def reset_preview_guard_runtime(
+    session: AsyncSession,
     *,
     audit_actor: str | None = None,
     request_id: str | None = None,
@@ -643,25 +750,24 @@ def reset_preview_guard_runtime(
     reason_code: str | None = None,
     note: str | None = None,
 ) -> None:
-    """Clear process-local runtime counters and overrides while preserving code defaults."""
+    """Clear process-local rate-limit windows while preserving durable policy."""
     with _mutation_lock:
         _mutation_windows.clear()
-    with _policy_lock:
-        for key in _policy_overrides:
-            _policy_overrides[key] = None
-        _agent_policy_overrides.clear()
     if audit_actor:
-        _record_admin_action(
+        await _record_admin_action(
+            session,
             "reset_preview_guard_runtime",
             actor=audit_actor,
             request_id=request_id,
             client_fingerprint=client_fingerprint,
             reason_code=reason_code,
             note=note,
+            payload={"scope": "rate_limits_only"},
         )
 
 
-def list_control_plane_audit(
+async def list_control_plane_audit(
+    session: AsyncSession,
     *,
     limit: int = 20,
     action: str | None = None,
@@ -669,32 +775,30 @@ def list_control_plane_audit(
     reason_code: str | None = None,
     request_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Return recent admin actions for the process-local preview policy."""
-    with _policy_lock:
-        entries = list(_audit_log)
-
+    """Return recent admin actions for the durable preview policy."""
+    stmt = select(ControlPlaneAuditLog)
     if action is not None:
-        entries = [entry for entry in entries if entry["action"] == action]
+        stmt = stmt.where(ControlPlaneAuditLog.action == action)
     if target_agent_id is not None:
-        entries = [entry for entry in entries if entry["target_agent_id"] == target_agent_id]
+        stmt = stmt.where(ControlPlaneAuditLog.target_agent_id == target_agent_id)
     if reason_code is not None:
-        entries = [entry for entry in entries if entry["reason_code"] == reason_code]
+        stmt = stmt.where(ControlPlaneAuditLog.reason_code == reason_code)
     if request_id is not None:
-        entries = [entry for entry in entries if entry["request_id"] == request_id]
-    return entries[: max(limit, 0)]
-
-
-def build_preview_guard_metadata() -> dict[str, Any]:
-    """Expose the current preview guard posture for `/meta/runtime`."""
-    return get_preview_guard_state()
+        stmt = stmt.where(ControlPlaneAuditLog.request_id == request_id)
+    stmt = stmt.order_by(ControlPlaneAuditLog.id.desc()).limit(max(limit, 0))
+    result = await session.execute(stmt)
+    return [
+        _serialize_audit_entry(entry)
+        for entry in result.scalars().all()
+    ]
 
 
 def reset_preview_guard_state() -> None:
-    """Clear in-memory guard state for deterministic tests."""
+    """Clear process-local guard state for deterministic tests."""
     with _mutation_lock:
         _mutation_windows.clear()
-    with _policy_lock:
-        for key in _policy_overrides:
-            _policy_overrides[key] = None
-        _agent_policy_overrides.clear()
-        _audit_log.clear()
+
+
+async def hydrate_preview_guard_runtime(session: AsyncSession) -> dict[str, Any]:
+    """Compatibility hook for startup/runtime metadata refresh."""
+    return await get_preview_guard_state(session)

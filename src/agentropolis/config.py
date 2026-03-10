@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     # Legacy scaffold game mechanics
     TICK_INTERVAL_SECONDS: int = 60
+    HOUSEKEEPING_AUTOSTART: bool = False
     INITIAL_BALANCE: int = 10_000
     INITIAL_WORKERS: int = 100
     WORKER_RAT_PER_TICK: float = 0.5  # RAT consumed per worker per tick
@@ -51,6 +52,7 @@ class Settings(BaseSettings):
     PREVIEW_WARFARE_MUTATIONS_PER_WINDOW: int = 10
     PREVIEW_REGISTRATIONS_PER_WINDOW_PER_HOST: int = 10
     CONTROL_PLANE_ADMIN_TOKEN: str | None = None
+    HOUSEKEEPING_AUTOSTART: bool = True
 
     # Target world kernel defaults
     AGENT_BASE_CARRY_KG: int = 50

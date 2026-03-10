@@ -8,8 +8,8 @@ file presence alone.
 from __future__ import annotations
 
 from agentropolis.api.preview_guard import (
+    ERROR_CODE_CATALOG,
     ERROR_CODE_HEADER,
-    build_preview_guard_metadata,
 )
 from agentropolis.middleware import REQUEST_ID_HEADER
 from agentropolis.models import Base
@@ -25,7 +25,7 @@ MOUNTED_ROUTE_GROUPS = [
     {
         "module": "production",
         "prefix": "/api/production",
-        "state": "placeholder-heavy",
+        "state": "service_backed_writes",
         "auth_model": "legacy_company_auth",
     },
     {
@@ -37,8 +37,8 @@ MOUNTED_ROUTE_GROUPS = [
     {
         "module": "company",
         "prefix": "/api/company",
-        "state": "placeholder-heavy",
-        "auth_model": "legacy_company_auth",
+        "state": "mixed_agent_creation_legacy_company_ops",
+        "auth_model": "mixed_agent_company_auth",
     },
     {
         "module": "game",
@@ -104,8 +104,7 @@ MOUNTED_ROUTE_GROUPS = [
 
 UNMOUNTED_ROUTE_GROUPS = []
 
-
-def build_runtime_metadata() -> dict:
+def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
     """Return a machine-readable snapshot of the current runtime surface."""
     return {
         "stage": "migration_scaffold",
@@ -117,8 +116,8 @@ def build_runtime_metadata() -> dict:
         "public_contract_frozen": False,
         "control_plane_surface": {
             "admin_endpoint": "/meta/control-plane",
-            "scope": "process_local_preview_policy",
-            "persistent": False,
+            "scope": "db_persisted_preview_policy",
+            "persistent": True,
             "request_id_header": REQUEST_ID_HEADER,
             "error_code_header": ERROR_CODE_HEADER,
             "error_code_catalog": "preview_guard.error_codes",
@@ -131,6 +130,7 @@ def build_runtime_metadata() -> dict:
                 "audit_request_id_filtering",
                 "audit_request_context",
                 "stable_error_codes",
+                "db_persisted_policy",
             ],
         },
         "auth_surface": {
@@ -143,7 +143,40 @@ def build_runtime_metadata() -> dict:
                 "entrypoint": "get_current_agent",
             },
         },
-        "preview_guard": build_preview_guard_metadata(),
+        "preview_guard": preview_guard_state
+        or {
+            "surface_enabled": True,
+            "writes_enabled": True,
+            "warfare_mutations_enabled": True,
+            "degraded_mode": False,
+            "mutation_window_seconds": 60,
+            "agent_mutations_per_window": 60,
+            "registrations_per_window_per_host": 10,
+            "family_limits": {},
+            "agent_policy_count": 0,
+            "audit_log_size": 0,
+            "policy_features": {
+                "authenticated_read_policy": "family_scoped",
+                "authenticated_write_policy": "family_scoped_with_budget",
+                "public_preview_read_policy": "surface_only",
+                "admin_action_context": "structured_reason_note",
+                "budget_refill_support": True,
+                "audit_filter_support": True,
+                "audit_request_id_filtering": True,
+                "stable_error_codes": True,
+                "persistent_policy_store": True,
+            },
+            "rate_limit_store": "process_local_best_effort",
+            "persistent_policy_store": "database",
+            "error_codes": dict(ERROR_CODE_CATALOG),
+            "admin_api": {
+                "path": "/meta/control-plane",
+                "configured": False,
+                "token_header": "X-Control-Plane-Token",
+                "request_id_header": REQUEST_ID_HEADER,
+                "error_code_header": ERROR_CODE_HEADER,
+            },
+        },
         "orm_surface": {
             "metadata_table_count": len(Base.metadata.tables),
             "target_models_registered": True,

@@ -9,6 +9,11 @@ from agentropolis.models.base import Base, TimestampMixin
 from agentropolis.models.building import Building, BuildingStatus
 from agentropolis.models.building_type import BuildingType
 from agentropolis.models.company import Company
+from agentropolis.models.control_plane_state import (
+    ControlPlaneAuditLog,
+    PreviewAgentPolicy,
+    PreviewControlPlaneState,
+)
 from agentropolis.models.decision_log import AgentDecisionLog, DecisionType
 from agentropolis.models.game_state import GameState
 from agentropolis.models.guild import Guild, GuildMember, GuildRank
@@ -65,6 +70,7 @@ __all__ = [
     "BuildingType",
     "CombatDoctrine",
     "Company",
+    "ControlPlaneAuditLog",
     "ContractParticipant",
     "ContractStatus",
     "ContractType",
@@ -92,6 +98,8 @@ __all__ = [
     "PlayerContractStatus",
     "PriceHistory",
     "PrimaryFocus",
+    "PreviewAgentPolicy",
+    "PreviewControlPlaneState",
     "ProjectStatus",
     "ProjectType",
     "Region",

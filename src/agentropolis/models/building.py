@@ -28,6 +28,7 @@ class Building(Base, TimestampMixin):
     )
     active_recipe_id: Mapped[int | None] = mapped_column(ForeignKey("recipes.id"))
     production_progress: Mapped[int] = mapped_column(default=0)
+    last_production_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     durability: Mapped[float] = mapped_column(Float, nullable=False, default=100.0)
     max_durability: Mapped[float] = mapped_column(Float, nullable=False, default=100.0)
     last_durability_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
