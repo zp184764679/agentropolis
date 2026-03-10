@@ -20,13 +20,16 @@ from fastapi.responses import JSONResponse
 from agentropolis.api.agent import router as agent_router
 from agentropolis.api.company import router as company_router
 from agentropolis.api.diplomacy import router as diplomacy_router
+from agentropolis.api.decisions import router as decisions_router
 from agentropolis.api.game import router as game_router
 from agentropolis.api.guild import router as guild_router
 from agentropolis.api.inventory import router as inventory_router
 from agentropolis.api.market import router as market_router
 from agentropolis.api.production import router as production_router
 from agentropolis.api.skills import router as skills_router
+from agentropolis.api.strategy import router as strategy_router
 from agentropolis.api.transport import router as transport_router
+from agentropolis.api.warfare import router as warfare_router
 from agentropolis.api.world import router as world_router
 from agentropolis.config import settings
 from agentropolis.database import async_session, engine
@@ -87,6 +90,9 @@ app.include_router(skills_router, prefix="/api")
 app.include_router(transport_router, prefix="/api")
 app.include_router(guild_router, prefix="/api")
 app.include_router(diplomacy_router, prefix="/api")
+app.include_router(strategy_router, prefix="/api")
+app.include_router(decisions_router, prefix="/api")
+app.include_router(warfare_router, prefix="/api")
 
 # TODO: mount the MCP surface after the transport and external contract are frozen.
 # from agentropolis.mcp.server import mcp

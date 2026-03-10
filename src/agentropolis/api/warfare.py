@@ -29,7 +29,7 @@ async def create_contract(
 ):
     """Create a mercenary contract. Escrow is deducted from your balance."""
     try:
-        result = await warfare_svc.create_contract(
+        created = await warfare_svc.create_contract(
             session,
             employer_agent_id=agent.id,
             mission_type=req.mission_type,
@@ -41,9 +41,11 @@ async def create_contract(
             mission_duration_seconds=req.mission_duration_seconds,
             expires_in_seconds=req.expires_in_seconds,
         )
+        result = await warfare_svc.get_contract(session, created["contract_id"])
         await session.commit()
         return result
     except ValueError as e:
+        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from None
 
 
@@ -56,13 +58,16 @@ async def list_contracts(
     session: AsyncSession = Depends(get_session),
 ):
     """List mercenary contracts with optional filters."""
-    contracts = await warfare_svc.list_contracts(
-        session,
-        region_id=region_id,
-        status=status,
-        mission_type=mission_type,
-        limit=limit,
-    )
+    try:
+        contracts = await warfare_svc.list_contracts(
+            session,
+            region_id=region_id,
+            status=status,
+            mission_type=mission_type,
+            limit=limit,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
     return {"contracts": contracts}
 
 
@@ -90,6 +95,7 @@ async def enlist_in_contract(
         await session.commit()
         return {"message": f"Enlisted as {result['role']} ({result['enlisted_count']}/{result['max_agents']})"}
     except ValueError as e:
+        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from None
 
 
@@ -111,6 +117,7 @@ async def activate_contract(
         await session.commit()
         return {"message": f"Contract activated with {result['active_agents']} agents"}
     except ValueError as e:
+        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from None
 
 
@@ -126,6 +133,7 @@ async def cancel_contract(
         await session.commit()
         return {"message": f"Contract cancelled. Refund: {result['refund']}, fee: {result['fee']}"}
     except ValueError as e:
+        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from None
 
 
@@ -153,6 +161,7 @@ async def execute_contract(
         await session.commit()
         return result
     except ValueError as e:
+        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from None
 
 
@@ -168,6 +177,7 @@ async def garrison_building(
         await session.commit()
         return result
     except ValueError as e:
+        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from None
 
 
@@ -183,6 +193,7 @@ async def ungarrison_building(
         await session.commit()
         return {"message": "Ungarrisoned from building"}
     except ValueError as e:
+        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from None
 
 
@@ -198,6 +209,7 @@ async def repair_building(
         await session.commit()
         return result
     except ValueError as e:
+        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from None
 
 

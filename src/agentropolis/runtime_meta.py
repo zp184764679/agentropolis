@@ -77,28 +77,27 @@ MOUNTED_ROUTE_GROUPS = [
         "state": "preview_service_backed",
         "auth_model": "target_agent_auth",
     },
-]
-
-UNMOUNTED_ROUTE_GROUPS = [
     {
         "module": "strategy",
         "prefix": "/api/strategy",
-        "state": "importable_partially_implemented",
+        "state": "preview_service_backed",
         "auth_model": "target_agent_auth",
     },
     {
         "module": "decisions",
         "prefix": "/api/agent/decisions",
-        "state": "importable_partially_implemented",
+        "state": "preview_service_backed",
         "auth_model": "target_agent_auth",
     },
     {
         "module": "warfare",
         "prefix": "/api/warfare",
-        "state": "importable_partially_implemented",
+        "state": "preview_service_backed",
         "auth_model": "target_agent_auth",
     },
 ]
+
+UNMOUNTED_ROUTE_GROUPS = []
 
 
 def build_runtime_metadata() -> dict:

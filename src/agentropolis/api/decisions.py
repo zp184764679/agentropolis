@@ -1,6 +1,6 @@
 """Decision Journal REST API endpoints."""
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
@@ -20,7 +20,15 @@ async def list_decisions(
     session: AsyncSession = Depends(get_session),
 ):
     """Get your recent decisions with outcomes."""
-    entries = await get_recent_decisions(session, agent.id, limit=limit, decision_type=decision_type)
+    try:
+        entries = await get_recent_decisions(
+            session,
+            agent.id,
+            limit=limit,
+            decision_type=decision_type,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
     return {"entries": entries}
 
 
