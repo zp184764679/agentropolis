@@ -84,6 +84,7 @@ curl http://localhost:8000/meta/execution
 - FastAPI validation failures (`422`) now use the same contract instead of the framework default body shape
 - `/meta/runtime` and `/meta/control-plane` now expose the current migration-phase preview/control-plane error code catalog
 - A concrete REST/MCP parity baseline now exists under `tests/contract/test_rest_mcp_parity.py` and `tests/e2e/test_rest_mcp_parity_journey.py`, covering company/world/intel/transport, market/production/inventory/game, strategy/autonomy/digest, social/warfare, and key negative-path error parity
+- `/meta/contract` and `/meta/runtime` now also publish the parity boundary explicitly: the covered gameplay subset, the intentional REST-only operations, and the MCP-only local-preview groups (`npc`, `notifications`)
 - Admin control-plane audit entries capture request id and best-effort client fingerprint
 - Fresh-database bootstrap now assumes `alembic upgrade head` followed by scaffold/world seed on startup
 

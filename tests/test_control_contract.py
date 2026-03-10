@@ -92,6 +92,12 @@ def test_control_contract_catalog_matches_runtime_and_mcp_registry() -> None:
         "Presented company API key is invalid or inactive."
     )
     assert len(catalog["authorization"]["mcp_tool_scopes"]) == 60
+    assert catalog["parity_surface"]["mode"] == "semantic_parity_subset"
+    assert "npc" in catalog["parity_surface"]["mcp_only_groups"]
+    assert any(
+        entry["path"] == "/api/company/status"
+        for entry in catalog["parity_surface"]["rest_only_operations"]
+    )
     assert any(
         entry["operation"] == "place_buy_order"
         for entry in catalog["authorization"]["dangerous_operations"]
@@ -108,6 +114,8 @@ def test_control_contract_catalog_matches_runtime_and_mcp_registry() -> None:
     assert any(group["prefix"] == "/meta/execution" for group in catalog["authorization"]["rest_route_scopes"])
     assert runtime_meta["control_contract_surface"]["endpoint"] == "/meta/contract"
     assert runtime_meta["control_contract_surface"]["version"] == CONTROL_CONTRACT_VERSION
+    assert runtime_meta["parity_surface"]["catalog_source"] == "/meta/contract"
+    assert "notifications" in runtime_meta["parity_surface"]["mcp_only_groups"]
 
     snapshot = build_contract_snapshot()
     assert snapshot["control_contract"]["version"] == CONTROL_CONTRACT_VERSION

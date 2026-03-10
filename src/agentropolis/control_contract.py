@@ -207,6 +207,104 @@ AUTHORIZATION_DELEGATION_RULES = [
     },
 ]
 
+REST_MCP_PARITY_COVERED_PREFIXES = [
+    "/api/agent",
+    "/api/world",
+    "/api/skills",
+    "/api/transport",
+    "/api/inventory",
+    "/api/market",
+    "/api/production",
+    "/api/guild",
+    "/api/diplomacy",
+    "/api/warfare",
+    "/api/autonomy",
+    "/api/strategy",
+    "/api/agent/decisions",
+    "/api/digest",
+    "/api/dashboard",
+    "/api/intel",
+    "/api/game",
+]
+
+REST_MCP_PARITY_REST_ONLY_OPERATIONS = [
+    {
+        "method": "GET",
+        "path": "/api/company/status",
+        "reason": "Legacy company-key compatibility route; MCP company module is intentionally agent-centric.",
+    },
+    {
+        "method": "GET",
+        "path": "/api/company/workers",
+        "reason": "Legacy company-key compatibility route; MCP company module is intentionally agent-centric.",
+    },
+    {
+        "method": "POST",
+        "path": "/api/guild/{guild_id}/promote",
+        "reason": "Guild admin extras are mounted REST-only in the current 60-tool local-preview MCP catalog.",
+    },
+    {
+        "method": "POST",
+        "path": "/api/guild/{guild_id}/deposit",
+        "reason": "Guild treasury admin actions are intentionally REST-only in the current local-preview MCP catalog.",
+    },
+    {
+        "method": "POST",
+        "path": "/api/guild/{guild_id}/disband",
+        "reason": "Guild destructive admin action is intentionally REST-only in the current local-preview MCP catalog.",
+    },
+    {
+        "method": "POST",
+        "path": "/api/warfare/garrison/{building_id}",
+        "reason": "Building garrison actions remain REST-only in the current local-preview MCP catalog.",
+    },
+    {
+        "method": "DELETE",
+        "path": "/api/warfare/garrison/{building_id}",
+        "reason": "Building ungarrison actions remain REST-only in the current local-preview MCP catalog.",
+    },
+    {
+        "method": "POST",
+        "path": "/api/warfare/repair/{building_id}",
+        "reason": "Building repair actions remain REST-only in the current local-preview MCP catalog.",
+    },
+    {
+        "method": "GET",
+        "path": "/meta/control-plane",
+        "reason": "Admin control-plane and operator meta surfaces are intentionally REST-only; no MCP admin tool surface exists.",
+    },
+    {
+        "method": "GET",
+        "path": "/meta/contract",
+        "reason": "Machine-readable contract endpoint is intentionally REST-only and is the source of truth for parity boundaries.",
+    },
+    {
+        "method": "GET",
+        "path": "/meta/execution",
+        "reason": "Execution/job operator surface is intentionally REST-only.",
+    },
+    {
+        "method": "GET",
+        "path": "/meta/observability",
+        "reason": "Observability/operator snapshot is intentionally REST-only.",
+    },
+    {
+        "method": "GET",
+        "path": "/meta/alerts",
+        "reason": "Alerts/operator snapshot is intentionally REST-only.",
+    },
+    {
+        "method": "GET",
+        "path": "/meta/rollout-readiness",
+        "reason": "Rollout/operator readiness snapshot is intentionally REST-only.",
+    },
+]
+
+REST_MCP_PARITY_MCP_ONLY_GROUPS = [
+    "npc",
+    "notifications",
+]
+
 REST_ROUTE_SCOPE_GROUPS = [
     {
         "prefix": "/health",
@@ -861,6 +959,21 @@ def build_authorization_scope_catalog() -> dict:
     }
 
 
+def build_parity_surface_catalog() -> dict:
+    return {
+        "mode": "semantic_parity_subset",
+        "coverage_policy": "mounted_gameplay_subset_plus_explicit_exclusions",
+        "covered_rest_prefixes": list(REST_MCP_PARITY_COVERED_PREFIXES),
+        "rest_only_operations": deepcopy(REST_MCP_PARITY_REST_ONLY_OPERATIONS),
+        "mcp_only_groups": list(REST_MCP_PARITY_MCP_ONLY_GROUPS),
+        "mutation_parity_contract": "success_message_plus_side_effects_when_envelopes_differ",
+        "legacy_company_note": (
+            "Legacy /api/company status and worker reads remain mounted REST compatibility "
+            "routes; MCP company tools map to the agent-owned company surface instead."
+        ),
+    }
+
+
 def build_control_contract_catalog() -> dict:
     return {
         "version": CONTROL_CONTRACT_VERSION,
@@ -936,5 +1049,6 @@ def build_control_contract_catalog() -> dict:
             },
         },
         "authorization": build_authorization_scope_catalog(),
+        "parity_surface": build_parity_surface_catalog(),
         "error_taxonomy": build_error_taxonomy(),
     }

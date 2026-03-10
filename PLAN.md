@@ -94,6 +94,7 @@
 - 若 migration-phase error taxonomy 已存在，也必须通过 `/meta/runtime` 或 `/meta/control-plane` 暴露机器可读 error-code catalog，避免客户端文档漂移
 - 若 control-contract baseline 已冻结，也应提供单独的 `/meta/contract` 机器可读入口，明确 transport、version、scope catalog 与错误分类，而不是要求客户端拼接多份元数据
 - 若 `#82 Authorization & Tool Scope Model` 已有 repo baseline，也必须把 actor/resource/action + delegation catalog 同步暴露到 `/meta/contract` 与 `/meta/runtime`，避免授权语义只存在于分散代码路径中
+- 若 `#88 REST/MCP Parity` 只覆盖 gameplay 子集，也必须把 covered subset、REST-only operations、MCP-only groups 明确暴露到 `/meta/contract` 与 `/meta/runtime`，避免把未承诺的 parity surface 误当成 contract
 - HTTP 422 校验失败也必须纳入同一套错误契约，不能保留框架默认 shape 混入外部接口
 - 若审计已记录 request-id，则 `/meta/control-plane/audit` 必须支持按 request-id 过滤，才能把客户端失败与管理动作真正串起来
 

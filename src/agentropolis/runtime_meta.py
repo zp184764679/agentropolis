@@ -13,6 +13,7 @@ from agentropolis.control_contract import (
     IDEMPOTENCY_KEY_HEADER,
     build_authorization_scope_catalog,
     build_dangerous_operation_catalog,
+    build_parity_surface_catalog,
 )
 from agentropolis.api.preview_guard import (
     ERROR_CODE_CATALOG,
@@ -141,6 +142,7 @@ UNMOUNTED_ROUTE_GROUPS = []
 def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
     """Return a machine-readable snapshot of the current runtime surface."""
     authorization_catalog = build_authorization_scope_catalog()
+    parity_catalog = build_parity_surface_catalog()
     rest_scope_families = sorted(
         {
             entry["scope_family"]
@@ -332,6 +334,16 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
                 "agents, not authentication principals."
             ),
             "delegation_rules": authorization_catalog["delegation_rules"],
+        },
+        "parity_surface": {
+            "catalog_source": "/meta/contract",
+            "mode": parity_catalog["mode"],
+            "coverage_policy": parity_catalog["coverage_policy"],
+            "covered_rest_prefixes": list(parity_catalog["covered_rest_prefixes"]),
+            "rest_only_operations": list(parity_catalog["rest_only_operations"]),
+            "mcp_only_groups": list(parity_catalog["mcp_only_groups"]),
+            "mutation_parity_contract": parity_catalog["mutation_parity_contract"],
+            "legacy_company_note": parity_catalog["legacy_company_note"],
         },
         "preview_guard": preview_guard_state
         or {

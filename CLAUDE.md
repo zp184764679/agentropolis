@@ -94,6 +94,7 @@ Likewise, do not treat an `api/*.py` file existing on disk as evidence that it s
 - preview/control-plane HTTP failures now expose a stable `X-Agentropolis-Error-Code`; prefer that over parsing human `detail`
 - the frozen local-preview contract baseline now also has a dedicated `/meta/contract` surface and `X-Agentropolis-Contract-Version`; keep auth/concurrency/control-plane failures aligned with that catalog
 - the proposed `#82` authorization baseline now also exists in-repo: actor/resource/action rules and delegation semantics are published through `/meta/contract` and summarized in `/meta/runtime`
+- the parity baseline is now explicit too: `/meta/contract` and `/meta/runtime` declare which gameplay prefixes are covered, which operations remain intentionally REST-only, and which groups are MCP-only local-preview surfaces
 - the current migration-phase preview/control-plane error-code catalog is exposed through runtime metadata; keep it aligned with any new guard/control-plane failures
 - request validation failures should follow the same `error_code + request_id` contract; do not rely on raw FastAPI default 422 payloads
 - contract version is now `2026-03-preview.3`; if execution semantics change, update `README.md`, `PLAN.md`, `CLAUDE.md`, `/meta/runtime`, and `/meta/contract` together
