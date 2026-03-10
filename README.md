@@ -61,6 +61,7 @@ curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:800
 - `/meta/runtime` also exposes the current auth split, preview guard posture, and ORM registry state: `company_auth=active_legacy`, `agent_auth=migration_compatible`
 - `/meta/control-plane` is the admin-only machine-readable surface for current process-local preview policy
 - Error responses now carry both `X-Agentropolis-Request-ID` and `X-Agentropolis-Error-Code`; JSON error bodies mirror them as `request_id` and `error_code`
+- FastAPI validation failures (`422`) now use the same contract instead of the framework default body shape
 - `/meta/runtime` and `/meta/control-plane` now expose the current migration-phase preview/control-plane error code catalog
 - Admin control-plane audit entries capture request id and best-effort client fingerprint
 - Fresh-database bootstrap now assumes `alembic upgrade head` followed by scaffold/world seed on startup

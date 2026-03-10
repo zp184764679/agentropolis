@@ -153,6 +153,7 @@ def build_runtime_metadata() -> dict:
             "mounted_route_groups": MOUNTED_ROUTE_GROUPS,
             "unmounted_route_groups": UNMOUNTED_ROUTE_GROUPS,
             "placeholder_error_status": 501,
+            "validation_error_status": 422,
             "error_code_header": ERROR_CODE_HEADER,
         },
         "mcp_surface": {

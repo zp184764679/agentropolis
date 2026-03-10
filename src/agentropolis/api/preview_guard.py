@@ -29,6 +29,7 @@ from agentropolis.middleware import REQUEST_ID_HEADER
 
 ERROR_CODE_HEADER = "X-Agentropolis-Error-Code"
 ERROR_CODE_CATALOG = {
+    "request_validation_failed": "Request payload, path params, or query params failed validation.",
     "preview_surface_disabled": "Global preview surface kill switch is active.",
     "preview_writes_disabled": "Preview writes are disabled by runtime policy.",
     "preview_warfare_mutations_disabled": "Warfare preview mutations are disabled.",

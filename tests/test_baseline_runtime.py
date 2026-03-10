@@ -46,6 +46,7 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert mounted["strategy"] == "preview_service_backed"
     assert mounted["warfare"] == "preview_service_backed"
     assert meta["rest_surface"]["unmounted_route_groups"] == []
+    assert meta["rest_surface"]["validation_error_status"] == 422
     assert meta["rest_surface"]["error_code_header"] == "X-Agentropolis-Error-Code"
 
 
