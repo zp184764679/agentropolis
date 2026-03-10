@@ -15,6 +15,13 @@
 - **Layer 1 Shape**: 13 parallel service tracks + #23 orchestrator
 - **Repo**: https://github.com/zp184764679/agentropolis
 
+### Status Legend
+
+- `⬜ CREATED`: GitHub issue 已创建，但 repo 里未达到本文要求的完成态
+- `✅ REPO COMPLETE`: repo 已实现并通过当前验证；GitHub close/state sync 可能仍待手动同步
+- `✅ REPO BASELINE`: repo 已有可用 baseline，但仍可能不是最终 public-rollout 完成态
+- `✅ LOCAL PREVIEW COMPLETE`: repo 已满足本地/封闭环境目标；不代表外部公开 rollout 已完成
+
 ## Key Design Decisions
 
 | 决策 | 选择 |
@@ -824,24 +831,24 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 
 | Issue | Title | Status | Depends On | Key Files |
 |-------|-------|--------|------------|-----------|
-| [#64](https://github.com/zp184764679/agentropolis/issues/64) | Server Autopilot — Reflex + Standing Orders | ⬜ CREATED | #16,#17,#24,#27 | `models/autonomy.py`, `services/autopilot.py` |
-| [#65](https://github.com/zp184764679/agentropolis/issues/65) | Rich Information APIs — AI Decision Data | ⬜ CREATED | #17,#21,#22,#25 | `services/market_analysis_svc.py`, `api/market_analysis.py` |
-| [#67](https://github.com/zp184764679/agentropolis/issues/67) | Activity Digest / Morning Briefing | ⬜ CREATED | #57,#41,#22,#29 | `services/digest_svc.py`, `api/digest.py` |
-| [#69](https://github.com/zp184764679/agentropolis/issues/69) | MCP Tool Suite — AI Agent Core Interface | ⬜ CREATED | #35, all services | `mcp/*` |
+| [#64](https://github.com/zp184764679/agentropolis/issues/64) | Server Autopilot — Reflex + Standing Orders | ✅ REPO COMPLETE | #16,#17,#24,#27 | `models/autonomy.py`, `services/autopilot.py` |
+| [#65](https://github.com/zp184764679/agentropolis/issues/65) | Rich Information APIs — AI Decision Data | ✅ REPO COMPLETE | #17,#21,#22,#25 | `services/market_analysis_svc.py`, `api/market_analysis.py` |
+| [#67](https://github.com/zp184764679/agentropolis/issues/67) | Activity Digest / Morning Briefing | ✅ REPO COMPLETE | #57,#41,#22,#29 | `services/digest_svc.py`, `api/digest.py` |
+| [#69](https://github.com/zp184764679/agentropolis/issues/69) | MCP Tool Suite — AI Agent Core Interface | ✅ REPO COMPLETE | #35, all services | `mcp/*` |
 
 #### P1 — 控制
 
 | Issue | Title | Status | Depends On | Key Files |
 |-------|-------|--------|------------|-----------|
-| [#66](https://github.com/zp184764679/agentropolis/issues/66) | Goal Tracking System | ⬜ CREATED | #16,#17,#26 | `models/autonomy.py`, `services/goal_svc.py` |
-| [#68](https://github.com/zp184764679/agentropolis/issues/68) | Autonomy Config API | ⬜ CREATED | #64 | `api/autonomy.py` |
-| [#71](https://github.com/zp184764679/agentropolis/issues/71) | Housekeeping Integration | ⬜ CREATED | #23,#64,#66 | `services/game_engine.py` |
+| [#66](https://github.com/zp184764679/agentropolis/issues/66) | Goal Tracking System | ✅ REPO COMPLETE | #16,#17,#26 | `models/autonomy.py`, `services/goal_svc.py` |
+| [#68](https://github.com/zp184764679/agentropolis/issues/68) | Autonomy Config API | ✅ REPO COMPLETE | #64 | `api/autonomy.py` |
+| [#71](https://github.com/zp184764679/agentropolis/issues/71) | Housekeeping Integration | ✅ REPO COMPLETE | #23,#64,#66 | `services/game_engine.py` |
 
 #### P2 — 深度
 
 | Issue | Title | Status | Depends On | Key Files |
 |-------|-------|--------|------------|-----------|
-| [#70](https://github.com/zp184764679/agentropolis/issues/70) | Real-time Activity Dashboard API | ⬜ CREATED | #64,#68 | `api/dashboard.py` |
+| [#70](https://github.com/zp184764679/agentropolis/issues/70) | Real-time Activity Dashboard API | ✅ REPO COMPLETE | #64,#68 | `api/dashboard.py` |
 
 ### 执行波次
 
@@ -902,17 +909,17 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 
 | Issue | Title | Status | Depends On | Key Files |
 |-------|-------|--------|------------|-----------|
-| [#72](https://github.com/zp184764679/agentropolis/issues/72) | MCP Tools Expansion — Repo-Truthful 14 Modules / 60 Tools | ⬜ CREATED | #30-#34 (all APIs) | `mcp/*` (14 tool modules) |
-| [#73](https://github.com/zp184764679/agentropolis/issues/73) | Agentropolis World Skill — MCP-First With Mounted REST Fallback | ⬜ CREATED | #30-#34 | `skills/agentropolis-world/SKILL.md` + `references/*` |
-| [#74](https://github.com/zp184764679/agentropolis/issues/74) | Agent Brain Decision Framework — System Prompt | ⬜ CREATED | #72 | `prompts/agent-brain.md`, `mcp/server.py` |
-| [#75](https://github.com/zp184764679/agentropolis/issues/75) | OpenClaw Configuration Templates & Registration Flow | ⬜ CREATED | #72 | `openclaw/*` |
+| [#72](https://github.com/zp184764679/agentropolis/issues/72) | MCP Tools Expansion — Repo-Truthful 14 Modules / 60 Tools | ✅ LOCAL PREVIEW COMPLETE | #30-#34 (all APIs) | `mcp/*` (14 tool modules) |
+| [#73](https://github.com/zp184764679/agentropolis/issues/73) | Agentropolis World Skill — MCP-First With Mounted REST Fallback | ✅ LOCAL PREVIEW COMPLETE | #30-#34 | `skills/agentropolis-world/SKILL.md` + `references/*` |
+| [#74](https://github.com/zp184764679/agentropolis/issues/74) | Agent Brain Decision Framework — System Prompt | ✅ LOCAL PREVIEW COMPLETE | #72 | `prompts/agent-brain.md`, `mcp/server.py` |
+| [#75](https://github.com/zp184764679/agentropolis/issues/75) | OpenClaw Configuration Templates & Registration Flow | ✅ LOCAL PREVIEW COMPLETE | #72 | `openclaw/*` |
 
 ### Deployment & Testing
 
 | Issue | Title | Status | Depends On | Key Files |
 |-------|-------|--------|------------|-----------|
-| [#76](https://github.com/zp184764679/agentropolis/issues/76) | Multi-Agent Deployment Orchestration | ⬜ CREATED | #75 | `docker-compose.multi-agent.yml`, `scripts/*` |
-| [#77](https://github.com/zp184764679/agentropolis/issues/77) | End-to-End Integration Test — Full Agent Lifecycle | ⬜ CREATED | #72, #74 | `tests/e2e/*` |
+| [#76](https://github.com/zp184764679/agentropolis/issues/76) | Multi-Agent Deployment Orchestration | ✅ LOCAL PREVIEW COMPLETE | #75 | `docker-compose.multi-agent.yml`, `scripts/*` |
+| [#77](https://github.com/zp184764679/agentropolis/issues/77) | End-to-End Integration Test — Full Agent Lifecycle | ✅ LOCAL PREVIEW COMPLETE | #72, #74 | `tests/e2e/*` |
 
 ### File Ownership
 
@@ -1039,9 +1046,9 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 
 | Issue | Title | Status | Depends On | Key Files |
 |-------|-------|--------|------------|-----------|
-| [#78](https://github.com/zp184764679/agentropolis/issues/78) | Concurrency Guard Core — StripedLock + GlobalSemaphore | ⬜ CREATED | #16 | `services/concurrency.py`, `config.py`, `deps.py` |
-| [#79](https://github.com/zp184764679/agentropolis/issues/79) | Rate Limit Middleware — Sliding Window | ⬜ CREATED | #78 | `middleware/__init__.py`, `middleware/rate_limit.py` |
-| [#80](https://github.com/zp184764679/agentropolis/issues/80) | Concurrency Integration — main.py + Exception Handlers | ⬜ CREATED | #78, #79 | `main.py` |
+| [#78](https://github.com/zp184764679/agentropolis/issues/78) | Concurrency Guard Core — StripedLock + GlobalSemaphore | ✅ REPO COMPLETE | #16 | `services/concurrency.py`, `config.py`, `deps.py` |
+| [#79](https://github.com/zp184764679/agentropolis/issues/79) | Rate Limit Middleware — Sliding Window | ✅ REPO COMPLETE | #78 | `middleware/__init__.py`, `middleware/rate_limit.py` |
+| [#80](https://github.com/zp184764679/agentropolis/issues/80) | Concurrency Integration — main.py + Exception Handlers | ✅ REPO COMPLETE | #78, #79 | `main.py` |
 
 ### 执行顺序
 

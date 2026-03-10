@@ -65,12 +65,13 @@ Likewise, do not treat an `api/*.py` file existing on disk as evidence that it s
 - Issues #1-#15 已关闭（旧版计划，已废弃）
 - Issues #39-#55: Design Gap issues (PrUn/EVE 审查后的 17 个补全项)
 - Issues #56-#58: Training System (✅ prototype code complete)
-- Issues #64-#71: **Autonomy Engine** — AI 自主行为引擎 (8 issues, label: `autonomy`)
-- Issues #72-#77: OpenClaw Integration (外部玩家接入 + MCP 扩展)
-- Issues #78-#80: Concurrency Guard (应用层三层并发控制)
+- Issues #64-#71: **Autonomy Engine** — repo 已有完整本地预览实现；若 GitHub 仍 open，优先视为 issue-state sync 待补
+- Issues #72-#77: OpenClaw Integration — repo 已达到本地/封闭环境原型完成态；这不等于 public rollout 已完成
+- Issues #78-#80: Concurrency Guard — repo 已实现并进入运行时/观测面；若 GitHub 仍 open，优先视为 issue-state sync 待补
 - Proposed backlog #81+: cross-cutting control-plane / governance / recovery issues, still only draft entries in PLAN.md
 - `PLAN.md` now contains issue-ready draft specs for proposed `#81-#88` (goal / scope / non-goals / acceptance)
 - `#88` now has a concrete repo baseline in `tests/contract/test_rest_mcp_parity.py` and `tests/e2e/test_rest_mcp_parity_journey.py`
+- `PLAN.md` status markers now distinguish `GitHub issue created/open` from `repo complete/local preview complete`; do not assume `⬜ CREATED` means “code not done” without checking the current repo truth
 - `.github/README.md` indexes both created-issue briefs and proposed control-plane draft issues
 - `/meta/runtime` is the machine-readable snapshot of the currently mounted scaffold surface
 - `/meta/control-plane` is the admin-only DB-backed preview policy surface when `CONTROL_PLANE_ADMIN_TOKEN` is configured
