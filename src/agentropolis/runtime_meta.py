@@ -164,6 +164,7 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
             "request_metrics": "process_local_best_effort",
             "economy_health_snapshot": True,
             "latest_housekeeping_summary": True,
+            "export_script": "scripts/export_observability_snapshot.py",
         },
         "rollout_readiness_surface": {
             "endpoint": "/meta/rollout-readiness",
@@ -326,4 +327,17 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
             "CLAUDE.md",
             ".github/README.md",
         ],
+        "operator_bundle_surface": {
+            "observability_script": "scripts/export_observability_snapshot.py",
+            "rollout_readiness_script": "scripts/export_rollout_readiness.py",
+            "review_bundle_script": "scripts/build_review_bundle.py",
+            "gate_check_script": "scripts/check_rollout_gate.py",
+            "cli_commands": [
+                "agentropolis contract-snapshot",
+                "agentropolis check-rollout-gate",
+                "agentropolis observability-snapshot",
+                "agentropolis rollout-readiness",
+                "agentropolis build-review-bundle",
+            ],
+        },
     }

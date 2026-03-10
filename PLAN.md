@@ -959,6 +959,7 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 - 当前 repo 也允许顺手补 proposed `#86/#87` 的最小基线：tunables registry、world snapshot、derived-state repair；这些是 rollout gate 的前置资产，不代表完整 live-ops 平台已完成
 - 当前 repo 也允许顺手补 proposed `#85` 的最小观测面：`/meta/observability` 可提供进程内 request metrics、economy health summary、latest housekeeping snapshot；这仍不是完整生产级 telemetry
 - 当前 repo 也允许把 rollout gate 进一步具体化为 `/meta/rollout-readiness`、contract snapshot、gate-check 脚本和 operator runbook；这样每一轮外部接入原型都能自检而不是凭记忆判断
+- 当前 repo 也允许继续把这些资产打包成 review bundle，作为封闭环境验收和后续 GitHub 审查输入；bundle 至少应包含 contract snapshot、observability snapshot、rollout readiness、gate summary、world snapshot；这属于 rollout scaffolding，不改变玩法面
 
 ### MCP Tool 清单 (60 tools, repo-truthful local preview)
 

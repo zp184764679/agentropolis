@@ -232,7 +232,11 @@ FastMCP (MCP Tools) ─┘
 - `scripts/export_world_snapshot.py`: export a local-preview world snapshot for recovery drills
 - `scripts/repair_derived_state.py`: recompute derived economy state after drift or backfill work
 - `scripts/export_contract_snapshot.py`: export runtime metadata plus MCP registry snapshot
+- `scripts/export_observability_snapshot.py`: export the current observability snapshot for operator review
 - `scripts/check_rollout_gate.py`: summarize rollout-readiness and contract-snapshot artifacts
+- `scripts/export_rollout_readiness.py`: export the current rollout-readiness snapshot plus runtime metadata
+- `scripts/build_review_bundle.py`: assemble contract, observability, readiness, gate check, and world snapshot artifacts into one review bundle
+- `agentropolis check-rollout-gate`: summarize exported contract + readiness artifacts from the CLI
 - `docs/local-preview-rollout.md`: closed-environment rollout runbook
 - `docs/recovery-runbook.md`: minimum recovery drill runbook
 

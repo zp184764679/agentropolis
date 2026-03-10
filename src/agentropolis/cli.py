@@ -106,6 +106,118 @@ def repair_derived_state():
     asyncio.run(_repair())
 
 
+@cli.command("contract-snapshot")
+@click.option(
+    "--output",
+    default="openclaw/runtime/contract-snapshot.json",
+    show_default=True,
+    help="Contract snapshot output path.",
+)
+def contract_snapshot(output: str):
+    """Export runtime metadata plus the static MCP registry snapshot."""
+    from pathlib import Path
+
+    from scripts.export_contract_snapshot import build_contract_snapshot
+
+    payload = build_contract_snapshot()
+    target = Path(output)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    console.print_json(json.dumps(payload))
+
+
+@cli.command("rollout-readiness")
+@click.option(
+    "--output",
+    default="openclaw/runtime/rollout-readiness.json",
+    show_default=True,
+    help="Rollout readiness output path.",
+)
+def rollout_readiness(output: str):
+    """Export current local-preview rollout readiness."""
+    from scripts.export_rollout_readiness import build_rollout_readiness_export
+
+    async def _readiness():
+        payload = await build_rollout_readiness_export()
+        from pathlib import Path
+
+        target = Path(output)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        console.print_json(json.dumps(payload))
+
+    asyncio.run(_readiness())
+
+
+@cli.command("check-rollout-gate")
+@click.option(
+    "--readiness",
+    default="openclaw/runtime/rollout-readiness.json",
+    show_default=True,
+    help="Rollout readiness snapshot path.",
+)
+@click.option(
+    "--contract-snapshot",
+    default="openclaw/runtime/contract-snapshot.json",
+    show_default=True,
+    help="Contract snapshot path.",
+)
+def check_rollout_gate(readiness: str, contract_snapshot: str):
+    """Summarize rollout-gate state from exported review artifacts."""
+    from pathlib import Path
+
+    from scripts.check_rollout_gate import build_rollout_gate_summary
+
+    readiness_payload = json.loads(Path(readiness).read_text(encoding="utf-8"))
+    contract_payload = json.loads(Path(contract_snapshot).read_text(encoding="utf-8"))
+    payload = build_rollout_gate_summary(
+        readiness_payload["rollout_readiness"],
+        contract_payload,
+    )
+    console.print_json(json.dumps(payload))
+
+
+@cli.command("observability-snapshot")
+@click.option(
+    "--output",
+    default="openclaw/runtime/observability.json",
+    show_default=True,
+    help="Observability snapshot output path.",
+)
+def observability_snapshot(output: str):
+    """Export the current observability snapshot."""
+    from scripts.export_observability_snapshot import build_observability_export
+
+    async def _snapshot():
+        payload = await build_observability_export()
+        from pathlib import Path
+
+        target = Path(output)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        console.print_json(json.dumps(payload))
+
+    asyncio.run(_snapshot())
+
+
+@cli.command("build-review-bundle")
+@click.option(
+    "--output-dir",
+    default="openclaw/runtime/review-bundle",
+    show_default=True,
+    help="Review bundle output directory.",
+)
+def build_review_bundle(output_dir: str):
+    """Assemble contract, readiness, observability, and world artifacts into one directory."""
+    from scripts.build_review_bundle import build_review_bundle as build_review_bundle_svc
+
+    async def _bundle():
+        payload = await build_review_bundle_svc(output_dir)
+        console.print_json(json.dumps(payload))
+
+    asyncio.run(_bundle())
+
+
 @cli.command()
 @click.confirmation_option(prompt="This will delete ALL game data. Are you sure?")
 def reset():
