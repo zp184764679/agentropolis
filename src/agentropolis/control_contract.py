@@ -9,7 +9,7 @@ from agentropolis.services.concurrency import (
     ERROR_CODE_HEADER,
 )
 
-CONTROL_CONTRACT_VERSION = "2026-03-preview.1"
+CONTROL_CONTRACT_VERSION = "2026-03-preview.2"
 CONTRACT_VERSION_HEADER = "X-Agentropolis-Contract-Version"
 IDEMPOTENCY_KEY_HEADER = "X-Idempotency-Key"
 REQUEST_ID_HEADER = "X-Agentropolis-Request-ID"
@@ -341,6 +341,11 @@ _MCP_TOOL_GROUP_SPECS = [
             "rest": "non_idempotent_mutation",
         },
         "dangerous_tools": {"eat", "drink", "rest"},
+        "dangerous_operation_codes": {
+            "eat": ["vitals_mutations"],
+            "drink": ["vitals_mutations"],
+            "rest": ["vitals_mutations"],
+        },
     },
     {
         "module": "world",
@@ -356,6 +361,7 @@ _MCP_TOOL_GROUP_SPECS = [
         ],
         "mutation_tools": {"start_travel": "non_idempotent_mutation"},
         "dangerous_tools": {"start_travel"},
+        "dangerous_operation_codes": {"start_travel": ["travel_start"]},
     },
     {
         "module": "inventory",
@@ -391,6 +397,11 @@ _MCP_TOOL_GROUP_SPECS = [
             "cancel_order": "non_idempotent_mutation",
         },
         "dangerous_tools": {"place_buy_order", "place_sell_order", "cancel_order"},
+        "dangerous_operation_codes": {
+            "place_buy_order": ["place_buy_order"],
+            "place_sell_order": ["place_sell_order"],
+            "cancel_order": ["cancel_order"],
+        },
     },
     {
         "module": "npc",
@@ -422,6 +433,11 @@ _MCP_TOOL_GROUP_SPECS = [
             "stop_production": "non_idempotent_mutation",
         },
         "dangerous_tools": {"build_building", "start_production", "stop_production"},
+        "dangerous_operation_codes": {
+            "build_building": ["build_building"],
+            "start_production": ["start_production"],
+            "stop_production": ["stop_production"],
+        },
     },
     {
         "module": "company",
@@ -436,6 +452,7 @@ _MCP_TOOL_GROUP_SPECS = [
         ],
         "mutation_tools": {"create_company": "non_idempotent_create"},
         "dangerous_tools": {"create_company"},
+        "dangerous_operation_codes": {"create_company": ["company_creation"]},
     },
     {
         "module": "transport",
@@ -449,6 +466,7 @@ _MCP_TOOL_GROUP_SPECS = [
         ],
         "mutation_tools": {"create_transport": "non_idempotent_mutation"},
         "dangerous_tools": {"create_transport"},
+        "dangerous_operation_codes": {"create_transport": ["transport_create"]},
     },
     {
         "module": "skills",
@@ -490,6 +508,13 @@ _MCP_TOOL_GROUP_SPECS = [
             "treaty_tool",
             "relationship_tool",
         },
+        "dangerous_operation_codes": {
+            "create_guild": ["guild_create"],
+            "join_guild": ["guild_join_leave"],
+            "leave_guild": ["guild_join_leave"],
+            "treaty_tool": ["treaty_propose_accept"],
+            "relationship_tool": ["relationship_set"],
+        },
     },
     {
         "module": "warfare",
@@ -507,6 +532,10 @@ _MCP_TOOL_GROUP_SPECS = [
             "contract_action_tool": "mixed_action_tool",
         },
         "dangerous_tools": {"create_contract", "contract_action_tool"},
+        "dangerous_operation_codes": {
+            "create_contract": ["contract_create_activate_execute_cancel"],
+            "contract_action_tool": ["contract_create_activate_execute_cancel"],
+        },
     },
     {
         "module": "strategy",
@@ -528,6 +557,15 @@ _MCP_TOOL_GROUP_SPECS = [
             "strategy_profile_tool",
             "autonomy_tool",
             "digest_tool",
+        },
+        "dangerous_operation_codes": {
+            "strategy_profile_tool": ["strategy_profile_update"],
+            "autonomy_tool": [
+                "autonomy_config_update",
+                "standing_order_replace",
+                "goal_create_update",
+            ],
+            "digest_tool": ["digest_acknowledge"],
         },
     },
     {
@@ -575,6 +613,7 @@ def build_mcp_tool_scope_catalog() -> list[dict]:
     for group in _MCP_TOOL_GROUP_SPECS:
         mutation_tools = group["mutation_tools"]
         dangerous_tools = group["dangerous_tools"]
+        dangerous_operation_codes = group.get("dangerous_operation_codes", {})
         for tool_name in group["tools"]:
             entries.append(
                 {
@@ -588,9 +627,31 @@ def build_mcp_tool_scope_catalog() -> list[dict]:
                     else "sync",
                     "idempotency_policy": mutation_tools.get(tool_name, "safe_read"),
                     "dangerous_operation": tool_name in dangerous_tools,
+                    "dangerous_operation_codes": list(
+                        dangerous_operation_codes.get(tool_name, [])
+                    ),
                 }
             )
     return sorted(entries, key=lambda entry: entry["tool_name"])
+
+
+def build_dangerous_operation_catalog() -> list[dict]:
+    entries: list[dict] = []
+    seen: set[str] = set()
+    for group in REST_ROUTE_SCOPE_GROUPS:
+        for operation in group["dangerous_operations"]:
+            if operation in seen:
+                continue
+            seen.add(operation)
+            entries.append(
+                {
+                    "operation": operation,
+                    "rest_prefix": group["prefix"],
+                    "scope_family": group["scope_family"],
+                    "actor_kind": group["actor_kind"],
+                }
+            )
+    return sorted(entries, key=lambda entry: entry["operation"])
 
 
 def build_control_contract_catalog() -> dict:
@@ -634,6 +695,7 @@ def build_control_contract_catalog() -> dict:
             "actor_kinds": list(AUTHORIZATION_ACTOR_KINDS),
             "rest_route_scopes": deepcopy(REST_ROUTE_SCOPE_GROUPS),
             "mcp_tool_scopes": build_mcp_tool_scope_catalog(),
+            "dangerous_operations": build_dangerous_operation_catalog(),
             "dangerous_operation_gates": [
                 "preview_policy_family_authz",
                 "authenticated_request_rate_limit",

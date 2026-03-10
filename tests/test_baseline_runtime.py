@@ -21,10 +21,18 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["preview_guard"]["agent_policy_count"] == 0
     assert meta["preview_guard"]["audit_log_size"] == 0
     assert meta["preview_guard"]["policy_features"]["authenticated_read_policy"] == "family_scoped"
+    assert (
+        meta["preview_guard"]["policy_features"]["authenticated_write_policy"]
+        == "family_scoped_with_budget_and_operation_policy"
+    )
     assert meta["preview_guard"]["policy_features"]["budget_refill_support"] is True
+    assert meta["preview_guard"]["policy_features"]["per_operation_budget_support"] is True
+    assert meta["preview_guard"]["policy_features"]["unsafe_operation_denylist"] is True
+    assert meta["preview_guard"]["policy_features"]["spending_cap_support"] is True
     assert meta["preview_guard"]["policy_features"]["audit_request_id_filtering"] is True
     assert meta["preview_guard"]["policy_features"]["stable_error_codes"] is True
     assert meta["preview_guard"]["policy_features"]["persistent_policy_store"] is True
+    assert "place_buy_order" in meta["preview_guard"]["dangerous_operations"]
     assert meta["preview_guard"]["rate_limit_store"] == "process_local_best_effort"
     assert meta["preview_guard"]["persistent_policy_store"] == "database"
     assert meta["preview_guard"]["admin_api"]["path"] == "/meta/control-plane"
@@ -53,12 +61,15 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["request_context"]["request_id_header"] == "X-Agentropolis-Request-ID"
     assert meta["control_contract_surface"]["endpoint"] == "/meta/contract"
     assert meta["control_contract_surface"]["minimum_contract_frozen"] is True
-    assert meta["control_contract_surface"]["version"] == "2026-03-preview.1"
+    assert meta["control_contract_surface"]["version"] == "2026-03-preview.2"
     assert meta["control_contract_surface"]["version_header"] == "X-Agentropolis-Contract-Version"
     assert meta["control_contract_surface"]["idempotency_key_header"] == "X-Idempotency-Key"
     assert meta["control_contract_surface"]["scope_catalog_available"] is True
     assert meta["control_contract_surface"]["error_taxonomy_available"] is True
     assert "budget_refill" in meta["control_plane_surface"]["features"]
+    assert "per_operation_budgets" in meta["control_plane_surface"]["features"]
+    assert "unsafe_operation_denylists" in meta["control_plane_surface"]["features"]
+    assert "spending_caps" in meta["control_plane_surface"]["features"]
     assert "db_persisted_policy" in meta["control_plane_surface"]["features"]
     assert "audit_request_id_filtering" in meta["control_plane_surface"]["features"]
     assert "audit_request_context" in meta["control_plane_surface"]["features"]
@@ -105,6 +116,7 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["observability_surface"]["request_metrics"] == "process_local_best_effort"
     assert meta["observability_surface"]["economy_health_snapshot"] is True
     assert meta["observability_surface"]["concurrency_snapshot"] is True
+    assert meta["observability_surface"]["preview_policy_snapshot"] is True
     assert meta["observability_surface"]["export_script"] == "scripts/export_observability_snapshot.py"
     assert meta["alerts_surface"]["endpoint"] == "/meta/alerts"
     assert meta["alerts_surface"]["export_script"] == "scripts/export_alert_snapshot.py"

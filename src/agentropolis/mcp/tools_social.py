@@ -27,7 +27,12 @@ async def create_guild(
     home_region_id: int,
 ) -> dict:
     try:
-        async with agent_tool_context(agent_api_key, family="social", mutate=True) as (session, agent):
+        async with agent_tool_context(
+            agent_api_key,
+            family="social",
+            mutate=True,
+            operation="guild_create",
+        ) as (session, agent):
             payload = await create_guild_svc(session, agent.id, name, home_region_id)
             await session.commit()
             return {"ok": True, "guild": payload}
@@ -56,7 +61,12 @@ async def list_guilds(agent_api_key: str, region_id: int | None = None) -> dict:
 @mcp.tool()
 async def join_guild(agent_api_key: str, guild_id: int) -> dict:
     try:
-        async with agent_tool_context(agent_api_key, family="social", mutate=True) as (session, agent):
+        async with agent_tool_context(
+            agent_api_key,
+            family="social",
+            mutate=True,
+            operation="guild_join_leave",
+        ) as (session, agent):
             payload = await join_guild_svc(session, agent.id, guild_id)
             await session.commit()
             return {"ok": True, "membership": payload}
@@ -67,7 +77,12 @@ async def join_guild(agent_api_key: str, guild_id: int) -> dict:
 @mcp.tool()
 async def leave_guild(agent_api_key: str, guild_id: int) -> dict:
     try:
-        async with agent_tool_context(agent_api_key, family="social", mutate=True) as (session, agent):
+        async with agent_tool_context(
+            agent_api_key,
+            family="social",
+            mutate=True,
+            operation="guild_join_leave",
+        ) as (session, agent):
             await leave_guild_svc(session, agent.id, guild_id)
             await session.commit()
             return {"ok": True, "guild_id": guild_id}
@@ -89,7 +104,12 @@ async def treaty_tool(
 ) -> dict:
     mutate = action in {"propose", "accept"}
     try:
-        async with agent_tool_context(agent_api_key, family="social", mutate=mutate) as (session, agent):
+        async with agent_tool_context(
+            agent_api_key,
+            family="social",
+            mutate=mutate,
+            operation="treaty_propose_accept" if mutate else None,
+        ) as (session, agent):
             if action == "list":
                 return {
                     "ok": True,
@@ -130,7 +150,12 @@ async def relationship_tool(
 ) -> dict:
     mutate = action == "set"
     try:
-        async with agent_tool_context(agent_api_key, family="social", mutate=mutate) as (session, agent):
+        async with agent_tool_context(
+            agent_api_key,
+            family="social",
+            mutate=mutate,
+            operation="relationship_set" if mutate else None,
+        ) as (session, agent):
             if action == "list":
                 return {"ok": True, "relationships": await get_relationships(session, agent.id)}
             if action == "set":

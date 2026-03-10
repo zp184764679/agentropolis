@@ -62,7 +62,13 @@ async def place_buy_order(
     price: float,
 ) -> dict:
     try:
-        async with company_tool_context(company_api_key) as (session, company):
+        async with company_tool_context(
+            company_api_key,
+            family="company_market",
+            mutate=True,
+            operation="place_buy_order",
+            spend_amount=float(quantity) * float(price),
+        ) as (session, company):
             order_id = await market_engine.place_buy_order(
                 session,
                 company.id,
@@ -85,7 +91,12 @@ async def place_sell_order(
     price: float,
 ) -> dict:
     try:
-        async with company_tool_context(company_api_key) as (session, company):
+        async with company_tool_context(
+            company_api_key,
+            family="company_market",
+            mutate=True,
+            operation="place_sell_order",
+        ) as (session, company):
             order_id = await market_engine.place_sell_order(
                 session,
                 company.id,
@@ -103,7 +114,12 @@ async def place_sell_order(
 @mcp.tool()
 async def cancel_order(company_api_key: str, order_id: int) -> dict:
     try:
-        async with company_tool_context(company_api_key) as (session, company):
+        async with company_tool_context(
+            company_api_key,
+            family="company_market",
+            mutate=True,
+            operation="cancel_order",
+        ) as (session, company):
             cancelled = await market_engine.cancel_order(session, company.id, order_id)
             await session.commit()
             return {"ok": bool(cancelled), "order_id": order_id}

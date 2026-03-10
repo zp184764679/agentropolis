@@ -52,7 +52,12 @@ async def get_route(agent_api_key: str, to_region_id: int) -> dict:
 @mcp.tool()
 async def start_travel(agent_api_key: str, to_region_id: int) -> dict:
     try:
-        async with agent_tool_context(agent_api_key, family="world", mutate=True) as (session, agent):
+        async with agent_tool_context(
+            agent_api_key,
+            family="world",
+            mutate=True,
+            operation="travel_start",
+        ) as (session, agent):
             payload = await start_travel_svc(session, agent.id, to_region_id)
             await session.commit()
             return {"ok": True, "travel": payload}

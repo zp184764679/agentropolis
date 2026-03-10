@@ -5,8 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
 from agentropolis.api.preview_guard import (
+    make_agent_preview_write_guard,
     require_preview_surface,
-    require_warfare_preview_write,
 )
 from agentropolis.api.schemas import (
     ContractExecutionResponse,
@@ -35,10 +35,38 @@ router = APIRouter(
 )
 
 
+async def _contract_spend_resolver(request, _session, _agent) -> int:
+    payload = await request.json()
+    return int(payload["reward_per_agent"]) * int(payload["max_agents"])
+
+
+contract_create_guard = make_agent_preview_write_guard(
+    "warfare",
+    operation="contract_create_activate_execute_cancel",
+    spend_resolver=_contract_spend_resolver,
+    require_warfare_toggle=True,
+)
+contract_action_guard = make_agent_preview_write_guard(
+    "warfare",
+    operation="contract_create_activate_execute_cancel",
+    require_warfare_toggle=True,
+)
+garrison_guard = make_agent_preview_write_guard(
+    "warfare",
+    operation="garrison_assign_remove",
+    require_warfare_toggle=True,
+)
+repair_guard = make_agent_preview_write_guard(
+    "warfare",
+    operation="building_repair",
+    require_warfare_toggle=True,
+)
+
+
 @router.post(
     "/contracts",
     response_model=ContractDetailResponse,
-    dependencies=[Depends(require_warfare_preview_write)],
+    dependencies=[Depends(contract_create_guard)],
 )
 async def create_contract(
     req: ContractCreateRequest,
@@ -108,7 +136,7 @@ async def get_contract(
 @router.post(
     "/contracts/{contract_id}/enlist",
     response_model=SuccessResponse,
-    dependencies=[Depends(require_warfare_preview_write)],
+    dependencies=[Depends(contract_action_guard)],
 )
 async def enlist_in_contract(
     contract_id: int,
@@ -129,7 +157,7 @@ async def enlist_in_contract(
 @router.post(
     "/contracts/{contract_id}/activate",
     response_model=SuccessResponse,
-    dependencies=[Depends(require_warfare_preview_write)],
+    dependencies=[Depends(contract_action_guard)],
 )
 async def activate_contract(
     contract_id: int,
@@ -156,7 +184,7 @@ async def activate_contract(
 @router.post(
     "/contracts/{contract_id}/cancel",
     response_model=SuccessResponse,
-    dependencies=[Depends(require_warfare_preview_write)],
+    dependencies=[Depends(contract_action_guard)],
 )
 async def cancel_contract(
     contract_id: int,
@@ -177,7 +205,7 @@ async def cancel_contract(
 @router.post(
     "/contracts/{contract_id}/execute",
     response_model=ContractExecutionResponse,
-    dependencies=[Depends(require_warfare_preview_write)],
+    dependencies=[Depends(contract_action_guard)],
 )
 async def execute_contract(
     contract_id: int,
@@ -213,7 +241,7 @@ async def execute_contract(
 @router.post(
     "/garrison/{building_id}",
     response_model=GarrisonResponse,
-    dependencies=[Depends(require_warfare_preview_write)],
+    dependencies=[Depends(garrison_guard)],
 )
 async def garrison_building(
     building_id: int,
@@ -234,7 +262,7 @@ async def garrison_building(
 @router.delete(
     "/garrison/{building_id}",
     response_model=SuccessResponse,
-    dependencies=[Depends(require_warfare_preview_write)],
+    dependencies=[Depends(garrison_guard)],
 )
 async def ungarrison_building(
     building_id: int,
@@ -255,7 +283,7 @@ async def ungarrison_building(
 @router.post(
     "/repair/{building_id}",
     response_model=RepairResponse,
-    dependencies=[Depends(require_warfare_preview_write)],
+    dependencies=[Depends(repair_guard)],
 )
 async def repair_building(
     building_id: int,

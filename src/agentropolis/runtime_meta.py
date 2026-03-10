@@ -11,6 +11,7 @@ from agentropolis.control_contract import (
     CONTRACT_VERSION_HEADER,
     CONTROL_CONTRACT_VERSION,
     IDEMPOTENCY_KEY_HEADER,
+    build_dangerous_operation_catalog,
 )
 from agentropolis.api.preview_guard import (
     ERROR_CODE_CATALOG,
@@ -171,6 +172,9 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
                 "runtime_policy_toggles",
                 "per_agent_family_authz",
                 "per_family_budgets",
+                "per_operation_budgets",
+                "unsafe_operation_denylists",
+                "spending_caps",
                 "budget_refill",
                 "audit_log_filtering",
                 "audit_request_id_filtering",
@@ -216,6 +220,7 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
             "economy_health_snapshot": True,
             "latest_housekeeping_summary": True,
             "concurrency_snapshot": True,
+            "preview_policy_snapshot": True,
             "export_script": "scripts/export_observability_snapshot.py",
         },
         "rollout_readiness_surface": {
@@ -247,14 +252,20 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
             "agent_mutations_per_window": 60,
             "registrations_per_window_per_host": 10,
             "family_limits": {},
+            "dangerous_operations": [
+                entry["operation"] for entry in build_dangerous_operation_catalog()
+            ],
             "agent_policy_count": 0,
             "audit_log_size": 0,
             "policy_features": {
                 "authenticated_read_policy": "family_scoped",
-                "authenticated_write_policy": "family_scoped_with_budget",
+                "authenticated_write_policy": "family_scoped_with_budget_and_operation_policy",
                 "public_preview_read_policy": "surface_only",
                 "admin_action_context": "structured_reason_note",
                 "budget_refill_support": True,
+                "per_operation_budget_support": True,
+                "unsafe_operation_denylist": True,
+                "spending_cap_support": True,
                 "audit_filter_support": True,
                 "audit_request_id_filtering": True,
                 "stable_error_codes": True,

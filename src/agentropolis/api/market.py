@@ -7,7 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_company
-from agentropolis.api.preview_guard import ERROR_CODE_HEADER
+from agentropolis.api.preview_guard import (
+    ERROR_CODE_HEADER,
+    make_company_preview_write_guard,
+)
 from agentropolis.api.schemas import (
     CancelOrderRequest,
     MarketAnalysis,
@@ -25,6 +28,26 @@ from agentropolis.services import leaderboard as leaderboard_svc
 from agentropolis.services import market_engine
 
 router = APIRouter(prefix="/market", tags=["market"])
+
+
+async def _buy_order_spend_resolver(request, _session, _company) -> float:
+    payload = await request.json()
+    return float(payload["quantity"]) * float(payload["price"])
+
+
+market_buy_guard = make_company_preview_write_guard(
+    "company_market",
+    operation="place_buy_order",
+    spend_resolver=_buy_order_spend_resolver,
+)
+market_sell_guard = make_company_preview_write_guard(
+    "company_market",
+    operation="place_sell_order",
+)
+market_cancel_guard = make_company_preview_write_guard(
+    "company_market",
+    operation="cancel_order",
+)
 
 
 @router.get("/prices", response_model=list[MarketPrice])
@@ -61,7 +84,11 @@ async def get_price_history(
         ) from None
 
 
-@router.post("/buy", response_model=OrderResponse)
+@router.post(
+    "/buy",
+    response_model=OrderResponse,
+    dependencies=[Depends(market_buy_guard)],
+)
 async def place_buy_order(
     req: PlaceOrderRequest,
     company: Company = Depends(get_current_company),
@@ -89,7 +116,11 @@ async def place_buy_order(
         ) from None
 
 
-@router.post("/sell", response_model=OrderResponse)
+@router.post(
+    "/sell",
+    response_model=OrderResponse,
+    dependencies=[Depends(market_sell_guard)],
+)
 async def place_sell_order(
     req: PlaceOrderRequest,
     company: Company = Depends(get_current_company),
@@ -117,7 +148,11 @@ async def place_sell_order(
         ) from None
 
 
-@router.post("/cancel", response_model=OrderResponse)
+@router.post(
+    "/cancel",
+    response_model=OrderResponse,
+    dependencies=[Depends(market_cancel_guard)],
+)
 async def cancel_order(
     req: CancelOrderRequest,
     company: Company = Depends(get_current_company),

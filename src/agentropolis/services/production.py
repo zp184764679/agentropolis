@@ -253,6 +253,21 @@ async def stop_production(session: AsyncSession, company_id: int, building_id: i
     return True
 
 
+async def estimate_build_building_cost(
+    session: AsyncSession,
+    building_type_name: str,
+) -> int:
+    """Return the credit spend for constructing one building of the given type."""
+    building_type = (
+        await session.execute(
+            select(BuildingType).where(BuildingType.name == building_type_name)
+        )
+    ).scalar_one_or_none()
+    if building_type is None:
+        raise ValueError(f"Unknown building type: {building_type_name}")
+    return int(round(float(building_type.cost_credits)))
+
+
 async def build_building(
     session: AsyncSession, company_id: int, building_type_name: str
 ) -> dict:

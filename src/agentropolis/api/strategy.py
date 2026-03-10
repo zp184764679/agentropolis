@@ -35,7 +35,10 @@ router = APIRouter(
     tags=["strategy"],
     dependencies=[Depends(require_preview_surface)],
 )
-strategy_write_guard = make_agent_preview_write_guard("strategy")
+strategy_write_guard = make_agent_preview_write_guard(
+    "strategy",
+    operation="strategy_profile_update",
+)
 strategy_access_guard = make_agent_preview_access_guard("strategy")
 
 

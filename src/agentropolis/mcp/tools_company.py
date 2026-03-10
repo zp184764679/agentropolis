@@ -15,7 +15,12 @@ from agentropolis.services.production import get_agent_company_buildings
 @mcp.tool()
 async def create_company(agent_api_key: str, company_name: str) -> dict:
     try:
-        async with agent_tool_context(agent_api_key, family="agent_self", mutate=True) as (session, agent):
+        async with agent_tool_context(
+            agent_api_key,
+            family="agent_self",
+            mutate=True,
+            operation="company_creation",
+        ) as (session, agent):
             payload = await register_company_svc(
                 session,
                 company_name,

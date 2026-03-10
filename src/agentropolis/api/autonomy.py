@@ -37,7 +37,18 @@ router = APIRouter(
     dependencies=[Depends(require_preview_surface)],
 )
 strategy_access_guard = make_agent_preview_access_guard("strategy")
-strategy_write_guard = make_agent_preview_write_guard("strategy")
+autonomy_config_guard = make_agent_preview_write_guard(
+    "strategy",
+    operation="autonomy_config_update",
+)
+standing_orders_guard = make_agent_preview_write_guard(
+    "strategy",
+    operation="standing_order_replace",
+)
+goal_write_guard = make_agent_preview_write_guard(
+    "strategy",
+    operation="goal_create_update",
+)
 
 
 @router.get("/config", response_model=AutonomyConfigResponse)
@@ -52,7 +63,7 @@ async def read_autonomy_config(
 @router.put(
     "/config",
     response_model=AutonomyConfigResponse,
-    dependencies=[Depends(strategy_write_guard)],
+    dependencies=[Depends(autonomy_config_guard)],
 )
 async def write_autonomy_config(
     req: AutonomyConfigUpdateRequest,
@@ -92,7 +103,7 @@ async def read_standing_orders(
 @router.put(
     "/standing-orders",
     response_model=AutonomyStandingOrdersResponse,
-    dependencies=[Depends(strategy_write_guard)],
+    dependencies=[Depends(standing_orders_guard)],
 )
 async def write_standing_orders(
     req: StandingOrdersUpdateRequest,
@@ -129,7 +140,7 @@ async def read_goals(
 @router.post(
     "/goals",
     response_model=GoalResponse,
-    dependencies=[Depends(strategy_write_guard)],
+    dependencies=[Depends(goal_write_guard)],
 )
 async def create_autonomy_goal(
     req: GoalCreateRequest,
@@ -160,7 +171,7 @@ async def create_autonomy_goal(
 @router.patch(
     "/goals/{goal_id}",
     response_model=GoalResponse,
-    dependencies=[Depends(strategy_write_guard)],
+    dependencies=[Depends(goal_write_guard)],
 )
 async def patch_goal(
     goal_id: int,

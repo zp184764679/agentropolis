@@ -51,6 +51,16 @@ agent_self_write_guard = make_agent_preview_write_guard(
     "agent_self",
     allow_in_degraded_mode=True,
 )
+agent_company_write_guard = make_agent_preview_write_guard(
+    "agent_self",
+    allow_in_degraded_mode=True,
+    operation="company_creation",
+)
+agent_vitals_write_guard = make_agent_preview_write_guard(
+    "agent_self",
+    allow_in_degraded_mode=True,
+    operation="vitals_mutations",
+)
 agent_self_access_guard = make_agent_preview_access_guard("agent_self")
 
 
@@ -75,7 +85,7 @@ async def register_agent(
 @router.post(
     "/company",
     response_model=AgentCompanyCreateResponse,
-    dependencies=[Depends(agent_self_write_guard)],
+    dependencies=[Depends(agent_company_write_guard)],
 )
 async def register_company(
     req: AgentCompanyCreateRequest,
@@ -164,7 +174,7 @@ async def get_status(
 @router.post(
     "/eat",
     response_model=SuccessResponse,
-    dependencies=[Depends(agent_self_write_guard)],
+    dependencies=[Depends(agent_vitals_write_guard)],
 )
 async def eat(
     amount: int = 1,
@@ -190,7 +200,7 @@ async def eat(
 @router.post(
     "/drink",
     response_model=SuccessResponse,
-    dependencies=[Depends(agent_self_write_guard)],
+    dependencies=[Depends(agent_vitals_write_guard)],
 )
 async def drink(
     amount: int = 1,
@@ -216,7 +226,7 @@ async def drink(
 @router.post(
     "/rest",
     response_model=SuccessResponse,
-    dependencies=[Depends(agent_self_write_guard)],
+    dependencies=[Depends(agent_vitals_write_guard)],
 )
 async def rest(
     agent: Agent = Depends(get_current_agent),

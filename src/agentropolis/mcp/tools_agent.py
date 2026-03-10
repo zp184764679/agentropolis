@@ -50,6 +50,7 @@ async def eat(agent_api_key: str, amount: int = 1) -> dict:
             family="agent_self",
             mutate=True,
             allow_in_degraded_mode=True,
+            operation="vitals_mutations",
         ) as (session, agent):
             payload = await eat_agent(session, agent.id, amount=amount)
             await session.commit()
@@ -66,6 +67,7 @@ async def drink(agent_api_key: str, amount: int = 1) -> dict:
             family="agent_self",
             mutate=True,
             allow_in_degraded_mode=True,
+            operation="vitals_mutations",
         ) as (session, agent):
             payload = await drink_agent(session, agent.id, amount=amount)
             await session.commit()
@@ -82,6 +84,7 @@ async def rest(agent_api_key: str) -> dict:
             family="agent_self",
             mutate=True,
             allow_in_degraded_mode=True,
+            operation="vitals_mutations",
         ) as (session, agent):
             payload = await rest_agent(session, agent.id)
             await session.commit()

@@ -363,3 +363,144 @@ def test_runtime_metadata_reports_db_backed_control_plane(
             await engine.dispose()
 
     asyncio.run(scenario())
+
+
+def test_company_market_write_honors_operation_denylist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "CONTROL_PLANE_ADMIN_TOKEN", "root-token")
+
+    async def scenario() -> None:
+        engine, session_factory, agent_ids = await _create_seeded_engine(
+            agent_names=["Denied Trader"]
+        )
+        agent_id = agent_ids[0]
+        try:
+            async with _preview_client(session_factory, agent_id=agent_id) as client:
+                company_response = await client.post(
+                    "/api/company/register",
+                    json={"company_name": "Denied Trading Co"},
+                )
+                assert company_response.status_code == 200
+                company_api_key = company_response.json()["api_key"]
+
+                policy_response = await client.put(
+                    f"/meta/control-plane/agents/{agent_id}/policy",
+                    headers=_admin_headers(),
+                    json={
+                        "allowed_families": ["company_market"],
+                        "denied_operations": ["place_buy_order"],
+                    },
+                )
+                assert policy_response.status_code == 200
+
+                blocked = await client.post(
+                    "/api/market/buy",
+                    headers={"X-API-Key": company_api_key},
+                    json={"resource": "RAT", "quantity": 1, "price": 10},
+                )
+
+            _assert_error_contract(
+                blocked,
+                status_code=403,
+                error_code="preview_operation_denied",
+                detail=(
+                    f"Preview operation place_buy_order is denied for agent {agent_id}."
+                ),
+            )
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_company_market_write_enforces_spend_caps_and_operation_refill(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "CONTROL_PLANE_ADMIN_TOKEN", "root-token")
+
+    async def scenario() -> None:
+        engine, session_factory, agent_ids = await _create_seeded_engine(
+            agent_names=["Budget Trader"]
+        )
+        agent_id = agent_ids[0]
+        try:
+            async with _preview_client(session_factory, agent_id=agent_id) as client:
+                company_response = await client.post(
+                    "/api/company/register",
+                    json={"company_name": "Budget Trading Co"},
+                )
+                assert company_response.status_code == 200
+                company_api_key = company_response.json()["api_key"]
+
+                policy_response = await client.put(
+                    f"/meta/control-plane/agents/{agent_id}/policy",
+                    headers=_admin_headers(),
+                    json={
+                        "allowed_families": ["company_market"],
+                        "operation_budgets": {"place_buy_order": 1},
+                        "max_spend_per_operation": 5,
+                        "remaining_spend_budget": 12,
+                    },
+                )
+                assert policy_response.status_code == 200
+
+                spend_cap_blocked = await client.post(
+                    "/api/market/buy",
+                    headers={"X-API-Key": company_api_key},
+                    json={"resource": "RAT", "quantity": 1, "price": 10},
+                )
+                _assert_error_contract(
+                    spend_cap_blocked,
+                    status_code=403,
+                    error_code="preview_spending_cap_exceeded",
+                    detail=f"Preview spend cap exceeded for agent {agent_id}: 10 > 5.",
+                )
+
+                update_policy = await client.put(
+                    f"/meta/control-plane/agents/{agent_id}/policy",
+                    headers=_admin_headers(),
+                    json={
+                        "allowed_families": ["company_market"],
+                        "operation_budgets": {"place_buy_order": 1},
+                        "max_spend_per_operation": 15,
+                        "remaining_spend_budget": 8,
+                    },
+                )
+                assert update_policy.status_code == 200
+
+                spend_budget_blocked = await client.post(
+                    "/api/market/buy",
+                    headers={"X-API-Key": company_api_key},
+                    json={"resource": "RAT", "quantity": 1, "price": 10},
+                )
+                _assert_error_contract(
+                    spend_budget_blocked,
+                    status_code=403,
+                    error_code="preview_spending_budget_exhausted",
+                    detail=(
+                        f"Preview spend budget exhausted for agent {agent_id}: "
+                        "need 10, remaining 8."
+                    ),
+                )
+
+                refill = await client.post(
+                    f"/meta/control-plane/agents/{agent_id}/refill-budget",
+                    headers=_admin_headers(),
+                    json={
+                        "increments": {},
+                        "operation_increments": {"place_buy_order": 1},
+                        "spending_credits": 20,
+                        "reason_code": "budget_refill",
+                        "note": "raise operation and spend budget",
+                    },
+                )
+                assert refill.status_code == 200
+                refill_body = refill.json()
+                assert refill_body["operation_budgets"]["place_buy_order"] == 2
+                assert refill_body["remaining_spend_budget"] == 28
+                assert refill_body["last_spending_refill_at"] is not None
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())

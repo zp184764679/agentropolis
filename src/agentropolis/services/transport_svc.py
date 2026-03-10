@@ -15,6 +15,17 @@ TRANSPORT_COST_MULTIPLIERS: dict[str, float] = {
 }
 
 
+def _estimate_transport_cost_from_path(
+    path: dict,
+    items: dict[str, int],
+    transport_type: str,
+) -> int:
+    total_weight = sum(int(quantity) for quantity in items.values())
+    cost_multiplier = TRANSPORT_COST_MULTIPLIERS.get(transport_type, 1.0)
+    base_minutes = max(1, path["total_time_seconds"] // 60)
+    return max(1, int(round(total_weight * base_minutes * cost_multiplier)))
+
+
 def _coerce_now(now: datetime | None = None) -> datetime:
     if now is None:
         return datetime.now(UTC)
@@ -162,6 +173,7 @@ async def create_transport(
         raise ValueError("Transport items must contain positive quantities")
 
     path = await find_path(session, from_region_id, to_region_id)
+    cost = _estimate_transport_cost_from_path(path, normalized_items, transport_type)
     owner = await _validate_owner(
         session,
         agent_id=agent_id,
@@ -192,10 +204,6 @@ async def create_transport(
             )
         source_rows.append(inventory)
         total_weight += quantity
-
-    cost_multiplier = TRANSPORT_COST_MULTIPLIERS.get(transport_type, 1.0)
-    base_minutes = max(1, path["total_time_seconds"] // 60)
-    cost = max(1, int(round(total_weight * base_minutes * cost_multiplier)))
 
     if isinstance(owner, Agent):
         if int(owner.personal_balance) < cost:
@@ -231,6 +239,26 @@ async def create_transport(
     session.add(transport)
     await session.flush()
     return _serialize_transport(transport)
+
+
+async def estimate_transport_cost(
+    session: AsyncSession,
+    *,
+    from_region_id: int,
+    to_region_id: int,
+    items: dict[str, int],
+    transport_type: str = "backpack",
+) -> int:
+    """Estimate transport creation cost without mutating state."""
+    normalized_items = {
+        ticker: int(quantity)
+        for ticker, quantity in items.items()
+        if int(quantity) > 0
+    }
+    if not normalized_items:
+        raise ValueError("Transport items must contain positive quantities")
+    path = await find_path(session, from_region_id, to_region_id)
+    return _estimate_transport_cost_from_path(path, normalized_items, transport_type)
 
 
 async def settle_transport_arrivals(

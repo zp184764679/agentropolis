@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import JSON, BigInteger, Boolean, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from agentropolis.models.base import Base, TimestampMixin
@@ -28,7 +28,12 @@ class PreviewAgentPolicy(Base, TimestampMixin):
     )
     allowed_families: Mapped[list[str] | None] = mapped_column(JSON)
     family_budgets: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    operation_budgets: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    denied_operations: Mapped[list[str] | None] = mapped_column(JSON)
+    max_spend_per_operation: Mapped[int | None] = mapped_column(BigInteger)
+    remaining_spend_budget: Mapped[int | None] = mapped_column(BigInteger)
     last_budget_refill_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_spending_refill_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class ControlPlaneAuditLog(Base):

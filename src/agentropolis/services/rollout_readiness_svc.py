@@ -50,8 +50,11 @@ async def build_rollout_readiness_snapshot(session: AsyncSession, runtime_meta: 
         ),
         "abuse_budget_guard": _gate(
             runtime_meta["preview_guard"]["policy_features"]["budget_refill_support"]
+            and runtime_meta["preview_guard"]["policy_features"]["per_operation_budget_support"]
+            and runtime_meta["preview_guard"]["policy_features"]["unsafe_operation_denylist"]
+            and runtime_meta["preview_guard"]["policy_features"]["spending_cap_support"]
             and runtime_meta["preview_guard"]["persistent_policy_store"] == "database",
-            "Preview family budgets are durable and refillable; short-window rate limits remain process-local.",
+            "Preview family budgets, operation budgets, denylist rules, and spending caps are durable; short-window rate limits remain process-local.",
         ),
         "observability": _gate(
             observability["requests"]["requests_total"] >= 0

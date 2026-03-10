@@ -15,6 +15,7 @@ from agentropolis.models import Agent
 from agentropolis.services.concurrency import acquire_entity_locks, agent_lock_key
 from agentropolis.services.transport_svc import (
     create_transport as create_transport_svc,
+    estimate_transport_cost as estimate_transport_cost_svc,
     get_my_transports as get_my_transports_svc,
     get_transport_status as get_transport_status_svc,
 )
@@ -24,7 +25,22 @@ router = APIRouter(
     tags=["transport"],
     dependencies=[Depends(require_preview_surface)],
 )
-transport_write_guard = make_agent_preview_write_guard("transport")
+async def _transport_spend_resolver(request, session, agent) -> int:
+    payload = await request.json()
+    return await estimate_transport_cost_svc(
+        session,
+        from_region_id=int(payload["from_region_id"]),
+        to_region_id=int(payload["to_region_id"]),
+        items=payload["items"],
+        transport_type=payload.get("transport_type", "backpack"),
+    )
+
+
+transport_write_guard = make_agent_preview_write_guard(
+    "transport",
+    operation="transport_create",
+    spend_resolver=_transport_spend_resolver,
+)
 transport_access_guard = make_agent_preview_access_guard("transport")
 
 

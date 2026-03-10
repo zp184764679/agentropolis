@@ -20,7 +20,13 @@ async def create_contract(
     expires_in_seconds: int = 1800,
 ) -> dict:
     try:
-        async with agent_tool_context(agent_api_key, family="warfare", mutate=True) as (session, agent):
+        async with agent_tool_context(
+            agent_api_key,
+            family="warfare",
+            mutate=True,
+            operation="contract_create_activate_execute_cancel",
+            spend_amount=reward_per_agent * max_agents,
+        ) as (session, agent):
             created = await warfare_svc.create_contract(
                 session,
                 employer_agent_id=agent.id,
@@ -70,7 +76,12 @@ async def contract_action_tool(
 ) -> dict:
     mutate = action in {"enlist", "activate", "cancel", "execute"}
     try:
-        async with agent_tool_context(agent_api_key, family="warfare", mutate=mutate) as (session, agent):
+        async with agent_tool_context(
+            agent_api_key,
+            family="warfare",
+            mutate=mutate,
+            operation="contract_create_activate_execute_cancel" if mutate else None,
+        ) as (session, agent):
             if contract_id is None:
                 raise ValueError("contract_id is required")
 

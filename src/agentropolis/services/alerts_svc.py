@@ -93,6 +93,35 @@ async def build_alert_snapshot(session: AsyncSession, runtime_meta: dict) -> dic
             )
         )
 
+    preview_policy = observability["preview_policy"]
+    if int(preview_policy["exhausted_operation_budget_policies"]) > 0:
+        alerts.append(
+            _alert(
+                "preview_operation_budgets_exhausted",
+                "warning",
+                "One or more preview policies have exhausted dangerous-operation budgets.",
+                source="preview_policy",
+            )
+        )
+    if int(preview_policy["critical_spend_budget_policies"]) > 0:
+        alerts.append(
+            _alert(
+                "preview_spend_budget_critical",
+                "critical",
+                "One or more preview policies are at or below the critical remaining spend budget threshold.",
+                source="preview_policy",
+            )
+        )
+    elif int(preview_policy["low_spend_budget_policies"]) > 0:
+        alerts.append(
+            _alert(
+                "preview_spend_budget_low",
+                "warning",
+                "One or more preview policies are approaching their remaining spend budget threshold.",
+                source="preview_policy",
+            )
+        )
+
     severity_by_gate = {
         "control_contract": "critical",
         "authz": "critical",

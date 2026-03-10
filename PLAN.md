@@ -88,6 +88,7 @@
 - 迁移期的 preview policy 若扩展到 per-agent authz / budget / audit，也必须在 README、CLAUDE、`/meta/runtime`、`/meta/control-plane` 中同步声明“策略/预算/审计持久化，短窗限流仍 process-local”的分层事实
 - 若 preview policy 已覆盖 authenticated reads，也必须明确区分 “authenticated family-scoped reads” 与 “public intel/public world reads”，避免把公共查询误当私有面
 - 若 preview policy 支持 admin overrides / budget refill，必须要求结构化 reason/note，并允许按 action / target / reason / request_id 过滤 audit，避免无上下文操作
+- 迁移期的 preview policy 若承担 `#83` 基线，则至少应覆盖 per-family + per-operation budgets、spending caps、unsafe-operation denylist，并把这些能力同步暴露到 README、CLAUDE、`/meta/runtime`、`/meta/control-plane`
 - 若 control-plane 已暴露 request-id / client fingerprint traceability，也必须把 header 名和审计字段写入 runtime metadata 与 README，避免客户端各自猜测
 - 若 preview/control-plane 已对外暴露错误语义，必须提供稳定 `error_code`，并在 header/body 中可机器消费，避免客户端解析自然语言 `detail`
 - 若 migration-phase error taxonomy 已存在，也必须通过 `/meta/runtime` 或 `/meta/control-plane` 暴露机器可读 error-code catalog，避免客户端文档漂移

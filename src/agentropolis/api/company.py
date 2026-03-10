@@ -4,7 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent, get_current_company
-from agentropolis.api.preview_guard import ERROR_CODE_HEADER
+from agentropolis.api.preview_guard import (
+    ERROR_CODE_HEADER,
+    make_agent_preview_write_guard,
+)
 from agentropolis.api.schemas import (
     CompanyStatus,
     RegisterRequest,
@@ -21,9 +24,18 @@ from agentropolis.services.company_svc import (
 )
 
 router = APIRouter(prefix="/company", tags=["company"])
+company_register_guard = make_agent_preview_write_guard(
+    "agent_self",
+    allow_in_degraded_mode=True,
+    operation="legacy_company_register",
+)
 
 
-@router.post("/register", response_model=RegisterResponse)
+@router.post(
+    "/register",
+    response_model=RegisterResponse,
+    dependencies=[Depends(company_register_guard)],
+)
 async def register_company(
     req: RegisterRequest,
     agent: Agent = Depends(get_current_agent),

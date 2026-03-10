@@ -74,7 +74,7 @@ Likewise, do not treat an `api/*.py` file existing on disk as evidence that it s
 - `/meta/runtime` is the machine-readable snapshot of the currently mounted scaffold surface
 - `/meta/control-plane` is the admin-only DB-backed preview policy surface when `CONTROL_PLANE_ADMIN_TOKEN` is configured
 - legacy scaffold `market` / `inventory` / `game` routes are no longer all-placeholder: core read paths are live, but most legacy writes are still scaffold-only
-- preview policy now includes per-agent family authz, family budgets, budget refill, and admin action audit entries
+- preview policy now includes per-agent family authz, family and operation budgets, spend caps, unsafe-operation denylist rules, budget refill, and admin action audit entries
 - preview policy state is durable in the database; only short-window mutation throttling remains process-local
 - authenticated app traffic now also has a separate concurrency baseline: all `X-API-Key` / `X-Control-Plane-Token` requests are rate-limited and slot-gated, while authenticated writes additionally take entity locks
 - housekeeping now has reserved concurrency slots; anonymous public reads still stay outside the authenticated concurrency gate

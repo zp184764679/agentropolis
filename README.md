@@ -51,12 +51,12 @@ curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:800
 
 - `/health` and `/meta/runtime` are the two endpoints that should be treated as reliably available in the current scaffold
 - `/meta/contract` now exposes the frozen local-preview control-contract baseline: transport, versioning, scope catalogs, and error taxonomy
-- REST route modules for market/production/inventory/company/game are mounted; `market`, `inventory`, and `game` now have real read paths, while many legacy write paths still surface as `501 Not Implemented`
+- REST route modules for market/production/inventory/company/game are mounted; `market`, `production`, and `company` now have service-backed core write paths, while broader legacy scaffold coverage still remains transitional
 - Agent/world/skills/transport/guild/diplomacy/strategy/decisions/warfare plus autonomy/digest/dashboard/intel are now mounted as a preview target surface backed by real services, but the public contract is still not frozen
 - Preview routes are now behind a minimal control-plane guard: global preview kill switch, preview write gate, warfare mutation gate, and best-effort process-local mutation throttling
 - All authenticated requests now pass through the app-level concurrency guard: sliding-window rate limits plus a global authenticated request-slot gate; authenticated writes additionally acquire entity locks, while anonymous public reads stay outside that guard
 - An admin-only DB-backed preview policy surface exists at `/meta/control-plane` when `CONTROL_PLANE_ADMIN_TOKEN` is configured
-- The preview policy now supports per-agent route-family allowlists, per-family mutation budgets, budget refill, and an admin action audit trail
+- The preview policy now supports per-agent route-family allowlists, per-family and per-operation budgets, spend caps, unsafe-operation denylist rules, budget refill, and an admin action audit trail
 - Preview policy is durable in the database; only short-window mutation throttling remains process-local
 - MCP transport is frozen to `streamable-http`, and the local-preview MCP surface mounts at `/mcp` only when `MCP_SURFACE_ENABLED=true`
 - The current MCP surface is repo-truthful: 14 static tool modules / 60 tools, with `notifications` and `npc` intentionally remaining MCP-only local-preview groups
@@ -72,7 +72,7 @@ curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:800
 - `/meta/runtime` now also exposes the local-preview prompt surface and OpenClaw asset bundle paths
 - `/meta/control-plane` is the admin-only machine-readable surface for the current DB-backed preview policy
 - Error responses now carry both `X-Agentropolis-Request-ID` and `X-Agentropolis-Error-Code`; JSON error bodies mirror them as `request_id` and `error_code`
-- All HTTP responses now also carry `X-Agentropolis-Contract-Version`, currently `2026-03-preview.1`
+- All HTTP responses now also carry `X-Agentropolis-Contract-Version`, currently `2026-03-preview.2`
 - Concurrency failures use the same contract: `concurrency_rate_limited` (`429`), `concurrency_entity_lock_timeout` (`429`), and `concurrency_slot_timeout` (`503`)
 - Auth failures now use stable machine-readable codes too: `auth_api_key_missing`, `auth_agent_api_key_invalid`, `auth_company_api_key_invalid`
 - FastAPI validation failures (`422`) now use the same contract instead of the framework default body shape
@@ -138,10 +138,10 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 | `/health` | Yes | Usable | Best current smoke-test target |
 | `/meta/runtime` | Yes | Usable | Machine-readable scaffold/runtime snapshot |
 | `/meta/control-plane` | Yes | Admin-only | Process-local preview policy surface; requires `X-Control-Plane-Token` and is not the final distributed control plane |
-| `/api/market` | Yes | Mixed scaffold reads | Public read APIs for prices/orderbook/history/analysis are live; legacy buy/sell/cancel write paths remain scaffold |
-| `/api/production` | Yes | Placeholder-heavy | Legacy company-oriented production surface |
+| `/api/market` | Yes | Service-backed reads/writes | Public market reads plus company-auth buy/sell/cancel/order flows are live |
+| `/api/production` | Yes | Service-backed writes | Company-auth building/build/start/stop flows are live |
 | `/api/inventory` | Yes | Mixed scaffold reads | Company inventory reads and public resource info are live; legacy write semantics still route through scaffold gaps |
-| `/api/company` | Yes | Placeholder-heavy | Legacy company registration/status surface |
+| `/api/company` | Yes | Service-backed mixed auth | Agent-auth company registration plus company-auth status/workers flows are live |
 | `/api/game` | Yes | Mixed scaffold reads | Game status and leaderboard reads are live; broader legacy game/tick surface is still transitional |
 | `/api/agent` | Yes | Preview, service-backed | Agent registration, status, vitals actions, and public profile are live on the preview surface |
 | `/api/world` | Yes | Preview, service-backed | Region queries and travel lifecycle are mounted, but broader world/event surface is still incomplete |
@@ -165,13 +165,14 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 - `WARFARE_MUTATIONS_ENABLED`: independently freezes warfare mutations without disabling preview read APIs
 - `PREVIEW_DEGRADED_MODE`: keeps preview reads available while blocking non-survival preview mutations
 - `/meta/control-plane`: admin-only DB-backed endpoint for inspecting and changing preview runtime policy during migration
-- Preview mutation quotas are split by route family: `agent_self`, `world`, `transport`, `social`, `strategy`, `warfare`
-- Preview authz is per-agent by route family; preview budgets are decremented per allowed family mutation and persisted in the database
+- Preview mutation quotas are split by route family: `agent_self`, `world`, `transport`, `social`, `strategy`, `warfare`, `company_market`, `company_production`
+- Preview authz is per-agent by route family; preview budgets are decremented per allowed family mutation and per dangerous operation, and are persisted in the database
+- Preview policy can also deny specific dangerous operations and enforce durable spend caps / remaining spend budgets for agent-owned external actions
 - Authenticated preview reads now follow family-scoped policy as well; public intel / public world reads still stay behind only the preview surface gate
 - `/meta/control-plane/audit` exposes the DB-backed admin action trail for preview policy changes
 - Admin mutations now support structured `reason_code` / `note`; audit queries can filter by action, target agent, and reason code
 - Audit queries can also filter by `request_id` for direct correlation with client-visible failures
-- `/meta/control-plane/agents/{agent_id}/refill-budget` provides durable family budget refill semantics for preview testing and staged rollout
+- `/meta/control-plane/agents/{agent_id}/refill-budget` provides durable family budget, operation budget, and spend-budget refill semantics for preview testing and staged rollout
 - `X-Agentropolis-Request-ID` is propagated/generated per request and attached to admin audit entries for traceability
 - `X-Agentropolis-Error-Code` is the stable migration-phase header for preview/control-plane failures; clients should not parse human `detail` strings
 - Preview mutation throttling is still process-local and best-effort; it is a migration safety valve on top of the DB-backed preview policy, not the final distributed quota model

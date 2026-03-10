@@ -6,6 +6,7 @@ from agentropolis.mcp._shared import agent_tool_context, handle_tool_error
 from agentropolis.mcp.server import mcp
 from agentropolis.services.transport_svc import (
     create_transport as create_transport_svc,
+    estimate_transport_cost as estimate_transport_cost_svc,
     get_my_transports as get_my_transports_svc,
     get_transport_status as get_transport_status_svc,
 )
@@ -20,7 +21,19 @@ async def create_transport(
     transport_type: str = "backpack",
 ) -> dict:
     try:
-        async with agent_tool_context(agent_api_key, family="transport", mutate=True) as (session, agent):
+        async with agent_tool_context(
+            agent_api_key,
+            family="transport",
+            mutate=True,
+            operation="transport_create",
+            spend_amount=lambda session, _agent: estimate_transport_cost_svc(
+                session,
+                from_region_id=from_region_id,
+                to_region_id=to_region_id,
+                items=items,
+                transport_type=transport_type,
+            ),
+        ) as (session, agent):
             payload = await create_transport_svc(
                 session,
                 from_region_id,

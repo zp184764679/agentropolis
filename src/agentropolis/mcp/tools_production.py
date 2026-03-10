@@ -6,6 +6,7 @@ from agentropolis.mcp._shared import company_tool_context, handle_tool_error
 from agentropolis.mcp.server import mcp
 from agentropolis.services.production import (
     build_building as build_building_svc,
+    estimate_build_building_cost as estimate_build_building_cost_svc,
     get_building_types as get_building_types_svc,
     get_recipes as get_recipes_svc,
     start_production as start_production_svc,
@@ -34,7 +35,16 @@ async def get_building_types(company_api_key: str) -> dict:
 @mcp.tool()
 async def build_building(company_api_key: str, building_type: str) -> dict:
     try:
-        async with company_tool_context(company_api_key) as (session, company):
+        async with company_tool_context(
+            company_api_key,
+            family="company_production",
+            mutate=True,
+            operation="build_building",
+            spend_amount=lambda session, _company: estimate_build_building_cost_svc(
+                session,
+                building_type,
+            ),
+        ) as (session, company):
             payload = await build_building_svc(session, company.id, building_type)
             await session.commit()
             return {"ok": True, "building": payload}
@@ -49,7 +59,12 @@ async def start_production(
     recipe_id: int,
 ) -> dict:
     try:
-        async with company_tool_context(company_api_key) as (session, company):
+        async with company_tool_context(
+            company_api_key,
+            family="company_production",
+            mutate=True,
+            operation="start_production",
+        ) as (session, company):
             payload = await start_production_svc(session, company.id, building_id, recipe_id)
             await session.commit()
             return {"ok": True, "production": payload}
@@ -60,7 +75,12 @@ async def start_production(
 @mcp.tool()
 async def stop_production(company_api_key: str, building_id: int) -> dict:
     try:
-        async with company_tool_context(company_api_key) as (session, company):
+        async with company_tool_context(
+            company_api_key,
+            family="company_production",
+            mutate=True,
+            operation="stop_production",
+        ) as (session, company):
             stopped = await stop_production_svc(session, company.id, building_id)
             await session.commit()
             return {"ok": True, "stopped": bool(stopped), "building_id": building_id}

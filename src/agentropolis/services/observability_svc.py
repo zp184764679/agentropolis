@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.middleware.metrics import get_request_metrics_snapshot
-from agentropolis.models import Agent, Company, GameState, HousekeepingLog
+from agentropolis.models import Agent, Company, GameState, HousekeepingLog, PreviewAgentPolicy
 from agentropolis.services.concurrency import get_concurrency_snapshot
 from agentropolis.services.economy_governance import build_economy_health_thresholds
 
@@ -39,9 +39,55 @@ async def build_observability_snapshot(session: AsyncSession) -> dict:
 
     inflation_index = float(state.inflation_index) if state is not None else 1.0
     worker_warning = thresholds["worker_satisfaction"]["warning_below"]
+    preview_budget_thresholds = thresholds["preview_budget"]
+    policy_result = await session.execute(select(PreviewAgentPolicy))
+    policies = list(policy_result.scalars().all())
+    exhausted_family_budget_policies = 0
+    exhausted_operation_budget_policies = 0
+    low_spend_budget_policies = 0
+    critical_spend_budget_policies = 0
+    for policy in policies:
+        family_budgets = {
+            key: int(value)
+            for key, value in (policy.family_budgets or {}).items()
+        }
+        operation_budgets = {
+            key: int(value)
+            for key, value in (policy.operation_budgets or {}).items()
+        }
+        if any(value <= 0 for value in family_budgets.values()):
+            exhausted_family_budget_policies += 1
+        if any(value <= 0 for value in operation_budgets.values()):
+            exhausted_operation_budget_policies += 1
+        if policy.remaining_spend_budget is not None:
+            remaining = int(policy.remaining_spend_budget)
+            if remaining <= preview_budget_thresholds["warning_remaining_below"]:
+                low_spend_budget_policies += 1
+            if remaining <= preview_budget_thresholds["critical_remaining_below"]:
+                critical_spend_budget_policies += 1
     return {
         "requests": get_request_metrics_snapshot(),
         "concurrency": get_concurrency_snapshot(),
+        "preview_policy": {
+            "policies_total": len(policies),
+            "policies_with_operation_budgets": sum(
+                1 for policy in policies if bool(policy.operation_budgets)
+            ),
+            "policies_with_denied_operations": sum(
+                1 for policy in policies if bool(policy.denied_operations)
+            ),
+            "policies_with_spending_caps": sum(
+                1
+                for policy in policies
+                if policy.max_spend_per_operation is not None
+                or policy.remaining_spend_budget is not None
+            ),
+            "exhausted_family_budget_policies": exhausted_family_budget_policies,
+            "exhausted_operation_budget_policies": exhausted_operation_budget_policies,
+            "low_spend_budget_policies": low_spend_budget_policies,
+            "critical_spend_budget_policies": critical_spend_budget_policies,
+            "thresholds": preview_budget_thresholds,
+        },
         "economy": {
             "active_agents": active_agents,
             "active_companies": active_companies,

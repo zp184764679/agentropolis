@@ -21,7 +21,10 @@ router = APIRouter(
     dependencies=[Depends(require_preview_surface)],
 )
 strategy_access_guard = make_agent_preview_access_guard("strategy")
-strategy_write_guard = make_agent_preview_write_guard("strategy")
+strategy_write_guard = make_agent_preview_write_guard(
+    "strategy",
+    operation="digest_acknowledge",
+)
 
 
 @router.get("", response_model=DigestResponse)

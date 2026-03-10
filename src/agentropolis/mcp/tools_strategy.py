@@ -60,7 +60,12 @@ async def strategy_profile_tool(
 ) -> dict:
     mutate = action == "update"
     try:
-        async with agent_tool_context(agent_api_key, family="strategy", mutate=mutate) as (session, agent):
+        async with agent_tool_context(
+            agent_api_key,
+            family="strategy",
+            mutate=mutate,
+            operation="strategy_profile_update" if mutate else None,
+        ) as (session, agent):
             if action == "get":
                 profile = await get_profile(session, agent.id)
                 if profile is None:
@@ -122,7 +127,19 @@ async def autonomy_tool(
 ) -> dict:
     mutate = action in {"update_config", "update_standing_orders", "create_goal", "update_goal"}
     try:
-        async with agent_tool_context(agent_api_key, family="strategy", mutate=mutate) as (session, agent):
+        operation = None
+        if action == "update_config":
+            operation = "autonomy_config_update"
+        elif action == "update_standing_orders":
+            operation = "standing_order_replace"
+        elif action in {"create_goal", "update_goal"}:
+            operation = "goal_create_update"
+        async with agent_tool_context(
+            agent_api_key,
+            family="strategy",
+            mutate=mutate,
+            operation=operation,
+        ) as (session, agent):
             if action == "get_config":
                 return {"ok": True, "config": await get_autonomy_config(session, agent.id)}
             if action == "update_config":
@@ -180,7 +197,12 @@ async def autonomy_tool(
 async def digest_tool(agent_api_key: str, action: str = "get") -> dict:
     mutate = action == "ack"
     try:
-        async with agent_tool_context(agent_api_key, family="strategy", mutate=mutate) as (session, agent):
+        async with agent_tool_context(
+            agent_api_key,
+            family="strategy",
+            mutate=mutate,
+            operation="digest_acknowledge" if mutate else None,
+        ) as (session, agent):
             if action == "get":
                 return {"ok": True, "digest": await build_digest(session, agent.id)}
             if action == "ack":

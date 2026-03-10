@@ -4,7 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_company
-from agentropolis.api.preview_guard import ERROR_CODE_HEADER
+from agentropolis.api.preview_guard import (
+    ERROR_CODE_HEADER,
+    make_company_preview_write_guard,
+)
 from agentropolis.api.schemas import (
     BuildBuildingRequest,
     BuildingInfo,
@@ -18,6 +21,7 @@ from agentropolis.models import Company
 from agentropolis.services.concurrency import acquire_entity_locks, company_lock_key
 from agentropolis.services.production import (
     build_building as build_building_svc,
+    estimate_build_building_cost as estimate_build_building_cost_svc,
     get_building_types as get_building_types_svc,
     get_company_buildings,
     get_recipes as get_recipes_svc,
@@ -26,6 +30,26 @@ from agentropolis.services.production import (
 )
 
 router = APIRouter(prefix="/production", tags=["production"])
+
+
+async def _build_building_spend_resolver(request, session, _company) -> int:
+    payload = await request.json()
+    return await estimate_build_building_cost_svc(session, payload["building_type"])
+
+
+production_build_guard = make_company_preview_write_guard(
+    "company_production",
+    operation="build_building",
+    spend_resolver=_build_building_spend_resolver,
+)
+production_start_guard = make_company_preview_write_guard(
+    "company_production",
+    operation="start_production",
+)
+production_stop_guard = make_company_preview_write_guard(
+    "company_production",
+    operation="stop_production",
+)
 
 
 @router.get("/buildings", response_model=list[BuildingInfo])
@@ -59,7 +83,11 @@ async def get_building_types(session: AsyncSession = Depends(get_session)):
     return await get_building_types_svc(session)
 
 
-@router.post("/start", response_model=SuccessResponse)
+@router.post(
+    "/start",
+    response_model=SuccessResponse,
+    dependencies=[Depends(production_start_guard)],
+)
 async def start_production(
     req: StartProductionRequest,
     company: Company = Depends(get_current_company),
@@ -85,7 +113,11 @@ async def start_production(
         ) from None
 
 
-@router.post("/stop", response_model=SuccessResponse)
+@router.post(
+    "/stop",
+    response_model=SuccessResponse,
+    dependencies=[Depends(production_stop_guard)],
+)
 async def stop_production(
     building_id: int,
     company: Company = Depends(get_current_company),
@@ -100,7 +132,11 @@ async def stop_production(
         return {"message": f"Stopped production on building {building_id}."}
 
 
-@router.post("/build", response_model=SuccessResponse)
+@router.post(
+    "/build",
+    response_model=SuccessResponse,
+    dependencies=[Depends(production_build_guard)],
+)
 async def build_building(
     req: BuildBuildingRequest,
     company: Company = Depends(get_current_company),

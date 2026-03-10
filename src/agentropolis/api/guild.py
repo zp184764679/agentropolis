@@ -39,12 +39,19 @@ router = APIRouter(
     dependencies=[Depends(require_preview_surface)],
 )
 social_write_guard = make_agent_preview_write_guard("social")
+guild_create_guard = make_agent_preview_write_guard("social", operation="guild_create")
+guild_join_leave_guard = make_agent_preview_write_guard(
+    "social",
+    operation="guild_join_leave",
+)
+guild_promote_guard = make_agent_preview_write_guard("social", operation="guild_promote")
+guild_disband_guard = make_agent_preview_write_guard("social", operation="guild_disband")
 
 
 @router.post(
     "/create",
     response_model=GuildInfo,
-    dependencies=[Depends(social_write_guard)],
+    dependencies=[Depends(guild_create_guard)],
 )
 async def create_guild(
     req: GuildCreateRequest,
@@ -86,7 +93,7 @@ async def list_all_guilds(
 @router.post(
     "/{guild_id}/join",
     response_model=SuccessResponse,
-    dependencies=[Depends(social_write_guard)],
+    dependencies=[Depends(guild_join_leave_guard)],
 )
 async def join_guild(
     guild_id: int,
@@ -107,7 +114,7 @@ async def join_guild(
 @router.post(
     "/{guild_id}/leave",
     response_model=SuccessResponse,
-    dependencies=[Depends(social_write_guard)],
+    dependencies=[Depends(guild_join_leave_guard)],
 )
 async def leave_guild(
     guild_id: int,
@@ -128,7 +135,7 @@ async def leave_guild(
 @router.post(
     "/{guild_id}/promote",
     response_model=SuccessResponse,
-    dependencies=[Depends(social_write_guard)],
+    dependencies=[Depends(guild_promote_guard)],
 )
 async def promote_guild_member(
     guild_id: int,
@@ -186,7 +193,7 @@ async def deposit_guild_treasury(
 @router.post(
     "/{guild_id}/disband",
     response_model=SuccessResponse,
-    dependencies=[Depends(social_write_guard)],
+    dependencies=[Depends(guild_disband_guard)],
 )
 async def disband(
     guild_id: int,

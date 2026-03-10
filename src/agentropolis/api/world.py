@@ -30,7 +30,10 @@ router = APIRouter(
     tags=["world"],
     dependencies=[Depends(require_preview_surface)],
 )
-world_write_guard = make_agent_preview_write_guard("world")
+world_write_guard = make_agent_preview_write_guard(
+    "world",
+    operation="travel_start",
+)
 world_access_guard = make_agent_preview_access_guard("world")
 
 

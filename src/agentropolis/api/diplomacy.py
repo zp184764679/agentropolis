@@ -37,13 +37,21 @@ router = APIRouter(
     dependencies=[Depends(require_preview_surface)],
 )
 social_write_guard = make_agent_preview_write_guard("social")
+social_treaty_guard = make_agent_preview_write_guard(
+    "social",
+    operation="treaty_propose_accept",
+)
+social_relationship_guard = make_agent_preview_write_guard(
+    "social",
+    operation="relationship_set",
+)
 social_access_guard = make_agent_preview_access_guard("social")
 
 
 @router.post(
     "/treaty/propose",
     response_model=TreatyInfo,
-    dependencies=[Depends(social_write_guard)],
+    dependencies=[Depends(social_treaty_guard)],
 )
 async def propose_treaty(
     req: TreatyProposeRequest,
@@ -77,7 +85,7 @@ async def propose_treaty(
 @router.post(
     "/treaty/{treaty_id}/accept",
     response_model=TreatyInfo,
-    dependencies=[Depends(social_write_guard)],
+    dependencies=[Depends(social_treaty_guard)],
 )
 async def accept_treaty(
     treaty_id: int,
@@ -120,7 +128,7 @@ async def list_relationships(
 @router.post(
     "/relationship",
     response_model=RelationshipInfo,
-    dependencies=[Depends(social_write_guard)],
+    dependencies=[Depends(social_relationship_guard)],
 )
 async def set_relationship(
     req: RelationshipSetRequest,

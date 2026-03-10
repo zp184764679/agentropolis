@@ -239,6 +239,7 @@ class PreviewControlPlaneResponse(BaseModel):
     agent_mutations_per_window: int
     registrations_per_window_per_host: int
     family_limits: dict[str, int] = Field(default_factory=dict)
+    dangerous_operations: list[str] = Field(default_factory=list)
     agent_policy_count: int = 0
     audit_log_size: int = 0
     policy_features: dict = Field(default_factory=dict)
@@ -262,12 +263,18 @@ class PreviewControlPlaneUpdateRequest(BaseModel):
 class PreviewAgentPolicyRequest(BaseModel):
     allowed_families: list[str] | None = None
     family_budgets: dict[str, int] | None = None
+    operation_budgets: dict[str, int] | None = None
+    denied_operations: list[str] | None = None
+    max_spend_per_operation: int | None = Field(default=None, ge=0)
+    remaining_spend_budget: int | None = Field(default=None, ge=0)
     reason_code: str | None = Field(default=None, min_length=2, max_length=64)
     note: str | None = Field(default=None, min_length=2, max_length=280)
 
 
 class PreviewAgentBudgetRefillRequest(BaseModel):
     increments: dict[str, int]
+    operation_increments: dict[str, int] | None = None
+    spending_credits: int | None = Field(default=None, ge=1)
     reason_code: str | None = Field(default=None, min_length=2, max_length=64)
     note: str | None = Field(default=None, min_length=2, max_length=280)
 
@@ -281,6 +288,12 @@ class PreviewAgentPolicyResponse(BaseModel):
     agent_id: int
     allowed_families: list[str] | None = None
     family_budgets: dict[str, int] = Field(default_factory=dict)
+    operation_budgets: dict[str, int] = Field(default_factory=dict)
+    denied_operations: list[str] | None = None
+    max_spend_per_operation: int | None = None
+    remaining_spend_budget: int | None = None
+    last_budget_refill_at: str | None = None
+    last_spending_refill_at: str | None = None
     updated_at: str
 
 

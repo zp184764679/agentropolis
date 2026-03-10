@@ -7,8 +7,10 @@ Durable policy, budgets, and audit trail are stored in the database.
 from __future__ import annotations
 
 from collections import defaultdict, deque
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 import hashlib
+import math
 from threading import Lock
 from time import monotonic
 from typing import Any
@@ -19,10 +21,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
+from agentropolis.control_contract import build_dangerous_operation_catalog
 from agentropolis.config import settings
 from agentropolis.database import get_session
 from agentropolis.middleware import REQUEST_ID_HEADER
 from agentropolis.models import (
+    Company,
     ControlPlaneAuditLog,
     PreviewAgentPolicy,
     PreviewControlPlaneState,
@@ -40,6 +44,10 @@ ERROR_CODE_CATALOG = {
     "preview_mutation_rate_limited": "Generic preview mutation quota exceeded.",
     "preview_{family}_access_denied": "Authenticated preview access is not allowed for this route family.",
     "preview_{family}_budget_exhausted": "Configured preview mutation budget for this route family is exhausted.",
+    "preview_operation_denied": "Configured preview policy denies this dangerous operation.",
+    "preview_operation_budget_exhausted": "Configured preview operation budget is exhausted.",
+    "preview_spending_cap_exceeded": "Configured preview spend cap for a single operation was exceeded.",
+    "preview_spending_budget_exhausted": "Configured preview spend budget is exhausted.",
     "control_plane_admin_unconfigured": "Control-plane admin token is not configured.",
     "control_plane_admin_invalid": "Control-plane admin token is invalid.",
     "control_plane_policy_invalid": "Submitted control-plane agent policy payload is invalid.",
@@ -60,7 +68,20 @@ _FAMILY_LIMIT_ATTRS = {
     "social": "PREVIEW_SOCIAL_MUTATIONS_PER_WINDOW",
     "strategy": "PREVIEW_STRATEGY_MUTATIONS_PER_WINDOW",
     "warfare": "PREVIEW_WARFARE_MUTATIONS_PER_WINDOW",
+    "company_market": "PREVIEW_COMPANY_MARKET_MUTATIONS_PER_WINDOW",
+    "company_production": "PREVIEW_COMPANY_PRODUCTION_MUTATIONS_PER_WINDOW",
 }
+
+_DANGEROUS_OPERATION_SPECS = {
+    entry["operation"]: entry
+    for entry in build_dangerous_operation_catalog()
+}
+_FAMILY_OPERATIONS: dict[str, set[str]] = defaultdict(set)
+for _operation, _spec in _DANGEROUS_OPERATION_SPECS.items():
+    scope_family = _spec["scope_family"]
+    if scope_family is not None:
+        _FAMILY_OPERATIONS[scope_family].add(_operation)
+_FAMILY_OPERATIONS["agent_self"].add("legacy_company_register")
 
 
 def _utc_now() -> datetime:
@@ -140,6 +161,23 @@ def _validate_family(family: str) -> str:
     return family
 
 
+def _validate_operation(operation: str) -> str:
+    if operation not in _DANGEROUS_OPERATION_SPECS:
+        raise ValueError(f"Unknown preview dangerous operation: {operation}")
+    return operation
+
+
+def _validate_operation_for_family(family: str, operation: str) -> str:
+    _validate_family(family)
+    _validate_operation(operation)
+    allowed = _FAMILY_OPERATIONS.get(family, set())
+    if operation not in allowed:
+        raise ValueError(
+            f"Preview operation {operation} is not valid for family {family}"
+        )
+    return operation
+
+
 def _normalize_allowed_families(families: list[str] | None) -> list[str] | None:
     if families is None:
         return None
@@ -159,18 +197,81 @@ def _normalize_family_budgets(family_budgets: dict[str, int] | None) -> dict[str
     return normalized
 
 
+def _normalize_operation_budgets(
+    operation_budgets: dict[str, int] | None,
+) -> dict[str, int]:
+    if not operation_budgets:
+        return {}
+    normalized: dict[str, int] = {}
+    for operation, budget in operation_budgets.items():
+        _validate_operation(operation)
+        amount = int(budget)
+        if amount < 0:
+            raise ValueError(f"Preview operation budget for {operation} must be >= 0")
+        normalized[operation] = amount
+    return normalized
+
+
+def _normalize_denied_operations(
+    denied_operations: list[str] | None,
+) -> list[str] | None:
+    if denied_operations is None:
+        return None
+    return sorted({_validate_operation(operation) for operation in denied_operations})
+
+
+def _normalize_optional_positive_int(
+    value: int | None,
+    *,
+    field_name: str,
+) -> int | None:
+    if value is None:
+        return None
+    amount = int(value)
+    if amount < 0:
+        raise ValueError(f"{field_name} must be >= 0")
+    return amount
+
+
+def _normalize_spend_amount(spend_amount: float | int | None) -> int:
+    if spend_amount is None:
+        return 0
+    amount = float(spend_amount)
+    if amount <= 0:
+        return 0
+    return int(math.ceil(amount))
+
+
 def _policy_value(override: bool | None, default: bool) -> bool:
     return default if override is None else bool(override)
 
 
 def _serialize_agent_policy(policy: PreviewAgentPolicy) -> dict[str, Any]:
     updated_at = policy.__dict__.get("updated_at")
+    last_budget_refill_at = policy.__dict__.get("last_budget_refill_at")
+    last_spending_refill_at = policy.__dict__.get("last_spending_refill_at")
     return {
         "agent_id": policy.agent_id,
         "allowed_families": list(policy.allowed_families)
         if policy.allowed_families is not None
         else None,
         "family_budgets": dict(policy.family_budgets or {}),
+        "operation_budgets": dict(policy.operation_budgets or {}),
+        "denied_operations": list(policy.denied_operations)
+        if policy.denied_operations is not None
+        else None,
+        "max_spend_per_operation": (
+            int(policy.max_spend_per_operation)
+            if policy.max_spend_per_operation is not None
+            else None
+        ),
+        "remaining_spend_budget": (
+            int(policy.remaining_spend_budget)
+            if policy.remaining_spend_budget is not None
+            else None
+        ),
+        "last_budget_refill_at": _isoformat(last_budget_refill_at),
+        "last_spending_refill_at": _isoformat(last_spending_refill_at),
         "updated_at": _isoformat(updated_at) or _utc_now().isoformat(),
     }
 
@@ -270,7 +371,14 @@ async def _apply_agent_policy_gate(
     agent_id: int,
     family: str,
     consume_budget: bool,
+    operation: str | None = None,
+    spend_amount: float | int | None = None,
 ) -> None:
+    _validate_family(family)
+    normalized_spend = _normalize_spend_amount(spend_amount)
+    if operation is not None:
+        _validate_operation_for_family(family, operation)
+
     policy = await _get_agent_policy(session, agent_id, for_update=consume_budget)
     if policy is None:
         return
@@ -284,18 +392,69 @@ async def _apply_agent_policy_gate(
         )
 
     family_budgets = dict(policy.family_budgets or {})
-    remaining = family_budgets.get(family)
-    if remaining is None:
-        return
-    if int(remaining) <= 0:
+    family_remaining = family_budgets.get(family)
+    if family_remaining is not None and int(family_remaining) <= 0:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Preview {family} budget exhausted for agent {agent_id}.",
             headers={ERROR_CODE_HEADER: f"preview_{family}_budget_exhausted"},
         )
+
+    operation_budgets = dict(policy.operation_budgets or {})
+    if operation is not None:
+        denied_operations = set(policy.denied_operations or [])
+        if operation in denied_operations:
+            raise _guard_exception(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Preview operation {operation} is denied for agent {agent_id}."
+                ),
+                error_code="preview_operation_denied",
+            )
+
+        operation_remaining = operation_budgets.get(operation)
+        if operation_remaining is not None and int(operation_remaining) <= 0:
+            raise _guard_exception(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Preview operation budget exhausted for {operation} and agent {agent_id}."
+                ),
+                error_code="preview_operation_budget_exhausted",
+            )
+
+    if normalized_spend > 0 and policy.max_spend_per_operation is not None:
+        if normalized_spend > int(policy.max_spend_per_operation):
+            raise _guard_exception(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Preview spend cap exceeded for agent {agent_id}: "
+                    f"{normalized_spend} > {int(policy.max_spend_per_operation)}."
+                ),
+                error_code="preview_spending_cap_exceeded",
+            )
+
+    if normalized_spend > 0 and policy.remaining_spend_budget is not None:
+        if int(policy.remaining_spend_budget) < normalized_spend:
+            raise _guard_exception(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Preview spend budget exhausted for agent {agent_id}: "
+                    f"need {normalized_spend}, remaining {int(policy.remaining_spend_budget)}."
+                ),
+                error_code="preview_spending_budget_exhausted",
+            )
+
     if consume_budget:
-        family_budgets[family] = int(remaining) - 1
-        policy.family_budgets = family_budgets
+        if family_remaining is not None:
+            family_budgets[family] = int(family_remaining) - 1
+            policy.family_budgets = family_budgets
+        if operation is not None:
+            operation_remaining = operation_budgets.get(operation)
+            if operation_remaining is not None:
+                operation_budgets[operation] = int(operation_remaining) - 1
+                policy.operation_budgets = operation_budgets
+        if normalized_spend > 0 and policy.remaining_spend_budget is not None:
+            policy.remaining_spend_budget = int(policy.remaining_spend_budget) - normalized_spend
         await session.flush()
 
 
@@ -344,14 +503,45 @@ async def _require_family_degraded_policy(
         )
 
 
-def _record_agent_mutation(agent_id: Any, family: str) -> None:
+async def _resolve_company_policy_agent_id(
+    session: AsyncSession,
+    company: Company | int,
+) -> int | None:
+    if isinstance(company, Company):
+        return company.founder_agent_id
+    result = await session.execute(
+        select(Company.founder_agent_id).where(Company.id == company)
+    )
+    return result.scalar_one_or_none()
+
+
+def _record_actor_mutation(actor_kind: str, actor_id: Any, family: str) -> None:
     _record_window_event(
-        f"preview-family:{family}:agent:{agent_id}",
+        f"preview-family:{family}:{actor_kind}:{actor_id}",
         limit=_family_limit(family),
         window_seconds=settings.PREVIEW_MUTATION_WINDOW_SECONDS,
         detail=f"Preview {family} mutation rate limit exceeded.",
         error_code=f"preview_{family}_rate_limited",
     )
+
+
+SpendResolver = Callable[[Request, AsyncSession, Any], Awaitable[float | int] | float | int]
+
+
+async def _resolve_spend_amount_from_request(
+    request: Request | None,
+    session: AsyncSession,
+    actor: Any,
+    spend_resolver: SpendResolver | None,
+) -> float | int:
+    if spend_resolver is None:
+        return 0
+    if request is None:
+        return 0
+    value = spend_resolver(request, session, actor)
+    if isinstance(value, Awaitable):
+        return await value
+    return value
 
 
 async def require_preview_surface(
@@ -399,13 +589,79 @@ def make_agent_preview_write_guard(
     family: str,
     *,
     allow_in_degraded_mode: bool = False,
+    operation: str | None = None,
+    spend_resolver: SpendResolver | None = None,
+    require_warfare_toggle: bool = False,
 ):
     """Build a dependency that guards preview mutations for one route family."""
 
     async def dependency(
+        request: Request = None,
         agent: Any = Depends(get_current_agent),
         session: AsyncSession = Depends(get_session),
     ) -> None:
+        if not isinstance(request, Request):
+            if isinstance(agent, AsyncSession):
+                session = agent
+            agent = request
+            request = None
+        await _require_preview_surface_enabled(session)
+        await _require_preview_writes_enabled(session)
+        if require_warfare_toggle:
+            await _require_warfare_mutations_enabled(session)
+        await _require_family_degraded_policy(
+            session,
+            family,
+            allow_in_degraded_mode=allow_in_degraded_mode,
+        )
+        spend_amount = await _resolve_spend_amount_from_request(
+            request,
+            session,
+            agent,
+            spend_resolver,
+        )
+        await _apply_agent_policy_gate(
+            session,
+            agent_id=agent.id,
+            family=family,
+            consume_budget=False,
+            operation=operation,
+            spend_amount=spend_amount,
+        )
+        _record_actor_mutation("agent", agent.id, family)
+        await _apply_agent_policy_gate(
+            session,
+            agent_id=agent.id,
+            family=family,
+            consume_budget=True,
+            operation=operation,
+            spend_amount=spend_amount,
+        )
+
+    return dependency
+
+
+def make_company_preview_write_guard(
+    family: str,
+    *,
+    operation: str | None = None,
+    allow_in_degraded_mode: bool = False,
+    spend_resolver: SpendResolver | None = None,
+):
+    """Build a dependency that applies preview abuse/budget policy to company-auth writes."""
+
+    from agentropolis.api.auth import get_current_company
+
+    async def dependency(
+        request: Request = None,
+        company: Company = Depends(get_current_company),
+        session: AsyncSession = Depends(get_session),
+    ) -> None:
+        if not isinstance(request, Request):
+            if isinstance(company, AsyncSession):
+                session = company
+            company = request
+            request = None
         await _require_preview_surface_enabled(session)
         await _require_preview_writes_enabled(session)
         await _require_family_degraded_policy(
@@ -413,19 +669,32 @@ def make_agent_preview_write_guard(
             family,
             allow_in_degraded_mode=allow_in_degraded_mode,
         )
-        await _apply_agent_policy_gate(
+        spend_amount = await _resolve_spend_amount_from_request(
+            request,
             session,
-            agent_id=agent.id,
-            family=family,
-            consume_budget=False,
+            company,
+            spend_resolver,
         )
-        _record_agent_mutation(agent.id, family)
-        await _apply_agent_policy_gate(
-            session,
-            agent_id=agent.id,
-            family=family,
-            consume_budget=True,
-        )
+        founder_agent_id = await _resolve_company_policy_agent_id(session, company)
+        if founder_agent_id is not None:
+            await _apply_agent_policy_gate(
+                session,
+                agent_id=founder_agent_id,
+                family=family,
+                consume_budget=False,
+                operation=operation,
+                spend_amount=spend_amount,
+            )
+        _record_actor_mutation("company", company.id, family)
+        if founder_agent_id is not None:
+            await _apply_agent_policy_gate(
+                session,
+                agent_id=founder_agent_id,
+                family=family,
+                consume_budget=True,
+                operation=operation,
+                spend_amount=spend_amount,
+            )
 
     return dependency
 
@@ -465,7 +734,7 @@ async def require_warfare_preview_write(
         family="warfare",
         consume_budget=False,
     )
-    _record_agent_mutation(agent.id, "warfare")
+    _record_actor_mutation("agent", agent.id, "warfare")
     await _apply_agent_policy_gate(
         session,
         agent_id=agent.id,
@@ -480,6 +749,8 @@ async def allow_internal_preview_family_mutation(
     family: str,
     *,
     allow_in_degraded_mode: bool = False,
+    operation: str | None = None,
+    spend_amount: float | int | None = None,
 ) -> None:
     """Apply preview policy semantics to non-HTTP internal mutations.
 
@@ -499,12 +770,54 @@ async def allow_internal_preview_family_mutation(
         agent_id=agent_id,
         family=family,
         consume_budget=False,
+        operation=operation,
+        spend_amount=spend_amount,
     )
     await _apply_agent_policy_gate(
         session,
         agent_id=agent_id,
         family=family,
         consume_budget=True,
+        operation=operation,
+        spend_amount=spend_amount,
+    )
+
+
+async def allow_internal_company_family_mutation(
+    session: AsyncSession,
+    company: Company | int,
+    family: str,
+    *,
+    operation: str | None = None,
+    allow_in_degraded_mode: bool = False,
+    spend_amount: float | int | None = None,
+) -> None:
+    """Apply preview mutation policy to company-auth operations owned by an agent."""
+    await _require_preview_surface_enabled(session)
+    await _require_preview_writes_enabled(session)
+    await _require_family_degraded_policy(
+        session,
+        family,
+        allow_in_degraded_mode=allow_in_degraded_mode,
+    )
+    founder_agent_id = await _resolve_company_policy_agent_id(session, company)
+    if founder_agent_id is None:
+        return
+    await _apply_agent_policy_gate(
+        session,
+        agent_id=founder_agent_id,
+        family=family,
+        consume_budget=False,
+        operation=operation,
+        spend_amount=spend_amount,
+    )
+    await _apply_agent_policy_gate(
+        session,
+        agent_id=founder_agent_id,
+        family=family,
+        consume_budget=True,
+        operation=operation,
+        spend_amount=spend_amount,
     )
 
 
@@ -576,14 +889,18 @@ async def get_preview_guard_state(session: AsyncSession) -> dict[str, Any]:
             family: _family_limit(family)
             for family in sorted(_FAMILY_LIMIT_ATTRS)
         },
+        "dangerous_operations": sorted(_DANGEROUS_OPERATION_SPECS),
         "agent_policy_count": agent_policy_count,
         "audit_log_size": audit_log_size,
         "policy_features": {
             "authenticated_read_policy": "family_scoped",
-            "authenticated_write_policy": "family_scoped_with_budget",
+            "authenticated_write_policy": "family_scoped_with_budget_and_operation_policy",
             "public_preview_read_policy": "surface_only",
             "admin_action_context": "structured_reason_note",
             "budget_refill_support": True,
+            "per_operation_budget_support": True,
+            "unsafe_operation_denylist": True,
+            "spending_cap_support": True,
             "audit_filter_support": True,
             "audit_request_id_filtering": True,
             "stable_error_codes": True,
@@ -674,6 +991,10 @@ async def upsert_agent_preview_policy(
     *,
     allowed_families: list[str] | None = None,
     family_budgets: dict[str, int] | None = None,
+    operation_budgets: dict[str, int] | None = None,
+    denied_operations: list[str] | None = None,
+    max_spend_per_operation: int | None = None,
+    remaining_spend_budget: int | None = None,
     audit_actor: str | None = None,
     request_id: str | None = None,
     client_fingerprint: str | None = None,
@@ -683,17 +1004,35 @@ async def upsert_agent_preview_policy(
     """Upsert a durable per-agent preview policy."""
     normalized_families = _normalize_allowed_families(allowed_families)
     normalized_budgets = _normalize_family_budgets(family_budgets)
+    normalized_operation_budgets = _normalize_operation_budgets(operation_budgets)
+    normalized_denied_operations = _normalize_denied_operations(denied_operations)
+    normalized_max_spend = _normalize_optional_positive_int(
+        max_spend_per_operation,
+        field_name="max_spend_per_operation",
+    )
+    normalized_remaining_spend = _normalize_optional_positive_int(
+        remaining_spend_budget,
+        field_name="remaining_spend_budget",
+    )
     policy = await _get_agent_policy(session, agent_id, for_update=True)
     if policy is None:
         policy = PreviewAgentPolicy(
             agent_id=agent_id,
             allowed_families=normalized_families,
             family_budgets=normalized_budgets,
+            operation_budgets=normalized_operation_budgets,
+            denied_operations=normalized_denied_operations,
+            max_spend_per_operation=normalized_max_spend,
+            remaining_spend_budget=normalized_remaining_spend,
         )
         session.add(policy)
     else:
         policy.allowed_families = normalized_families
         policy.family_budgets = normalized_budgets
+        policy.operation_budgets = normalized_operation_budgets
+        policy.denied_operations = normalized_denied_operations
+        policy.max_spend_per_operation = normalized_max_spend
+        policy.remaining_spend_budget = normalized_remaining_spend
     await session.flush()
 
     if audit_actor:
@@ -709,6 +1048,10 @@ async def upsert_agent_preview_policy(
             payload={
                 "allowed_families": normalized_families,
                 "family_budgets": normalized_budgets,
+                "operation_budgets": normalized_operation_budgets,
+                "denied_operations": normalized_denied_operations,
+                "max_spend_per_operation": normalized_max_spend,
+                "remaining_spend_budget": normalized_remaining_spend,
             },
         )
     return _serialize_agent_policy(policy)
@@ -749,6 +1092,8 @@ async def refill_agent_preview_budget(
     agent_id: int,
     *,
     increments: dict[str, int],
+    operation_increments: dict[str, int] | None = None,
+    spending_credits: int | None = None,
     audit_actor: str | None = None,
     request_id: str | None = None,
     client_fingerprint: str | None = None,
@@ -757,11 +1102,23 @@ async def refill_agent_preview_budget(
 ) -> dict[str, Any]:
     """Increment durable per-agent family budgets."""
     normalized = _normalize_family_budgets(increments)
-    if not normalized:
-        raise ValueError("At least one preview family budget increment is required.")
+    normalized_operation_increments = _normalize_operation_budgets(operation_increments)
+    normalized_spending_credits = _normalize_optional_positive_int(
+        spending_credits,
+        field_name="spending_credits",
+    )
+    if not normalized and not normalized_operation_increments and not normalized_spending_credits:
+        raise ValueError(
+            "At least one family, operation, or spending budget increment is required."
+        )
     for family, amount in normalized.items():
         if amount <= 0:
             raise ValueError(f"Preview budget refill for {family} must be > 0")
+    for operation, amount in normalized_operation_increments.items():
+        if amount <= 0:
+            raise ValueError(f"Preview budget refill for {operation} must be > 0")
+    if normalized_spending_credits is not None and normalized_spending_credits <= 0:
+        raise ValueError("Preview spending credit refill must be > 0")
 
     policy = await _get_agent_policy(session, agent_id, for_update=True)
     if policy is None:
@@ -769,6 +1126,7 @@ async def refill_agent_preview_budget(
             agent_id=agent_id,
             allowed_families=None,
             family_budgets={},
+            operation_budgets={},
         )
         session.add(policy)
         await session.flush()
@@ -777,6 +1135,22 @@ async def refill_agent_preview_budget(
     for family, amount in normalized.items():
         budgets[family] = int(budgets.get(family, 0)) + amount
     policy.family_budgets = budgets
+    if normalized or normalized_operation_increments:
+        policy.last_budget_refill_at = _utc_now()
+
+    operation_budgets = dict(policy.operation_budgets or {})
+    for operation, amount in normalized_operation_increments.items():
+        operation_budgets[operation] = int(operation_budgets.get(operation, 0)) + amount
+    policy.operation_budgets = operation_budgets
+
+    if normalized_spending_credits is not None:
+        current_remaining = (
+            int(policy.remaining_spend_budget)
+            if policy.remaining_spend_budget is not None
+            else 0
+        )
+        policy.remaining_spend_budget = current_remaining + normalized_spending_credits
+        policy.last_spending_refill_at = _utc_now()
     await session.flush()
 
     if audit_actor:
@@ -789,7 +1163,11 @@ async def refill_agent_preview_budget(
             client_fingerprint=client_fingerprint,
             reason_code=reason_code,
             note=note,
-            payload={"increments": normalized},
+            payload={
+                "increments": normalized,
+                "operation_increments": normalized_operation_increments,
+                "spending_credits": normalized_spending_credits,
+            },
         )
     return _serialize_agent_policy(policy)
 

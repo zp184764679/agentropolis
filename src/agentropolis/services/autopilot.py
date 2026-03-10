@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.preview_guard import allow_internal_preview_family_mutation
+from agentropolis.api.preview_guard import allow_internal_company_family_mutation
 from agentropolis.config import settings
 from agentropolis.models import (
     Agent,
@@ -473,10 +474,12 @@ async def run_all_standing_orders(
                     skipped_budget += 1
                     continue
 
-                await allow_internal_preview_family_mutation(
+                await allow_internal_company_family_mutation(
                     session,
-                    agent.id,
-                    "strategy",
+                    company.id,
+                    "company_market",
+                    operation="place_buy_order",
+                    spend_amount=float(buy_rule["below_price"]) * max_affordable,
                 )
                 order_id = await place_buy_order(
                     session,
@@ -554,10 +557,11 @@ async def run_all_standing_orders(
                 if order_qty <= 0:
                     continue
 
-                await allow_internal_preview_family_mutation(
+                await allow_internal_company_family_mutation(
                     session,
-                    agent.id,
-                    "strategy",
+                    company.id,
+                    "company_market",
+                    operation="place_sell_order",
                 )
                 order_id = await place_sell_order(
                     session,

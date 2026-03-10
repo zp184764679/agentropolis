@@ -86,6 +86,17 @@ def test_control_contract_catalog_matches_runtime_and_mcp_registry() -> None:
         "Presented company API key is invalid or inactive."
     )
     assert len(catalog["authorization"]["mcp_tool_scopes"]) == 60
+    assert any(
+        entry["operation"] == "place_buy_order"
+        for entry in catalog["authorization"]["dangerous_operations"]
+    )
+    market_tool = next(
+        entry
+        for entry in catalog["authorization"]["mcp_tool_scopes"]
+        if entry["tool_name"] == "place_buy_order"
+    )
+    assert market_tool["dangerous_operation"] is True
+    assert market_tool["dangerous_operation_codes"] == ["place_buy_order"]
     assert scope_names == registry_names
     assert any(group["prefix"] == "/meta/contract" for group in catalog["authorization"]["rest_route_scopes"])
     assert runtime_meta["control_contract_surface"]["endpoint"] == "/meta/contract"
