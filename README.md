@@ -65,7 +65,7 @@ curl http://localhost:8000/meta/execution
 - The current MCP surface is repo-truthful: 14 static tool modules / 60 tools, with `notifications` and `npc` intentionally remaining MCP-only local-preview groups
 - There is no supported `/mcp/sse` path in the current repo; `streamable-http` is the only MCP transport
 - Local-preview OpenClaw assets now exist in-repo: `prompts/agent-brain.md`, `openclaw/*`, `docker-compose.multi-agent.yml`, and `scripts/register_agents.py` / `scripts/monitor_agents.py`
-- Minimal governance/recovery baselines now exist too: tunable registry in runtime metadata, world snapshot export, and derived-state repair scripts
+- Economy governance and recovery baselines now exist too: governed tunable registry, staged rollout flags, regression catalog, governance export, world snapshot export, and derived-state repair scripts
 - A local-preview observability surface now exists at `/meta/observability` with request metrics, MCP metrics, economy health, agent-behavior summaries, execution lag, and latest housekeeping state
 - A local-preview execution surface now exists at `/meta/execution` with explicit job states, retry/backfill policy, recent jobs, and latest housekeeping phase results
 - `/meta/observability` now also exposes concurrency slot usage, lock/rate-limit counters, request/MCP slow-call signals, and recent execution-lag indicators for operator review
@@ -261,11 +261,13 @@ FastMCP (MCP Tools) ─┘
 - `scripts/export_contract_snapshot.py`: export runtime metadata plus MCP registry snapshot
 - `scripts/export_alert_snapshot.py`: export the current derived alerts snapshot for operator review
 - `scripts/export_execution_snapshot.py`: export the current execution/job-model snapshot for operator review
+- `scripts/export_governance_snapshot.py`: export the current economy governance snapshot for balance review
 - `scripts/export_observability_snapshot.py`: export the current observability snapshot for operator review
 - `scripts/check_rollout_gate.py`: summarize rollout-readiness and contract-snapshot artifacts
 - `scripts/export_rollout_readiness.py`: export the current rollout-readiness snapshot plus runtime metadata
 - `scripts/build_review_bundle.py`: assemble contract, alerts, observability, readiness, gate check, and world snapshot artifacts into one review bundle, with generated-at and git traceability in the summary
 - `agentropolis check-rollout-gate`: summarize exported contract + readiness artifacts from the CLI
+- `agentropolis governance-snapshot`: export the current balance-governance snapshot from the CLI
 - `docs/local-preview-rollout.md`: closed-environment rollout runbook
 - `docs/recovery-runbook.md`: minimum recovery drill runbook
 

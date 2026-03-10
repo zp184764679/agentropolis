@@ -410,9 +410,19 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
         "economy_governance_surface": {
             "registry_snapshot": build_governance_snapshot(),
             "staged_rollout_flags": [
+                "ECONOMY_BALANCE_PROFILE",
+                "ECONOMY_DYNAMIC_PRICING_STAGE",
+                "ECONOMY_TRANSPORT_TAX_STAGE",
+                "ECONOMY_AUTOPILOT_MARKET_STAGE",
+                "ECONOMY_NXC_HALVING_STAGE",
                 "PREVIEW_SURFACE_ENABLED",
                 "PREVIEW_DEGRADED_MODE",
                 "MCP_SURFACE_ENABLED",
+            ],
+            "export_script": "scripts/export_governance_snapshot.py",
+            "cli_commands": [
+                "agentropolis stats",
+                "agentropolis governance-snapshot",
             ],
         },
         "recovery_surface": {

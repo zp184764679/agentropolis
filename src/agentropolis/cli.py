@@ -58,11 +58,31 @@ def run():
 
 @cli.command()
 def stats():
-    """Show game statistics."""
+    """Show economy governance and tuning statistics."""
     from agentropolis.services.economy_governance import build_governance_snapshot
 
     snapshot = build_governance_snapshot()
     console.print_json(json.dumps(snapshot))
+
+
+@cli.command("governance-snapshot")
+@click.option(
+    "--output",
+    default="openclaw/runtime/governance.json",
+    show_default=True,
+    help="Governance snapshot output path.",
+)
+def governance_snapshot(output: str):
+    """Export the current economy governance snapshot."""
+    from pathlib import Path
+
+    from scripts.export_governance_snapshot import build_governance_export
+
+    payload = build_governance_export()
+    target = Path(output)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    console.print_json(json.dumps(payload))
 
 
 @cli.command("world-snapshot")

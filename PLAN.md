@@ -964,7 +964,7 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 - `npc` 与 `notifications` 当前允许作为 MCP-only local-preview groups 存在，不要求同步挂载 REST route
 - `#73` 的 skill 保持简洁，MCP-first；只对当前已挂载的 REST 前缀声明 fallback，不在本波次增加 `agents/openai.yaml`
 - `#74-#77` 的当前 repo 目标是“本地/封闭环境可验证的 OpenClaw 原型资产”，包括 prompt、模板、注册 manifest、monitor snapshot、compose 与 e2e；这仍然不等于 public rollout
-- 当前 repo 也允许顺手补 proposed `#86/#87` 的最小基线：tunables registry、world snapshot、derived-state repair；这些是 rollout gate 的前置资产，不代表完整 live-ops 平台已完成
+- 当前 repo 已具备 proposed `#86` 的 baseline：集中 tunable registry、staged rollout flags、balance review checklist、regression scenario catalog、governance export；这些足以支持本地预览阶段的参数评审，但仍不是完整 live-ops 平台
 - 当前 repo 已具备 proposed `#85` 的 baseline：`/meta/observability` 暴露进程内 request/MCP metrics、economy health、agent behavior、execution lag、latest housekeeping snapshot；这仍不是完整生产级 telemetry
 - 当前 repo 也允许把 rollout gate 进一步具体化为 `/meta/rollout-readiness`、contract snapshot、gate-check 脚本和 operator runbook；这样每一轮外部接入原型都能自检而不是凭记忆判断
 - 当前 repo 也允许继续把这些资产打包成 review bundle，作为封闭环境验收和后续 GitHub 审查输入；bundle 至少应包含 contract snapshot、alerts snapshot、observability snapshot、rollout readiness、gate summary、world snapshot；这属于 rollout scaffolding，不改变玩法面

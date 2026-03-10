@@ -78,6 +78,11 @@ class Settings(BaseSettings):
     OBSERVABILITY_EXECUTION_LAG_CRITICAL_SECONDS: int = 300
     OBSERVABILITY_REQUEST_ERROR_WARNING_RATE: float = 0.25
     OBSERVABILITY_MCP_FAILURE_WARNING_RATE: float = 0.25
+    ECONOMY_BALANCE_PROFILE: str = "local_preview_default"
+    ECONOMY_DYNAMIC_PRICING_STAGE: str = "disabled"
+    ECONOMY_TRANSPORT_TAX_STAGE: str = "local_preview"
+    ECONOMY_AUTOPILOT_MARKET_STAGE: str = "assisted_only"
+    ECONOMY_NXC_HALVING_STAGE: str = "local_preview"
 
     # Target world kernel defaults
     AGENT_BASE_CARRY_KG: int = 50

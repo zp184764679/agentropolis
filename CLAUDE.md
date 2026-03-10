@@ -82,7 +82,7 @@ Likewise, do not treat an `api/*.py` file existing on disk as evidence that it s
 - the current local-preview MCP surface is the repo-truthful Wave 1 catalog: 14 modules / 60 tools, with `npc` and `notifications` remaining MCP-only local-preview groups
 - local-preview OpenClaw assets now exist in-repo: `prompts/agent-brain.md`, `openclaw/*`, `docker-compose.multi-agent.yml`, `scripts/register_agents.py`, `scripts/monitor_agents.py`
 - `/meta/runtime` exposes the prompt surface and OpenClaw local-preview bundle paths; keep those synchronized when assets move
-- minimal proposed-#86/#87 baselines also exist in-repo now: tunable registry snapshot, world snapshot export, and derived-state repair helpers
+- proposed `#86` baseline now exists in-repo: governed tunable registry, staged rollout flags, regression catalog, and governance export; `#87` still covers the recovery-oriented world snapshot and derived-state repair helpers
 - `/meta/observability` now exists as the local-preview observability snapshot; treat it as best-effort process-local request/MCP metrics plus economy, agent-behavior, execution-lag, and housekeeping summary, not a full production telemetry stack
 - `/meta/execution` now exists as the execution/job-model snapshot; use it to answer when work is accepted, pending, retried, dead-lettered, or backfilled
 - `/meta/rollout-readiness` now exists as the local-preview rollout gate summary; use it with the contract snapshot and runbooks before claiming a runtime is ready for wider exposure

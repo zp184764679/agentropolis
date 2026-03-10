@@ -171,6 +171,14 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert "agentropolis execution-snapshot" in meta["operator_bundle_surface"]["cli_commands"]
     assert "agentropolis observability-snapshot" in meta["operator_bundle_surface"]["cli_commands"]
     assert "registry" in meta["economy_governance_surface"]["registry_snapshot"]
+    assert "staged_rollout_flags" in meta["economy_governance_surface"]["registry_snapshot"]
+    assert "ownership_index" in meta["economy_governance_surface"]["registry_snapshot"]
+    assert meta["economy_governance_surface"]["staged_rollout_flags"][:2] == [
+        "ECONOMY_BALANCE_PROFILE",
+        "ECONOMY_DYNAMIC_PRICING_STAGE",
+    ]
+    assert meta["economy_governance_surface"]["export_script"] == "scripts/export_governance_snapshot.py"
+    assert "agentropolis governance-snapshot" in meta["economy_governance_surface"]["cli_commands"]
     assert meta["recovery_surface"]["snapshot_script"] == "scripts/export_world_snapshot.py"
     assert meta["recovery_surface"]["repair_script"] == "scripts/repair_derived_state.py"
     assert "agentropolis world-snapshot" in meta["recovery_surface"]["cli_commands"]

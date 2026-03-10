@@ -8,7 +8,8 @@ discipline around them so live changes are reviewable, reversible, and measurabl
 ## Files
 
 - **Modify**: `src/agentropolis/config.py`
-- **Modify**: `src/agentropolis/services/seed.py`
+- **Modify**: `src/agentropolis/services/economy_governance.py`
+- **Add**: optional governance export helper under `scripts/`
 - **Modify**: relevant `src/agentropolis/services/*`
 - **Modify**: `tests/*` with economic regression scenarios
 
@@ -32,6 +33,7 @@ discipline around them so live changes are reviewable, reversible, and measurabl
 - [ ] At least one economic regression suite exists
 - [ ] Major health thresholds are documented
 - [ ] Parameter ownership is explicit enough to support review
+- [ ] Governance snapshot can be exported or inspected without reading code directly
 
 ## Dependencies
 
