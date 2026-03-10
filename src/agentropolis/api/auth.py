@@ -13,6 +13,7 @@ from fastapi.security import APIKeyHeader
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agentropolis.control_contract import AUTH_ERROR_CODES
 from agentropolis.database import get_session
 from agentropolis.models import Company
 
@@ -30,6 +31,7 @@ def _require_api_key(api_key: str | None) -> str:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing X-API-Key header",
+            headers={"X-Agentropolis-Error-Code": "auth_api_key_missing"},
         )
     return hash_api_key(api_key)
 
@@ -96,6 +98,7 @@ async def resolve_company_from_api_key(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or inactive API key",
+            headers={"X-Agentropolis-Error-Code": "auth_company_api_key_invalid"},
         )
     return company
 
@@ -112,7 +115,8 @@ async def resolve_agent_from_api_key(
     except Exception as exc:  # pragma: no cover - defensive migration guard
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="Agent auth model is not wired into the current scaffold runtime yet.",
+            detail=AUTH_ERROR_CODES["auth_agent_model_unavailable"],
+            headers={"X-Agentropolis-Error-Code": "auth_agent_model_unavailable"},
         ) from exc
 
     try:
@@ -122,7 +126,8 @@ async def resolve_agent_from_api_key(
     except Exception as exc:  # pragma: no cover - defensive migration guard
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="Agent auth exists in the target design but is not active in this runtime yet.",
+            detail=AUTH_ERROR_CODES["auth_agent_model_unavailable"],
+            headers={"X-Agentropolis-Error-Code": "auth_agent_model_unavailable"},
         ) from exc
 
     agent = result.scalar_one_or_none()
@@ -130,5 +135,6 @@ async def resolve_agent_from_api_key(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or inactive API key for agent auth",
+            headers={"X-Agentropolis-Error-Code": "auth_agent_api_key_invalid"},
         )
     return agent

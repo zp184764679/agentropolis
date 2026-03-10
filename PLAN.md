@@ -91,6 +91,7 @@
 - 若 control-plane 已暴露 request-id / client fingerprint traceability，也必须把 header 名和审计字段写入 runtime metadata 与 README，避免客户端各自猜测
 - 若 preview/control-plane 已对外暴露错误语义，必须提供稳定 `error_code`，并在 header/body 中可机器消费，避免客户端解析自然语言 `detail`
 - 若 migration-phase error taxonomy 已存在，也必须通过 `/meta/runtime` 或 `/meta/control-plane` 暴露机器可读 error-code catalog，避免客户端文档漂移
+- 若 control-contract baseline 已冻结，也应提供单独的 `/meta/contract` 机器可读入口，明确 transport、version、scope catalog 与错误分类，而不是要求客户端拼接多份元数据
 - HTTP 422 校验失败也必须纳入同一套错误契约，不能保留框架默认 shape 混入外部接口
 - 若审计已记录 request-id，则 `/meta/control-plane/audit` 必须支持按 request-id 过滤，才能把客户端失败与管理动作真正串起来
 
@@ -1070,3 +1071,4 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 - 匿名 public reads 不进入 authenticated concurrency gate
 - 当前实现仍是 process-local baseline，不包含 Redis / 分布式锁；这是 `P4` 的本地冻结版本，不是最终横向扩展方案
 - `/meta/runtime`、`/meta/observability`、`/meta/rollout-readiness`、`/meta/alerts` 都必须反映这层并发状态，而不能只在代码里存在
+- 当前 repo 也已经补了 `#81` 的最小基线：`/meta/contract`、`X-Agentropolis-Contract-Version`、稳定 auth error codes、REST/MCP scope catalogs；这仍然是 local-preview contract freeze，不等于 public rollout 已开放

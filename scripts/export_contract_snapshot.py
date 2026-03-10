@@ -6,6 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
+from agentropolis.control_contract import build_control_contract_catalog
 from agentropolis.runtime_meta import build_runtime_metadata
 from agentropolis.mcp.server import mcp
 
@@ -15,6 +16,7 @@ def build_contract_snapshot() -> dict:
     tool_names = sorted(mcp._tool_manager._tools.keys())
     return {
         "runtime_meta": meta,
+        "control_contract": build_control_contract_catalog(),
         "mcp_registry": {
             "tool_count": len(tool_names),
             "tool_names": tool_names,

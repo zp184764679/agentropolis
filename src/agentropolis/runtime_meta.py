@@ -7,6 +7,11 @@ file presence alone.
 
 from __future__ import annotations
 
+from agentropolis.control_contract import (
+    CONTRACT_VERSION_HEADER,
+    CONTROL_CONTRACT_VERSION,
+    IDEMPOTENCY_KEY_HEADER,
+)
 from agentropolis.api.preview_guard import (
     ERROR_CODE_CATALOG,
     ERROR_CODE_HEADER,
@@ -135,12 +140,26 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
     """Return a machine-readable snapshot of the current runtime surface."""
     return {
         "stage": "migration_scaffold",
-        "reliable_endpoints": ["/health", "/meta/runtime"],
+        "reliable_endpoints": ["/health", "/meta/runtime", "/meta/contract"],
         "request_context": {
             "request_id_header": REQUEST_ID_HEADER,
             "client_fingerprint_source": "best_effort_request_client",
         },
         "public_contract_frozen": False,
+        "control_contract_surface": {
+            "endpoint": "/meta/contract",
+            "minimum_contract_frozen": True,
+            "version": CONTROL_CONTRACT_VERSION,
+            "version_header": CONTRACT_VERSION_HEADER,
+            "idempotency_key_header": IDEMPOTENCY_KEY_HEADER,
+            "error_code_header": ERROR_CODE_HEADER,
+            "request_id_header": REQUEST_ID_HEADER,
+            "transport": "streamable-http",
+            "scope_catalog_available": True,
+            "error_taxonomy_available": True,
+            "local_preview_only": True,
+            "public_rollout_ready": False,
+        },
         "control_plane_surface": {
             "admin_endpoint": "/meta/control-plane",
             "scope": "db_persisted_preview_policy",
@@ -367,6 +386,7 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
             "rollout_readiness_script": "scripts/export_rollout_readiness.py",
             "review_bundle_script": "scripts/build_review_bundle.py",
             "gate_check_script": "scripts/check_rollout_gate.py",
+            "contract_catalog_script": "scripts/export_contract_snapshot.py",
             "summary_metadata": [
                 "generated_at",
                 "git.branch",

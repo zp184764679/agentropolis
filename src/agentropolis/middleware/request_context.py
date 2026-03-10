@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+from agentropolis.control_contract import (
+    CONTROL_CONTRACT_VERSION,
+    CONTRACT_VERSION_HEADER,
+)
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
@@ -31,4 +35,5 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
         response.headers[REQUEST_ID_HEADER] = request_id
+        response.headers[CONTRACT_VERSION_HEADER] = CONTROL_CONTRACT_VERSION
         return response

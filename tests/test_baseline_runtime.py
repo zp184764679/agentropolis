@@ -51,6 +51,13 @@ def test_runtime_metadata_reports_target_registry() -> None:
         "Authenticated request rate limit exceeded."
     )
     assert meta["request_context"]["request_id_header"] == "X-Agentropolis-Request-ID"
+    assert meta["control_contract_surface"]["endpoint"] == "/meta/contract"
+    assert meta["control_contract_surface"]["minimum_contract_frozen"] is True
+    assert meta["control_contract_surface"]["version"] == "2026-03-preview.1"
+    assert meta["control_contract_surface"]["version_header"] == "X-Agentropolis-Contract-Version"
+    assert meta["control_contract_surface"]["idempotency_key_header"] == "X-Idempotency-Key"
+    assert meta["control_contract_surface"]["scope_catalog_available"] is True
+    assert meta["control_contract_surface"]["error_taxonomy_available"] is True
     assert "budget_refill" in meta["control_plane_surface"]["features"]
     assert "db_persisted_policy" in meta["control_plane_surface"]["features"]
     assert "audit_request_id_filtering" in meta["control_plane_surface"]["features"]
@@ -59,6 +66,7 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["orm_surface"]["target_models_registered"] is True
     assert meta["orm_surface"]["metadata_table_count"] >= 39
     assert meta["migration_surface"]["alembic_baseline_present"] is True
+    assert "/meta/contract" in meta["reliable_endpoints"]
     assert mounted["agent"] == "preview_service_backed"
     assert mounted["production"] == "service_backed_writes"
     assert mounted["company"] == "mixed_agent_creation_legacy_company_ops"

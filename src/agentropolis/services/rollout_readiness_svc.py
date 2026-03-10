@@ -28,10 +28,13 @@ async def build_rollout_readiness_snapshot(session: AsyncSession, runtime_meta: 
 
     gates = {
         "control_contract": _gate(
-            runtime_meta["mcp_surface"]["transport_frozen"]
+            runtime_meta["control_contract_surface"]["minimum_contract_frozen"]
+            and runtime_meta["control_contract_surface"]["scope_catalog_available"]
+            and runtime_meta["control_contract_surface"]["error_taxonomy_available"]
+            and runtime_meta["mcp_surface"]["transport_frozen"]
             and runtime_meta["mcp_surface"]["transport"] == "streamable-http"
             and runtime_meta["rest_surface"]["error_code_header"] == "X-Agentropolis-Error-Code",
-            "MCP transport is frozen to streamable-http and HTTP error-code contract is present.",
+            "MCP transport, contract versioning, error taxonomy, and scope catalogs are exposed through the frozen local-preview contract surface.",
         ),
         "authz": _gate(
             runtime_meta["control_plane_surface"]["persistent"]

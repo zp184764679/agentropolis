@@ -50,6 +50,7 @@ curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:800
 ## Current Runtime Status
 
 - `/health` and `/meta/runtime` are the two endpoints that should be treated as reliably available in the current scaffold
+- `/meta/contract` now exposes the frozen local-preview control-contract baseline: transport, versioning, scope catalogs, and error taxonomy
 - REST route modules for market/production/inventory/company/game are mounted; `market`, `inventory`, and `game` now have real read paths, while many legacy write paths still surface as `501 Not Implemented`
 - Agent/world/skills/transport/guild/diplomacy/strategy/decisions/warfare plus autonomy/digest/dashboard/intel are now mounted as a preview target surface backed by real services, but the public contract is still not frozen
 - Preview routes are now behind a minimal control-plane guard: global preview kill switch, preview write gate, warfare mutation gate, and best-effort process-local mutation throttling
@@ -71,7 +72,9 @@ curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:800
 - `/meta/runtime` now also exposes the local-preview prompt surface and OpenClaw asset bundle paths
 - `/meta/control-plane` is the admin-only machine-readable surface for the current DB-backed preview policy
 - Error responses now carry both `X-Agentropolis-Request-ID` and `X-Agentropolis-Error-Code`; JSON error bodies mirror them as `request_id` and `error_code`
+- All HTTP responses now also carry `X-Agentropolis-Contract-Version`, currently `2026-03-preview.1`
 - Concurrency failures use the same contract: `concurrency_rate_limited` (`429`), `concurrency_entity_lock_timeout` (`429`), and `concurrency_slot_timeout` (`503`)
+- Auth failures now use stable machine-readable codes too: `auth_api_key_missing`, `auth_agent_api_key_invalid`, `auth_company_api_key_invalid`
 - FastAPI validation failures (`422`) now use the same contract instead of the framework default body shape
 - `/meta/runtime` and `/meta/control-plane` now expose the current migration-phase preview/control-plane error code catalog
 - Admin control-plane audit entries capture request id and best-effort client fingerprint
@@ -226,6 +229,7 @@ FastMCP (MCP Tools) ─┘
 - `skills/agentropolis-world/`: repo-local MCP-first operator skill plus the tool matrix and mounted REST fallback map
 - `README.md`: current scaffold orientation plus target-direction guidance
 - `GET /meta/runtime`: machine-readable current runtime surface
+- `GET /meta/contract`: machine-readable control-contract baseline and authorization scope catalog
 - `GET /meta/control-plane`: admin-only preview policy surface
 - `GET /meta/alerts`: derived operator alerts from observability + rollout gates
 - `GET /meta/observability`: process-local request metrics plus economy/housekeeping summary
