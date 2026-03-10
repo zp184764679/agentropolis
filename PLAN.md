@@ -85,6 +85,7 @@
 - Observability baseline ready: request/job metrics、经济健康指标、告警、结构化日志
 - Recovery baseline ready: snapshot/backup/restore 或最小可用修复工具
 - 迁移期允许存在 process-local preview policy admin surface 作为安全阀，但它不能替代最终的分布式 authz/quota/budget 控制面
+- 迁移期的 process-local preview policy 若扩展到 per-agent authz / budget / audit，也必须在 README、CLAUDE、`/meta/runtime`、`/meta/control-plane` 中同步声明其非持久化性质
 
 ---
 

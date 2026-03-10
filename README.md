@@ -54,6 +54,7 @@ curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:800
 - Agent/world/skills/transport/guild/diplomacy/strategy/decisions/warfare are now mounted as a preview target surface backed by real services, but the public contract is still not frozen
 - Preview routes are now behind a minimal control-plane guard: global preview kill switch, preview write gate, warfare mutation gate, and best-effort process-local mutation throttling
 - An admin-only process-local preview policy surface exists at `/meta/control-plane` when `CONTROL_PLANE_ADMIN_TOKEN` is configured
+- The process-local preview policy now supports per-agent route-family allowlists, per-family mutation budgets, and an admin action audit trail
 - MCP transport and public contract are still being frozen in the control-plane backlog
 - Do not treat legacy company-auth or `/mcp/sse` examples as the final external integration contract
 - `/meta/runtime` is the machine-readable source for the current mounted-vs-unmounted runtime surface
@@ -138,6 +139,8 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 - `PREVIEW_DEGRADED_MODE`: keeps preview reads available while blocking non-survival preview mutations
 - `/meta/control-plane`: admin-only process-local endpoint for inspecting and changing preview runtime policy during migration
 - Preview mutation quotas are split by route family: `agent_self`, `world`, `transport`, `social`, `strategy`, `warfare`
+- Preview authz is now process-local and per-agent by route family; preview budgets are decremented per allowed family mutation
+- `/meta/control-plane/audit` exposes the in-memory admin action trail for preview policy changes
 - Preview mutation throttling is currently process-local and best-effort; it is a migration safety valve, not the final distributed quota model
 
 ### Route Mount Policy

@@ -234,8 +234,12 @@ class PreviewControlPlaneResponse(BaseModel):
     agent_mutations_per_window: int
     registrations_per_window_per_host: int
     family_limits: dict[str, int] = Field(default_factory=dict)
+    agent_policy_count: int = 0
+    audit_log_size: int = 0
     rate_limit_store: str
     admin_api: dict = Field(default_factory=dict)
+    agent_policies: list["PreviewAgentPolicyResponse"] = Field(default_factory=list)
+    recent_audit_entries: list["ControlPlaneAuditEntry"] = Field(default_factory=list)
 
 
 class PreviewControlPlaneUpdateRequest(BaseModel):
@@ -243,6 +247,35 @@ class PreviewControlPlaneUpdateRequest(BaseModel):
     writes_enabled: bool | None = None
     warfare_mutations_enabled: bool | None = None
     degraded_mode: bool | None = None
+
+
+class PreviewAgentPolicyRequest(BaseModel):
+    allowed_families: list[str] | None = None
+    family_budgets: dict[str, int] | None = None
+
+
+class PreviewAgentPolicyResponse(BaseModel):
+    agent_id: int
+    allowed_families: list[str] | None = None
+    family_budgets: dict[str, int] = Field(default_factory=dict)
+    updated_at: str
+
+
+class PreviewAgentPolicyListResponse(BaseModel):
+    policies: list[PreviewAgentPolicyResponse] = Field(default_factory=list)
+
+
+class ControlPlaneAuditEntry(BaseModel):
+    event_id: int
+    action: str
+    actor: str
+    target_agent_id: int | None = None
+    payload: dict = Field(default_factory=dict)
+    occurred_at: str
+
+
+class ControlPlaneAuditResponse(BaseModel):
+    entries: list[ControlPlaneAuditEntry] = Field(default_factory=list)
 
 
 # ─── Target World / Agent Surface ───────────────────────────────────────────
@@ -650,3 +683,6 @@ class RegionThreatResponse(BaseModel):
     region_id: int
     active_threats: int
     contracts: list[RegionThreatContractResponse] = Field(default_factory=list)
+
+
+PreviewControlPlaneResponse.model_rebuild()
