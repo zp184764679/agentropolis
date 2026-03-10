@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
 from agentropolis.api.preview_guard import (
+    make_agent_preview_access_guard,
     make_agent_preview_write_guard,
     require_preview_surface,
 )
@@ -30,6 +31,7 @@ router = APIRouter(
     dependencies=[Depends(require_preview_surface)],
 )
 social_write_guard = make_agent_preview_write_guard("social")
+social_access_guard = make_agent_preview_access_guard("social")
 
 
 @router.post(
@@ -84,6 +86,7 @@ async def accept_treaty(
 @router.get("/treaties", response_model=list[TreatyInfo])
 async def get_agent_treaties(
     active_only: bool = Query(default=True),
+    _guard: None = Depends(social_access_guard),
     agent: Agent = Depends(get_current_agent),
     session: AsyncSession = Depends(get_session),
 ):
@@ -93,6 +96,7 @@ async def get_agent_treaties(
 
 @router.get("/relationships", response_model=list[RelationshipInfo])
 async def list_relationships(
+    _guard: None = Depends(social_access_guard),
     agent: Agent = Depends(get_current_agent),
     session: AsyncSession = Depends(get_session),
 ):

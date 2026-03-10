@@ -4,7 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
-from agentropolis.api.preview_guard import require_preview_surface
+from agentropolis.api.preview_guard import (
+    make_agent_preview_access_guard,
+    require_preview_surface,
+)
 from agentropolis.api.schemas import DecisionAnalysisResponse, DecisionLogResponse
 from agentropolis.database import get_session
 from agentropolis.models import Agent
@@ -15,12 +18,14 @@ router = APIRouter(
     tags=["decisions"],
     dependencies=[Depends(require_preview_surface)],
 )
+strategy_access_guard = make_agent_preview_access_guard("strategy")
 
 
 @router.get("", response_model=DecisionLogResponse)
 async def list_decisions(
     limit: int = Query(default=50, ge=1, le=200),
     decision_type: str | None = Query(default=None, description="Filter by type: TRADE, COMBAT, etc."),
+    _guard: None = Depends(strategy_access_guard),
     agent: Agent = Depends(get_current_agent),
     session: AsyncSession = Depends(get_session),
 ):
@@ -39,6 +44,7 @@ async def list_decisions(
 
 @router.get("/analysis", response_model=DecisionAnalysisResponse)
 async def analyze_decisions(
+    _guard: None = Depends(strategy_access_guard),
     agent: Agent = Depends(get_current_agent),
     session: AsyncSession = Depends(get_session),
 ):

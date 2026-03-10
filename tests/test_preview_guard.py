@@ -242,6 +242,54 @@ def test_control_plane_agent_policy_blocks_unauthorized_family(
     asyncio.run(scenario())
 
 
+def test_control_plane_agent_policy_blocks_authenticated_reads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "CONTROL_PLANE_ADMIN_TOKEN", "root-token")
+    reset_preview_guard_state()
+
+    async def scenario() -> None:
+        async with _preview_client(agent_id=7) as client:
+            policy = await client.put(
+                "/meta/control-plane/agents/7/policy",
+                headers=_admin_headers(),
+                json={"allowed_families": ["agent_self"]},
+            )
+            assert policy.status_code == 200
+
+            response = await client.get("/api/agent/decisions")
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == (
+            "Preview strategy access is not allowed for agent 7."
+        )
+
+    asyncio.run(scenario())
+
+
+def test_public_preview_reads_remain_surface_scoped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "CONTROL_PLANE_ADMIN_TOKEN", "root-token")
+    reset_preview_guard_state()
+
+    async def scenario() -> None:
+        async with _preview_client(agent_id=7) as client:
+            policy = await client.put(
+                "/meta/control-plane/agents/7/policy",
+                headers=_admin_headers(),
+                json={"allowed_families": ["agent_self"]},
+            )
+            assert policy.status_code == 200
+
+            response = await client.get("/api/world/map")
+
+        assert response.status_code == 200
+        assert response.json() == {"regions": []}
+
+    asyncio.run(scenario())
+
+
 def test_control_plane_agent_policy_consumes_family_budget(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

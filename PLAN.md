@@ -86,6 +86,7 @@
 - Recovery baseline ready: snapshot/backup/restore 或最小可用修复工具
 - 迁移期允许存在 process-local preview policy admin surface 作为安全阀，但它不能替代最终的分布式 authz/quota/budget 控制面
 - 迁移期的 process-local preview policy 若扩展到 per-agent authz / budget / audit，也必须在 README、CLAUDE、`/meta/runtime`、`/meta/control-plane` 中同步声明其非持久化性质
+- 若 process-local preview policy 已覆盖 authenticated reads，也必须明确区分 “authenticated family-scoped reads” 与 “public intel/public world reads”，避免把公共查询误当私有面
 
 ---
 

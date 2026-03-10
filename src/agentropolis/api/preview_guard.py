@@ -188,6 +188,16 @@ def _require_agent_family_authorized(agent_id: int, family: str) -> None:
         )
 
 
+def make_agent_preview_access_guard(family: str):
+    """Build a dependency that guards authenticated preview reads for one route family."""
+
+    async def dependency(agent: Any = Depends(get_current_agent)) -> None:
+        _require_preview_surface_enabled()
+        _require_agent_family_authorized(agent.id, family)
+
+    return dependency
+
+
 def _consume_agent_budget(agent_id: int, family: str) -> None:
     with _policy_lock:
         policy = _agent_policy_overrides.get(agent_id)
@@ -366,6 +376,11 @@ def get_preview_guard_state() -> dict[str, Any]:
         },
         "agent_policy_count": agent_policy_count,
         "audit_log_size": audit_log_size,
+        "policy_features": {
+            "authenticated_read_policy": "family_scoped",
+            "authenticated_write_policy": "family_scoped_with_budget",
+            "public_preview_read_policy": "surface_only",
+        },
         "rate_limit_store": "process_local_best_effort",
         "admin_api": {
             "path": "/meta/control-plane",
