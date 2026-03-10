@@ -114,9 +114,21 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["openclaw_surface"]["manifest_output_default"] == "openclaw/runtime/agents.json"
     assert meta["observability_surface"]["endpoint"] == "/meta/observability"
     assert meta["observability_surface"]["request_metrics"] == "process_local_best_effort"
+    assert meta["observability_surface"]["mcp_metrics_snapshot"] is True
     assert meta["observability_surface"]["economy_health_snapshot"] is True
+    assert meta["observability_surface"]["agent_behavior_snapshot"] is True
     assert meta["observability_surface"]["concurrency_snapshot"] is True
     assert meta["observability_surface"]["preview_policy_snapshot"] is True
+    assert meta["observability_surface"]["execution_lag_snapshot"] is True
+    assert "request_complete" in meta["observability_surface"]["structured_logs"]
+    assert "mcp_tool_call" in meta["observability_surface"]["structured_logs"]
+    assert "housekeeping_sweep_completed" in meta["observability_surface"]["structured_logs"]
+    assert meta["observability_surface"]["thresholds"]["slow_request_ms"] == 250
+    assert meta["observability_surface"]["thresholds"]["slow_mcp_ms"] == 250
+    assert meta["observability_surface"]["thresholds"]["execution_lag_warning_seconds"] == 120
+    assert meta["observability_surface"]["thresholds"]["execution_lag_critical_seconds"] == 300
+    assert meta["observability_surface"]["thresholds"]["request_error_warning_rate"] == 0.25
+    assert meta["observability_surface"]["thresholds"]["mcp_failure_warning_rate"] == 0.25
     assert meta["observability_surface"]["export_script"] == "scripts/export_observability_snapshot.py"
     assert meta["execution_surface"]["endpoint"] == "/meta/execution"
     assert meta["execution_surface"]["job_states"] == [

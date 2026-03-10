@@ -66,9 +66,9 @@ curl http://localhost:8000/meta/execution
 - There is no supported `/mcp/sse` path in the current repo; `streamable-http` is the only MCP transport
 - Local-preview OpenClaw assets now exist in-repo: `prompts/agent-brain.md`, `openclaw/*`, `docker-compose.multi-agent.yml`, and `scripts/register_agents.py` / `scripts/monitor_agents.py`
 - Minimal governance/recovery baselines now exist too: tunable registry in runtime metadata, world snapshot export, and derived-state repair scripts
-- A local-preview observability surface now exists at `/meta/observability` with request metrics, economy health summary, and latest housekeeping state
+- A local-preview observability surface now exists at `/meta/observability` with request metrics, MCP metrics, economy health, agent-behavior summaries, execution lag, and latest housekeeping state
 - A local-preview execution surface now exists at `/meta/execution` with explicit job states, retry/backfill policy, recent jobs, and latest housekeeping phase results
-- `/meta/observability` now also exposes concurrency slot usage, lock/rate-limit counters, and recent timeout signals for operator review
+- `/meta/observability` now also exposes concurrency slot usage, lock/rate-limit counters, request/MCP slow-call signals, and recent execution-lag indicators for operator review
 - A local-preview rollout check surface now exists at `/meta/rollout-readiness`, with contract snapshot and gate-check scripts under `scripts/`
 - `/meta/rollout-readiness` now includes a first-class `concurrency_guard` gate instead of treating concurrency as implicit rollout context
 - `/meta/rollout-readiness` now also includes an `execution_semantics` gate; a runtime is not review-ready if phase results, retry policy, or backfill semantics are missing
@@ -249,7 +249,7 @@ FastMCP (MCP Tools) ─┘
 - `GET /meta/control-plane`: admin-only preview policy surface
 - `GET /meta/execution`: execution/job-model snapshot
 - `GET /meta/alerts`: derived operator alerts from observability + rollout gates
-- `GET /meta/observability`: process-local request metrics plus economy/housekeeping summary
+- `GET /meta/observability`: process-local request + MCP metrics, economy/agent-behavior health, execution lag, and housekeeping summary
 - `GET /meta/rollout-readiness`: local-preview rollout gate summary
 - `skills/agentropolis-world/SKILL.md`: MCP-first local operator skill with mounted REST fallback mapping
 - `prompts/agent-brain.md`: default local-preview operator prompt

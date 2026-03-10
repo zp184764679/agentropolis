@@ -69,8 +69,10 @@ def test_rollout_readiness_endpoint_and_artifacts_exist() -> None:
             assert "control_contract" in payload["gates"]
             assert "concurrency_guard" in payload["gates"]
             assert "execution_semantics" in payload["gates"]
+            assert "observability" in payload["gates"]
             assert payload["gates"]["concurrency_guard"]["ready"] is True
             assert payload["gates"]["execution_semantics"]["ready"] is True
+            assert payload["gates"]["observability"]["ready"] is True
             assert isinstance(payload["blocking_failures"], list)
 
     asyncio.run(scenario())

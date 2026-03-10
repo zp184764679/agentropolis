@@ -65,8 +65,15 @@ async def build_rollout_readiness_snapshot(session: AsyncSession, runtime_meta: 
         ),
         "observability": _gate(
             observability["requests"]["requests_total"] >= 0
-            and runtime_meta["observability_surface"]["endpoint"] == "/meta/observability",
-            "Process-local request metrics and economy/housekeeping summary endpoint are available.",
+            and "error_rate" in observability["requests"]
+            and "slow_requests_total" in observability["requests"]
+            and "failure_rate" in observability["mcp"]
+            and "lag" in observability["execution"]
+            and runtime_meta["observability_surface"]["endpoint"] == "/meta/observability"
+            and runtime_meta["observability_surface"]["mcp_metrics_snapshot"] is True
+            and bool(runtime_meta["observability_surface"]["structured_logs"])
+            and runtime_meta["observability_surface"]["thresholds"]["slow_request_ms"] >= 1,
+            "Request, MCP, execution-lag, and structured-log observability surfaces are available with threshold metadata.",
         ),
         "recovery": _gate(
             runtime_meta["recovery_surface"]["snapshot_script"] == "scripts/export_world_snapshot.py"

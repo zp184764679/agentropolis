@@ -10,7 +10,11 @@ control-plane degradation.
 
 - **Modify**: `src/agentropolis/main.py`
 - **Modify**: `src/agentropolis/config.py`
+- **Modify**: `src/agentropolis/middleware/metrics.py`
+- **Modify**: `src/agentropolis/mcp/_shared.py`
+- **Add**: `src/agentropolis/mcp/metrics.py`
 - **Modify**: `src/agentropolis/services/game_engine.py`
+- **Add**: `src/agentropolis/services/structured_logging.py`
 - **Modify**: `src/agentropolis/services/*`
 - **Optional**: monitoring export or dashboard helper files
 
@@ -18,7 +22,7 @@ control-plane degradation.
 
 - structured logging
 - request / MCP / housekeeping metrics
-- slow query and lock contention visibility
+- slow request / slow MCP and lock contention visibility
 - queue lag and periodic task latency
 - economy health metrics
 - autopilot and agent behavior metrics
@@ -32,7 +36,7 @@ control-plane degradation.
 ## Acceptance Criteria
 
 - [ ] Requests and background tasks emit structured context
-- [ ] API error rate, MCP failure rate, housekeeping duration, and lock contention are observable
+- [ ] API error rate, MCP failure rate, housekeeping duration, execution lag, and lock contention are observable
 - [ ] Economy health metrics cover at least source/sink, inflation, starvation, and stuck work signals
 - [ ] There is a minimum dashboard or export path for external monitoring
 - [ ] Rollout gates can reference real metrics instead of manual judgment only

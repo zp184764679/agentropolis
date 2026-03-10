@@ -71,6 +71,8 @@ def test_rollout_export_and_review_bundle_build_files() -> None:
             assert "alerts" in alerts
             assert "observability" in observability
             assert "execution" in execution
+            assert "mcp" in observability["observability"]
+            assert "lag" in observability["observability"]["execution"]
             bundle = await build_review_bundle(bundle_root, session_factory=session_factory)
             summary_path = Path(bundle["output_dir"]) / "bundle-summary.json"
             contract_path = Path(bundle["artifacts"]["contract_snapshot"])

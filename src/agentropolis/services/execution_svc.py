@@ -20,6 +20,7 @@ from agentropolis.models import (
     GameState,
     HousekeepingLog,
 )
+from agentropolis.services.structured_logging import emit_structured_log
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,12 @@ def _normalize_period_end(period_end: str | datetime | None, fallback: datetime)
     if isinstance(period_end, datetime):
         return _utc_now(period_end)
     return _utc_now(datetime.fromisoformat(period_end))
+
+
+def _age_seconds(value: datetime | None, *, now: datetime) -> float | None:
+    if value is None:
+        return None
+    return round(max((now - _utc_now(value)).total_seconds(), 0.0), 3)
 
 
 def _serialize_job(job: ExecutionJob) -> dict[str, Any]:
@@ -164,6 +171,17 @@ async def enqueue_execution_job(
     if dedupe_key:
         existing = await _find_active_dedupe_job(session, dedupe_key)
         if existing is not None:
+            emit_structured_log(
+                logger,
+                "execution_job_enqueued",
+                job_id=existing.id,
+                job_type=existing.job_type,
+                trigger_kind=existing.trigger_kind,
+                status=existing.status,
+                dedupe_key=dedupe_key,
+                created=False,
+                deduped=True,
+            )
             return _serialize_job(existing), False
 
     job = ExecutionJob(
@@ -179,6 +197,17 @@ async def enqueue_execution_job(
     )
     session.add(job)
     await session.flush()
+    emit_structured_log(
+        logger,
+        "execution_job_enqueued",
+        job_id=job.id,
+        job_type=job.job_type,
+        trigger_kind=job.trigger_kind,
+        status=job.status,
+        dedupe_key=job.dedupe_key,
+        created=True,
+        deduped=False,
+    )
     return _serialize_job(job), True
 
 
@@ -359,6 +388,20 @@ async def _mark_job_completed(
     job.dead_letter_reason = None
     _append_attempt(job, now=now, status=ExecutionJobStatus.COMPLETED.value)
     await session.flush()
+    emit_structured_log(
+        logger,
+        "execution_job_completed",
+        job_id=job.id,
+        job_type=job.job_type,
+        trigger_kind=job.trigger_kind,
+        attempts=int(job.attempts or 0),
+        status=job.status,
+        duration_seconds=(
+            round((_utc_now(now) - _utc_now(job.started_at)).total_seconds(), 3)
+            if job.started_at is not None
+            else None
+        ),
+    )
 
 
 async def _mark_job_failed(
@@ -383,6 +426,18 @@ async def _mark_job_failed(
         job.available_at = now + retry_delay
         _append_attempt(job, now=now, status=ExecutionJobStatus.FAILED.value, detail=detail)
     await session.flush()
+    emit_structured_log(
+        logger,
+        "execution_job_failed",
+        job_id=job.id,
+        job_type=job.job_type,
+        trigger_kind=job.trigger_kind,
+        attempts=int(job.attempts or 0),
+        status=job.status,
+        available_at=_isoformat(job.available_at),
+        dead_letter=job.status == ExecutionJobStatus.DEAD_LETTER.value,
+        detail=detail,
+    )
 
 
 async def _run_job_handler(
@@ -510,6 +565,14 @@ async def retry_execution_job(
     job.last_error = None
     job.dead_letter_reason = None
     await session.flush()
+    emit_structured_log(
+        logger,
+        "execution_job_requeued",
+        job_id=job.id,
+        job_type=job.job_type,
+        trigger_kind=job.trigger_kind,
+        status=job.status,
+    )
     await session.refresh(job)
     return _serialize_job(job)
 
@@ -519,6 +582,7 @@ async def build_execution_snapshot(
     *,
     recent_limit: int = 20,
 ) -> dict[str, Any]:
+    effective_now = _utc_now()
     by_status = {
         row[0]: int(row[1] or 0)
         for row in (
@@ -541,6 +605,49 @@ async def build_execution_snapshot(
             select(HousekeepingLog).order_by(HousekeepingLog.sweep_count.desc()).limit(1)
         )
     ).scalar_one_or_none()
+    oldest_pending_created_at = (
+        await session.execute(
+            select(func.min(ExecutionJob.created_at)).where(
+                ExecutionJob.status.in_(
+                    (
+                        ExecutionJobStatus.ACCEPTED.value,
+                        ExecutionJobStatus.PENDING.value,
+                    )
+                )
+            )
+        )
+    ).scalar_one()
+    oldest_retry_updated_at = (
+        await session.execute(
+            select(func.min(ExecutionJob.updated_at)).where(
+                ExecutionJob.status == ExecutionJobStatus.FAILED.value
+            )
+        )
+    ).scalar_one()
+    pending_backfills = int(
+        (
+            await session.execute(
+                select(func.count(ExecutionJob.id))
+                .where(ExecutionJob.job_type == ExecutionJobType.HOUSEKEEPING_BACKFILL.value)
+                .where(
+                    ExecutionJob.status.in_(
+                        (
+                            ExecutionJobStatus.ACCEPTED.value,
+                            ExecutionJobStatus.PENDING.value,
+                            ExecutionJobStatus.FAILED.value,
+                        )
+                    )
+                )
+            )
+        ).scalar_one()
+        or 0
+    )
+    retryable_jobs = int(by_status.get(ExecutionJobStatus.FAILED.value, 0))
+    oldest_pending_age = _age_seconds(oldest_pending_created_at, now=effective_now)
+    oldest_retry_age = _age_seconds(oldest_retry_updated_at, now=effective_now)
+    max_lag = max(
+        [0.0, *(value for value in (oldest_pending_age, oldest_retry_age) if value is not None)]
+    )
 
     return {
         "job_states": [item.value for item in ExecutionJobStatus],
@@ -556,10 +663,21 @@ async def build_execution_snapshot(
                 )
             ),
             "dead_letters": by_status.get(ExecutionJobStatus.DEAD_LETTER.value, 0),
+            "pending_backfills": pending_backfills,
+            "retryable_jobs": retryable_jobs,
         },
         "retry_policy": {
             "max_attempts_default": int(settings.EXECUTION_JOB_MAX_ATTEMPTS),
             "retry_delay_seconds": int(settings.EXECUTION_JOB_RETRY_DELAY_SECONDS),
+        },
+        "lag": {
+            "oldest_pending_age_seconds": oldest_pending_age,
+            "oldest_retry_age_seconds": oldest_retry_age,
+            "max_lag_seconds": max_lag,
+            "pending_backfills": pending_backfills,
+            "retryable_jobs": retryable_jobs,
+            "warning_threshold_seconds": int(settings.OBSERVABILITY_EXECUTION_LAG_WARNING_SECONDS),
+            "critical_threshold_seconds": int(settings.OBSERVABILITY_EXECUTION_LAG_CRITICAL_SECONDS),
         },
         "backfill_policy": {
             "max_backfill_sweeps": int(settings.EXECUTION_MAX_BACKFILL_SWEEPS),

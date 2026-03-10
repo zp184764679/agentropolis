@@ -28,6 +28,7 @@ from agentropolis.services.goal_svc import compute_all_goal_progress
 from agentropolis.services.market_engine import match_all_resources
 from agentropolis.services.nxc_mining_svc import adjust_difficulty, check_halving, update_active_refineries
 from agentropolis.services.production import settle_all_buildings
+from agentropolis.services.structured_logging import emit_structured_log
 from agentropolis.services.tax_svc import get_region_tax_history
 from agentropolis.services.transport_svc import settle_transport_arrivals
 from agentropolis.services.trait_svc import evaluate_agent_traits
@@ -353,6 +354,27 @@ async def _execute_housekeeping_sweep(
     )
     session.add(log)
     await session.flush()
+    emit_structured_log(
+        logger,
+        "housekeeping_sweep_completed",
+        sweep_count=current_tick,
+        trigger_kind=trigger_kind,
+        execution_job_id=execution_job_id,
+        duration_seconds=round(sweep_duration, 6),
+        error_count=len(errors),
+        active_companies=log.active_companies,
+        phase_timings=phase_timings,
+        reflex_actions=int(
+            ((autonomy_summary.get("reflex") or {}).get("actions") or 0)
+        ),
+        standing_orders_created=int(
+            ((autonomy_summary.get("standing_orders") or {}).get("buy_orders_created") or 0)
+        )
+        + int(((autonomy_summary.get("standing_orders") or {}).get("sell_orders_created") or 0)),
+        goals_completed=int(
+            ((autonomy_summary.get("goals") or {}).get("completed_now") or 0)
+        ),
+    )
 
     return {
         "current_tick": current_tick,

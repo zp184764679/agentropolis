@@ -108,6 +108,8 @@ def test_execution_endpoint_accepts_and_processes_backfill_jobs(
             assert snapshot.status_code == 200
             payload = snapshot.json()
             assert payload["counts"]["by_status"]["completed"] >= 1
+            assert payload["lag"]["warning_threshold_seconds"] >= 1
+            assert payload["lag"]["pending_backfills"] >= 0
             latest = payload["housekeeping_phase_contract"]["latest_sweep"]
             assert latest is not None
             assert latest["trigger_kind"] == "backfill"

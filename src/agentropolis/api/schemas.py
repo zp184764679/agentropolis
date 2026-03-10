@@ -365,6 +365,7 @@ class ExecutionSnapshotResponse(BaseModel):
     job_types: list[str] = Field(default_factory=list)
     counts: dict = Field(default_factory=dict)
     retry_policy: dict = Field(default_factory=dict)
+    lag: dict = Field(default_factory=dict)
     backfill_policy: dict = Field(default_factory=dict)
     housekeeping_phase_contract: ExecutionPhaseContractResponse
     recent_jobs: list[ExecutionJobResponse] = Field(default_factory=list)

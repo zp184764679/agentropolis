@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agentropolis.config import settings
 from agentropolis.services.observability_svc import build_observability_snapshot
 from agentropolis.services.rollout_readiness_svc import build_rollout_readiness_snapshot
 
@@ -93,6 +94,49 @@ async def build_alert_snapshot(session: AsyncSession, runtime_meta: dict) -> dic
             )
         )
 
+    requests = observability["requests"]
+    if float(requests["error_rate"]) >= float(settings.OBSERVABILITY_REQUEST_ERROR_WARNING_RATE):
+        alerts.append(
+            _alert(
+                "request_error_rate_high",
+                "warning",
+                "HTTP request error rate crossed the configured observability warning threshold.",
+                source="requests",
+            )
+        )
+    if int(requests["slow_requests_total"]) > 0:
+        alerts.append(
+            _alert(
+                "slow_requests_present",
+                "warning",
+                "One or more HTTP requests exceeded the configured slow-request threshold.",
+                source="requests",
+            )
+        )
+
+    mcp = observability["mcp"]
+    if (
+        int(mcp["calls_total"]) > 0
+        and float(mcp["failure_rate"]) >= float(settings.OBSERVABILITY_MCP_FAILURE_WARNING_RATE)
+    ):
+        alerts.append(
+            _alert(
+                "mcp_failure_rate_high",
+                "warning",
+                "MCP tool failure rate crossed the configured warning threshold.",
+                source="mcp",
+            )
+        )
+    if int(mcp["slow_calls_total"]) > 0:
+        alerts.append(
+            _alert(
+                "mcp_slow_calls_present",
+                "warning",
+                "One or more MCP tool calls exceeded the configured slow-call threshold.",
+                source="mcp",
+            )
+        )
+
     preview_policy = observability["preview_policy"]
     if int(preview_policy["exhausted_operation_budget_policies"]) > 0:
         alerts.append(
@@ -123,6 +167,25 @@ async def build_alert_snapshot(session: AsyncSession, runtime_meta: dict) -> dic
         )
 
     execution = observability["execution"]
+    execution_lag = float(execution["lag"]["max_lag_seconds"] or 0.0)
+    if execution_lag >= float(settings.OBSERVABILITY_EXECUTION_LAG_CRITICAL_SECONDS):
+        alerts.append(
+            _alert(
+                "execution_lag_critical",
+                "critical",
+                "Execution queue lag crossed the critical threshold.",
+                source="execution",
+            )
+        )
+    elif execution_lag >= float(settings.OBSERVABILITY_EXECUTION_LAG_WARNING_SECONDS):
+        alerts.append(
+            _alert(
+                "execution_lag_warning",
+                "warning",
+                "Execution queue lag crossed the warning threshold.",
+                source="execution",
+            )
+        )
     if int(execution["counts"]["by_status"].get("dead_letter", 0)) > 0:
         alerts.append(
             _alert(
@@ -141,6 +204,19 @@ async def build_alert_snapshot(session: AsyncSession, runtime_meta: dict) -> dic
                 source="execution",
             )
         )
+
+    latest_housekeeping = observability["housekeeping"]["latest_sweep"]
+    if latest_housekeeping is not None:
+        tick_interval = int(observability["housekeeping"]["tick_interval_seconds"] or 0)
+        if tick_interval > 0 and float(latest_housekeeping["duration_seconds"] or 0.0) >= float(tick_interval):
+            alerts.append(
+                _alert(
+                    "housekeeping_duration_overrun",
+                    "warning",
+                    "Latest housekeeping sweep duration reached or exceeded the configured tick interval.",
+                    source="housekeeping",
+                )
+            )
 
     severity_by_gate = {
         "control_contract": "critical",
