@@ -20,6 +20,12 @@ promise enforceable in CI.
 - golden-path tests for trading, inventory, production, travel, notifications, strategy config
 - smoke tests for OpenClaw-facing flows
 
+## Current Repo Baseline
+
+- `tests/contract/test_rest_mcp_parity.py` covers mounted gameplay and preview route families
+- `tests/e2e/test_rest_mcp_parity_journey.py` covers a mixed-surface playable journey
+- `src/agentropolis/mcp/*` now includes REST-consistent error mapping for key `403/404 + error_code` paths
+
 ## Non-Goals
 
 - exhaustive UI tests
@@ -27,11 +33,11 @@ promise enforceable in CI.
 
 ## Acceptance Criteria
 
-- [ ] Main gameplay/control-plane paths are covered by parity tests
-- [ ] Same logical action through REST and MCP yields the same state transition and equivalent errors
-- [ ] Scope and permission failures are covered
-- [ ] Contract-breaking changes fail CI clearly
-- [ ] OpenClaw smoke tests reuse the same contract fixtures where possible
+- [x] Main gameplay/control-plane paths are covered by parity tests
+- [x] Same logical action through REST and MCP yields the same state transition and equivalent errors
+- [x] Scope and permission failures are covered
+- [x] Contract-breaking changes fail CI clearly
+- [x] OpenClaw smoke tests reuse the same contract fixtures where possible
 
 ## Dependencies
 

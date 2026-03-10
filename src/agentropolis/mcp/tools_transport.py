@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from agentropolis.mcp._shared import agent_tool_context, handle_tool_error
+from agentropolis.mcp._shared import (
+    agent_tool_context,
+    handle_tool_error,
+    parity_http_error,
+)
 from agentropolis.mcp.server import mcp
 from agentropolis.services.transport_svc import (
     create_transport as create_transport_svc,
@@ -52,9 +56,12 @@ async def create_transport(
 async def get_transport_status(agent_api_key: str, transport_id: int) -> dict:
     try:
         async with agent_tool_context(agent_api_key, family="transport") as (session, agent):
-            payload = await get_transport_status_svc(session, transport_id)
+            try:
+                payload = await get_transport_status_svc(session, transport_id)
+            except ValueError as exc:
+                raise parity_http_error(404, str(exc)) from exc
             if payload["owner_agent_id"] != agent.id:
-                raise ValueError("Transport not found")
+                raise parity_http_error(404, "Transport not found")
             return {"ok": True, "transport": payload}
     except Exception as exc:
         return handle_tool_error(exc)

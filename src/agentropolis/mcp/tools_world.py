@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from agentropolis.mcp._shared import agent_tool_context, handle_tool_error
+from agentropolis.mcp._shared import (
+    agent_tool_context,
+    handle_tool_error,
+    parity_http_error,
+)
 from agentropolis.mcp.server import mcp
 from agentropolis.services.world_svc import (
     find_path,
@@ -26,7 +30,11 @@ async def get_world_map(agent_api_key: str) -> dict:
 async def get_region_info(agent_api_key: str, region_id: int) -> dict:
     try:
         async with agent_tool_context(agent_api_key, family="world") as (session, _agent):
-            return {"ok": True, "region": await get_region(session, region_id)}
+            try:
+                payload = await get_region(session, region_id)
+            except ValueError as exc:
+                raise parity_http_error(404, str(exc)) from exc
+            return {"ok": True, "region": payload}
     except Exception as exc:
         return handle_tool_error(exc)
 
@@ -69,6 +77,9 @@ async def start_travel(agent_api_key: str, to_region_id: int) -> dict:
 async def get_travel_status(agent_api_key: str) -> dict:
     try:
         async with agent_tool_context(agent_api_key, family="world") as (session, agent):
-            return {"ok": True, "travel": await get_travel_status_svc(session, agent.id)}
+            payload = await get_travel_status_svc(session, agent.id)
+            if payload is None:
+                raise parity_http_error(404, "Agent is not currently traveling")
+            return {"ok": True, "travel": payload}
     except Exception as exc:
         return handle_tool_error(exc)

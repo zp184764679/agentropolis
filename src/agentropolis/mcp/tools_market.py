@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from agentropolis.mcp._shared import company_tool_context, handle_tool_error
+from agentropolis.mcp._shared import (
+    company_tool_context,
+    handle_tool_error,
+    parity_http_error,
+)
 from agentropolis.mcp.server import mcp
 from agentropolis.services import leaderboard as leaderboard_svc
 from agentropolis.services import market_engine
@@ -21,7 +25,15 @@ async def get_market_prices(company_api_key: str) -> dict:
 async def get_order_book(company_api_key: str, resource: str) -> dict:
     try:
         async with company_tool_context(company_api_key) as (session, _company):
-            return {"ok": True, "order_book": await market_engine.get_order_book(session, resource)}
+            try:
+                payload = await market_engine.get_order_book(session, resource)
+            except ValueError as exc:
+                raise parity_http_error(
+                    404,
+                    str(exc),
+                    error_code="market_resource_not_found",
+                ) from exc
+            return {"ok": True, "order_book": payload}
     except Exception as exc:
         return handle_tool_error(exc)
 
@@ -30,10 +42,15 @@ async def get_order_book(company_api_key: str, resource: str) -> dict:
 async def get_price_history(company_api_key: str, resource: str, ticks: int = 50) -> dict:
     try:
         async with company_tool_context(company_api_key) as (session, _company):
-            return {
-                "ok": True,
-                "history": await leaderboard_svc.get_price_history(session, resource, ticks=ticks),
-            }
+            try:
+                payload = await leaderboard_svc.get_price_history(session, resource, ticks=ticks)
+            except ValueError as exc:
+                raise parity_http_error(
+                    404,
+                    str(exc),
+                    error_code="market_resource_not_found",
+                ) from exc
+            return {"ok": True, "history": payload}
     except Exception as exc:
         return handle_tool_error(exc)
 
@@ -46,10 +63,15 @@ async def get_trade_history(
 ) -> dict:
     try:
         async with company_tool_context(company_api_key) as (session, _company):
-            return {
-                "ok": True,
-                "trades": await leaderboard_svc.get_trade_history(session, resource, ticks=ticks),
-            }
+            try:
+                payload = await leaderboard_svc.get_trade_history(session, resource, ticks=ticks)
+            except ValueError as exc:
+                raise parity_http_error(
+                    404,
+                    str(exc),
+                    error_code="market_resource_not_found",
+                ) from exc
+            return {"ok": True, "trades": payload}
     except Exception as exc:
         return handle_tool_error(exc)
 
@@ -79,6 +101,14 @@ async def place_buy_order(
             await session.commit()
             orders = await market_engine.get_my_orders(session, company.id, status="ALL")
             return {"ok": True, "order": next(order for order in orders if order["order_id"] == order_id)}
+    except ValueError as exc:
+        return handle_tool_error(
+            parity_http_error(
+                400,
+                str(exc),
+                error_code="market_buy_invalid",
+            )
+        )
     except Exception as exc:
         return handle_tool_error(exc)
 
@@ -107,6 +137,14 @@ async def place_sell_order(
             await session.commit()
             orders = await market_engine.get_my_orders(session, company.id, status="ALL")
             return {"ok": True, "order": next(order for order in orders if order["order_id"] == order_id)}
+    except ValueError as exc:
+        return handle_tool_error(
+            parity_http_error(
+                400,
+                str(exc),
+                error_code="market_sell_invalid",
+            )
+        )
     except Exception as exc:
         return handle_tool_error(exc)
 
@@ -122,7 +160,17 @@ async def cancel_order(company_api_key: str, order_id: int) -> dict:
         ) as (session, company):
             cancelled = await market_engine.cancel_order(session, company.id, order_id)
             await session.commit()
-            return {"ok": bool(cancelled), "order_id": order_id}
+            if not cancelled:
+                raise parity_http_error(
+                    404,
+                    "Order not found or no longer cancellable.",
+                    error_code="market_order_not_cancellable",
+                )
+            orders = await market_engine.get_my_orders(session, company.id, status="ALL")
+            return {
+                "ok": True,
+                "order": next(order for order in orders if order["order_id"] == order_id),
+            }
     except Exception as exc:
         return handle_tool_error(exc)
 
@@ -131,6 +179,14 @@ async def cancel_order(company_api_key: str, order_id: int) -> dict:
 async def get_my_orders(company_api_key: str, status: str = "OPEN") -> dict:
     try:
         async with company_tool_context(company_api_key) as (session, company):
-            return {"ok": True, "orders": await market_engine.get_my_orders(session, company.id, status=status)}
+            try:
+                payload = await market_engine.get_my_orders(session, company.id, status=status)
+            except ValueError as exc:
+                raise parity_http_error(
+                    400,
+                    str(exc),
+                    error_code="market_order_status_invalid",
+                ) from exc
+            return {"ok": True, "orders": payload}
     except Exception as exc:
         return handle_tool_error(exc)

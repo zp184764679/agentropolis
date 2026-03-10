@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from agentropolis.mcp._shared import agent_tool_context, handle_tool_error
+from agentropolis.mcp._shared import (
+    agent_tool_context,
+    handle_tool_error,
+    parity_http_error,
+)
 from agentropolis.mcp.server import mcp
 from agentropolis.services import warfare_svc
 
@@ -88,20 +92,19 @@ async def contract_action_tool(
             if action == "get":
                 payload = await warfare_svc.get_contract(session, contract_id)
                 if payload is None:
-                    raise ValueError("Contract not found")
+                    raise parity_http_error(404, "Contract not found")
                 return {"ok": True, "contract": payload}
             if action == "enlist":
                 payload = await warfare_svc.enlist_in_contract(session, agent.id, contract_id)
                 await session.commit()
                 return {"ok": True, "result": payload}
 
-            contract = await warfare_svc.get_contract(session, contract_id)
-            if contract is None:
-                raise ValueError("Contract not found")
-            if contract["employer_agent_id"] != agent.id:
-                raise ValueError("Only the employer can perform this action")
-
             if action == "activate":
+                contract = await warfare_svc.get_contract(session, contract_id)
+                if contract is None:
+                    raise parity_http_error(404, "Contract not found")
+                if contract["employer_agent_id"] != agent.id:
+                    raise parity_http_error(403, "Only the employer can activate")
                 payload = await warfare_svc.activate_contract(session, contract_id)
                 await session.commit()
                 return {"ok": True, "result": payload}
@@ -110,6 +113,11 @@ async def contract_action_tool(
                 await session.commit()
                 return {"ok": True, "result": payload}
             if action == "execute":
+                contract = await warfare_svc.get_contract(session, contract_id)
+                if contract is None:
+                    raise parity_http_error(404, "Contract not found")
+                if contract["employer_agent_id"] != agent.id:
+                    raise parity_http_error(403, "Only the employer can execute")
                 mission_type = contract["mission_type"]
                 if mission_type == "sabotage_building":
                     payload = await warfare_svc.execute_sabotage(session, contract_id)

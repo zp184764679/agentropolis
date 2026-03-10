@@ -3,59 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager
 from pathlib import Path
 
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
-
-from agentropolis.database import get_session
-from agentropolis.main import app
-from agentropolis.models import Base
 from agentropolis.runtime_meta import build_runtime_metadata
-from agentropolis.services.seed import seed_game_data
-from agentropolis.services.seed_world import seed_world
 from scripts.monitor_agents import collect_fleet_snapshot
 from scripts.register_agents import bootstrap_agents, build_default_specs
-
-
-@asynccontextmanager
-async def _seeded_client():
-    engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
-        echo=False,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-    async def override_get_session():
-        async with session_factory() as session:
-            try:
-                yield session
-            except Exception:
-                await session.rollback()
-                raise
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    async with session_factory() as session:
-        await seed_game_data(session)
-        await seed_world(session)
-        await session.commit()
-
-    app.dependency_overrides[get_session] = override_get_session
-    try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app),
-            base_url="http://testserver",
-        ) as client:
-            yield client
-    finally:
-        app.dependency_overrides.clear()
-        await engine.dispose()
+from tests.contract.parity_helpers import seeded_client
 
 
 def test_openclaw_runtime_metadata_and_assets_exist() -> None:
@@ -99,7 +52,7 @@ def test_openclaw_local_preview_docs_stay_repo_truthful() -> None:
 
 def test_register_and_monitor_scripts_work_against_local_asgi_runtime() -> None:
     async def scenario() -> None:
-        async with _seeded_client() as client:
+        async with seeded_client() as (client, _session_factory):
             manifest = await bootstrap_agents(
                 client,
                 build_default_specs(2, prefix="OpenClaw"),

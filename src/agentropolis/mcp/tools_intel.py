@@ -7,7 +7,12 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 
 from agentropolis.api.auth import resolve_company_from_api_key
-from agentropolis.mcp._shared import agent_tool_context, handle_tool_error, public_tool_context
+from agentropolis.mcp._shared import (
+    agent_tool_context,
+    handle_tool_error,
+    parity_http_error,
+    public_tool_context,
+)
 from agentropolis.mcp.server import mcp
 from agentropolis.models import Company, GameState
 from agentropolis.services import leaderboard as leaderboard_svc
@@ -22,7 +27,15 @@ from agentropolis.services.market_analysis_svc import (
 async def get_market_intel(agent_api_key: str, resource: str) -> dict:
     try:
         async with agent_tool_context(agent_api_key, family="strategy") as (session, agent):
-            return {"ok": True, "intel": await get_market_intel_svc(session, agent.id, resource)}
+            try:
+                payload = await get_market_intel_svc(session, agent.id, resource)
+            except ValueError as exc:
+                raise parity_http_error(
+                    404,
+                    str(exc),
+                    error_code="market_resource_not_found",
+                ) from exc
+            return {"ok": True, "intel": payload}
     except Exception as exc:
         return handle_tool_error(exc)
 
@@ -31,7 +44,15 @@ async def get_market_intel(agent_api_key: str, resource: str) -> dict:
 async def get_route_intel(agent_api_key: str, to_region_id: int) -> dict:
     try:
         async with agent_tool_context(agent_api_key, family="strategy") as (session, agent):
-            return {"ok": True, "intel": await get_route_intel_svc(session, agent.id, to_region_id)}
+            try:
+                payload = await get_route_intel_svc(session, agent.id, to_region_id)
+            except ValueError as exc:
+                raise parity_http_error(
+                    404,
+                    str(exc),
+                    error_code="world_route_not_found",
+                ) from exc
+            return {"ok": True, "intel": payload}
     except Exception as exc:
         return handle_tool_error(exc)
 

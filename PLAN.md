@@ -399,6 +399,11 @@
 | `#87` | State Recovery & Repair Tooling | snapshot/replay、backup/restore runbook、repair/backfill scripts、migration rollback policy | #16, #23, #37, #84 | `cli.py`, `alembic/`, `scripts/*`, `services/*` |
 | `#88` | REST/MCP Contract Parity Test Suite | parity tests、scope coverage、external client compatibility checks | #81, #82, #84, #85 | `tests/contract/*`, `tests/e2e/*`, `mcp/*`, `api/*` |
 
+当前 repo 已有一版 `#88` baseline：
+- `tests/contract/test_rest_mcp_parity.py` 覆盖 mounted gameplay/preview families 的 REST/MCP parity
+- `tests/e2e/test_rest_mcp_parity_journey.py` 覆盖 mixed-surface golden path
+- `mcp/*` 已补一轮 REST-consistent error mapping，避免 MCP 把 REST 已定义的 `403/404 + error_code` 退化成裸 `400`
+
 ### Suggested Sequencing
 
 | Stage | Proposed Issues | Why |
@@ -519,6 +524,7 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
   - 同一操作经 REST 与 MCP 触发时，状态变化和错误语义一致
   - contract-breaking change 能在 CI 中直接暴露
   - OpenClaw 接入 smoke tests 复用同一套 contract fixture
+  - 当前 repo baseline 对应测试入口是 `tests/contract/test_rest_mcp_parity.py` 与 `tests/e2e/test_rest_mcp_parity_journey.py`
 
 ---
 

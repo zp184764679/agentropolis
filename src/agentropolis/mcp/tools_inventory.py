@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from sqlalchemy import select
 
-from agentropolis.mcp._shared import company_tool_context, handle_tool_error, public_tool_context
+from agentropolis.mcp._shared import (
+    company_tool_context,
+    handle_tool_error,
+    parity_http_error,
+    public_tool_context,
+)
 from agentropolis.mcp.server import mcp
 from agentropolis.models import Resource
 from agentropolis.services.inventory_svc import (
@@ -26,7 +31,15 @@ async def get_inventory(company_api_key: str) -> dict:
 async def get_inventory_item(company_api_key: str, resource: str) -> dict:
     try:
         async with company_tool_context(company_api_key) as (session, company):
-            return {"ok": True, "item": await get_resource_quantity(session, company.id, resource)}
+            try:
+                payload = await get_resource_quantity(session, company.id, resource)
+            except ValueError as exc:
+                raise parity_http_error(
+                    404,
+                    str(exc),
+                    error_code="inventory_resource_not_found",
+                ) from exc
+            return {"ok": True, "item": payload}
     except Exception as exc:
         return handle_tool_error(exc)
 
@@ -40,7 +53,11 @@ async def get_resource_info(resource: str) -> dict:
             )
             item = result.scalar_one_or_none()
             if item is None:
-                raise ValueError(f"Unknown resource ticker: {resource}")
+                raise parity_http_error(
+                    404,
+                    f"Unknown resource ticker: {resource}",
+                    error_code="inventory_resource_not_found",
+                )
             return {
                 "ok": True,
                 "resource": {

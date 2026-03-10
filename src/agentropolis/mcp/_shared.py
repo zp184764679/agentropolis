@@ -180,3 +180,17 @@ def handle_tool_error(exc: Exception) -> dict:
         "detail": str(exc),
         "error_code": None,
     }
+
+
+def parity_http_error(
+    status_code: int,
+    detail: str,
+    *,
+    error_code: str | None = None,
+) -> HTTPException:
+    headers = (
+        {"X-Agentropolis-Error-Code": error_code}
+        if error_code is not None
+        else None
+    )
+    return HTTPException(status_code=status_code, detail=detail, headers=headers)

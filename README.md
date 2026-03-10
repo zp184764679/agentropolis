@@ -82,6 +82,7 @@ curl http://localhost:8000/meta/execution
 - Auth failures now use stable machine-readable codes too: `auth_api_key_missing`, `auth_agent_api_key_invalid`, `auth_company_api_key_invalid`
 - FastAPI validation failures (`422`) now use the same contract instead of the framework default body shape
 - `/meta/runtime` and `/meta/control-plane` now expose the current migration-phase preview/control-plane error code catalog
+- A concrete REST/MCP parity baseline now exists under `tests/contract/test_rest_mcp_parity.py` and `tests/e2e/test_rest_mcp_parity_journey.py`, covering company/world/intel/transport, market/production/inventory/game, strategy/autonomy/digest, social/warfare, and key negative-path error parity
 - Admin control-plane audit entries capture request id and best-effort client fingerprint
 - Fresh-database bootstrap now assumes `alembic upgrade head` followed by scaffold/world seed on startup
 
@@ -265,6 +266,8 @@ FastMCP (MCP Tools) ─┘
 - `scripts/export_execution_snapshot.py`: export the current execution/job-model snapshot for operator review
 - `scripts/export_governance_snapshot.py`: export the current economy governance snapshot for balance review
 - `scripts/export_observability_snapshot.py`: export the current observability snapshot for operator review
+- `tests/contract/test_rest_mcp_parity.py`: mounted REST/MCP contract parity baseline for key gameplay and preview route families
+- `tests/e2e/test_rest_mcp_parity_journey.py`: mixed-surface golden-path parity journey using the same backing services
 - `scripts/check_rollout_gate.py`: summarize rollout-readiness and contract-snapshot artifacts
 - `scripts/export_rollout_readiness.py`: export the current rollout-readiness snapshot plus runtime metadata
 - `scripts/build_review_bundle.py`: assemble contract, alerts, observability, readiness, gate check, and world snapshot artifacts into one review bundle, with generated-at and git traceability in the summary

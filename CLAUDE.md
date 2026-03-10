@@ -70,6 +70,7 @@ Likewise, do not treat an `api/*.py` file existing on disk as evidence that it s
 - Issues #78-#80: Concurrency Guard (应用层三层并发控制)
 - Proposed backlog #81+: cross-cutting control-plane / governance / recovery issues, still only draft entries in PLAN.md
 - `PLAN.md` now contains issue-ready draft specs for proposed `#81-#88` (goal / scope / non-goals / acceptance)
+- `#88` now has a concrete repo baseline in `tests/contract/test_rest_mcp_parity.py` and `tests/e2e/test_rest_mcp_parity_journey.py`
 - `.github/README.md` indexes both created-issue briefs and proposed control-plane draft issues
 - `/meta/runtime` is the machine-readable snapshot of the currently mounted scaffold surface
 - `/meta/control-plane` is the admin-only DB-backed preview policy surface when `CONTROL_PLANE_ADMIN_TOKEN` is configured

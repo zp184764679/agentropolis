@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from sqlalchemy import select
 
-from agentropolis.mcp._shared import agent_tool_context, handle_tool_error
+from agentropolis.mcp._shared import (
+    agent_tool_context,
+    handle_tool_error,
+    parity_http_error,
+)
 from agentropolis.mcp.server import mcp
 from agentropolis.models.agent import Agent as AgentModel
 from agentropolis.models.strategy_profile import StrategyProfile
@@ -102,7 +106,7 @@ async def strategy_profile_tool(
                     raise ValueError("target_agent_id is required for scout")
                 payload = await get_public_profile(session, target_agent_id)
                 if payload is None:
-                    raise ValueError("Agent has no strategy profile")
+                    raise parity_http_error(404, "Agent has no strategy profile")
                 return {"ok": True, "profile": payload}
             raise ValueError("Unsupported action for strategy_profile_tool")
     except Exception as exc:

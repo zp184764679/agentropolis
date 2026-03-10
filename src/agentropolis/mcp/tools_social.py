@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from agentropolis.mcp._shared import agent_tool_context, handle_tool_error
+from agentropolis.mcp._shared import (
+    agent_tool_context,
+    handle_tool_error,
+    parity_http_error,
+)
 from agentropolis.mcp.server import mcp
 from agentropolis.services.diplomacy_svc import (
     accept_treaty,
@@ -44,7 +48,11 @@ async def create_guild(
 async def get_guild(agent_api_key: str, guild_id: int) -> dict:
     try:
         async with agent_tool_context(agent_api_key, family="social") as (session, _agent):
-            return {"ok": True, "guild": await get_guild_info(session, guild_id)}
+            try:
+                payload = await get_guild_info(session, guild_id)
+            except ValueError as exc:
+                raise parity_http_error(404, str(exc)) from exc
+            return {"ok": True, "guild": payload}
     except Exception as exc:
         return handle_tool_error(exc)
 
@@ -132,7 +140,11 @@ async def treaty_tool(
             if action == "accept":
                 if treaty_id is None:
                     raise ValueError("treaty_id is required for accept")
-                payload = await accept_treaty(session, treaty_id, agent.id)
+                try:
+                    payload = await accept_treaty(session, treaty_id, agent.id)
+                except ValueError as exc:
+                    status_code = 404 if "not found" in str(exc).lower() else 400
+                    raise parity_http_error(status_code, str(exc)) from exc
                 await session.commit()
                 return {"ok": True, "treaty": payload}
             raise ValueError("Unsupported action for treaty_tool")

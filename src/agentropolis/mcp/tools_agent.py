@@ -7,6 +7,7 @@ from sqlalchemy import select
 from agentropolis.mcp._shared import (
     agent_tool_context,
     handle_tool_error,
+    parity_http_error,
     public_tool_context,
 )
 from agentropolis.mcp.server import mcp
@@ -100,7 +101,7 @@ async def get_agent_profile(agent_api_key: str, agent_id: int) -> dict:
             result = await session.execute(select(Agent).where(Agent.id == agent_id))
             target = result.scalar_one_or_none()
             if target is None:
-                raise ValueError("Agent not found")
+                raise parity_http_error(404, "Agent not found")
 
             strategy = await get_public_profile(session, agent_id)
             traits = await get_agent_traits(session, agent_id)
