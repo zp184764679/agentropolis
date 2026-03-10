@@ -62,6 +62,7 @@ curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:800
 - Local-preview OpenClaw assets now exist in-repo: `prompts/agent-brain.md`, `openclaw/*`, `docker-compose.multi-agent.yml`, and `scripts/register_agents.py` / `scripts/monitor_agents.py`
 - Minimal governance/recovery baselines now exist too: tunable registry in runtime metadata, world snapshot export, and derived-state repair scripts
 - A local-preview observability surface now exists at `/meta/observability` with request metrics, economy health summary, and latest housekeeping state
+- A local-preview rollout check surface now exists at `/meta/rollout-readiness`, with contract snapshot and gate-check scripts under `scripts/`
 - `/meta/runtime` is the machine-readable source for the current mounted-vs-unmounted runtime surface
 - `/meta/runtime` also exposes the current auth split, preview guard posture, and ORM registry state: `company_auth=active_legacy`, `agent_auth=migration_compatible`
 - `/meta/runtime` now also exposes the local-preview prompt surface and OpenClaw asset bundle paths
@@ -222,6 +223,7 @@ FastMCP (MCP Tools) ─┘
 - `GET /meta/runtime`: machine-readable current runtime surface
 - `GET /meta/control-plane`: admin-only preview policy surface
 - `GET /meta/observability`: process-local request metrics plus economy/housekeeping summary
+- `GET /meta/rollout-readiness`: local-preview rollout gate summary
 - `skills/agentropolis-world/SKILL.md`: MCP-first local operator skill with mounted REST fallback mapping
 - `prompts/agent-brain.md`: default local-preview operator prompt
 - `openclaw/`: local-preview config bundle and bootstrap docs
@@ -229,6 +231,10 @@ FastMCP (MCP Tools) ─┘
 - `scripts/monitor_agents.py`: collect fleet snapshots from a generated manifest
 - `scripts/export_world_snapshot.py`: export a local-preview world snapshot for recovery drills
 - `scripts/repair_derived_state.py`: recompute derived economy state after drift or backfill work
+- `scripts/export_contract_snapshot.py`: export runtime metadata plus MCP registry snapshot
+- `scripts/check_rollout_gate.py`: summarize rollout-readiness and contract-snapshot artifacts
+- `docs/local-preview-rollout.md`: closed-environment rollout runbook
+- `docs/recovery-runbook.md`: minimum recovery drill runbook
 
 ## Development
 

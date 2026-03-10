@@ -165,6 +165,15 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
             "economy_health_snapshot": True,
             "latest_housekeeping_summary": True,
         },
+        "rollout_readiness_surface": {
+            "endpoint": "/meta/rollout-readiness",
+            "contract_snapshot_script": "scripts/export_contract_snapshot.py",
+            "gate_check_script": "scripts/check_rollout_gate.py",
+            "runbooks": [
+                "docs/local-preview-rollout.md",
+                "docs/recovery-runbook.md",
+            ],
+        },
         "auth_surface": {
             "company_auth": {
                 "status": "active_legacy",

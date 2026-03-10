@@ -34,6 +34,7 @@ from agentropolis.api.market_analysis import router as market_analysis_router
 from agentropolis.api.market import router as market_router
 from agentropolis.api.observability import router as observability_router
 from agentropolis.api.production import router as production_router
+from agentropolis.api.rollout_readiness import router as rollout_readiness_router
 from agentropolis.api.skills import router as skills_router
 from agentropolis.api.strategy import router as strategy_router
 from agentropolis.api.transport import router as transport_router
@@ -118,6 +119,7 @@ app.include_router(company_router, prefix="/api")
 app.include_router(game_router, prefix="/api")
 app.include_router(control_plane_router)
 app.include_router(observability_router)
+app.include_router(rollout_readiness_router)
 app.include_router(agent_router, prefix="/api")
 app.include_router(world_router, prefix="/api")
 app.include_router(skills_router, prefix="/api")

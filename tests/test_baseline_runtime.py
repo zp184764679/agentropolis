@@ -82,6 +82,9 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["observability_surface"]["endpoint"] == "/meta/observability"
     assert meta["observability_surface"]["request_metrics"] == "process_local_best_effort"
     assert meta["observability_surface"]["economy_health_snapshot"] is True
+    assert meta["rollout_readiness_surface"]["endpoint"] == "/meta/rollout-readiness"
+    assert meta["rollout_readiness_surface"]["contract_snapshot_script"] == "scripts/export_contract_snapshot.py"
+    assert meta["rollout_readiness_surface"]["gate_check_script"] == "scripts/check_rollout_gate.py"
     assert "registry" in meta["economy_governance_surface"]["registry_snapshot"]
     assert meta["recovery_surface"]["snapshot_script"] == "scripts/export_world_snapshot.py"
     assert meta["recovery_surface"]["repair_script"] == "scripts/repair_derived_state.py"
