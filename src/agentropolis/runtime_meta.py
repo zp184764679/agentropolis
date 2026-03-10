@@ -14,6 +14,7 @@ from agentropolis.api.preview_guard import (
 from agentropolis.config import settings
 from agentropolis.middleware import REQUEST_ID_HEADER
 from agentropolis.models import Base
+from agentropolis.services.concurrency import CONCURRENCY_ERROR_CODES
 from agentropolis.services.economy_governance import build_governance_snapshot
 
 
@@ -159,6 +160,29 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
                 "db_persisted_policy",
             ],
         },
+        "concurrency_surface": {
+            "enabled": True,
+            "middleware": "RequestConcurrencyMiddleware",
+            "authenticated_request_scope": "all",
+            "entity_lock_scope": "writes_only",
+            "actor_scopes": [
+                "agent",
+                "company",
+                "admin",
+            ],
+            "max_concurrent": int(settings.CONCURRENCY_MAX_CONCURRENT),
+            "housekeeping_reserved_slots": int(settings.HOUSEKEEPING_RESERVED_SLOTS),
+            "request_slot_timeout_seconds": float(settings.CONCURRENCY_SLOT_TIMEOUT),
+            "entity_lock_timeout_seconds": float(settings.CONCURRENCY_LOCK_TIMEOUT),
+            "stripe_count": int(settings.CONCURRENCY_STRIPE_COUNT),
+            "rate_limit_window_seconds": int(settings.RATE_LIMIT_WINDOW_SECONDS),
+            "rate_limit_limits": {
+                "agent": int(settings.RATE_LIMIT_AGENT_REQUESTS_PER_WINDOW),
+                "company": int(settings.RATE_LIMIT_COMPANY_REQUESTS_PER_WINDOW),
+                "admin": int(settings.RATE_LIMIT_ADMIN_REQUESTS_PER_WINDOW),
+            },
+            "error_codes": dict(CONCURRENCY_ERROR_CODES),
+        },
         "alerts_surface": {
             "endpoint": "/meta/alerts",
             "export_script": "scripts/export_alert_snapshot.py",
@@ -172,6 +196,7 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
             "request_metrics": "process_local_best_effort",
             "economy_health_snapshot": True,
             "latest_housekeeping_summary": True,
+            "concurrency_snapshot": True,
             "export_script": "scripts/export_observability_snapshot.py",
         },
         "rollout_readiness_surface": {
@@ -324,6 +349,7 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
         "external_rollout_gates": [
             "control_contract",
             "authz",
+            "concurrency_guard",
             "abuse_budget_guard",
             "observability",
             "recovery",

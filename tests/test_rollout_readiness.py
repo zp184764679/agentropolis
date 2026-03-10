@@ -67,6 +67,8 @@ def test_rollout_readiness_endpoint_and_artifacts_exist() -> None:
             assert "mcp_surface_enabled" in payload["gates"]
             assert "admin_token_configured" in payload["gates"]
             assert "control_contract" in payload["gates"]
+            assert "concurrency_guard" in payload["gates"]
+            assert payload["gates"]["concurrency_guard"]["ready"] is True
             assert isinstance(payload["blocking_failures"], list)
 
     asyncio.run(scenario())

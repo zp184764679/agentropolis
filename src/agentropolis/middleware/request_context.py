@@ -25,6 +25,9 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         request_id = request.headers.get(REQUEST_ID_HEADER, uuid4().hex)
         request.state.request_id = request_id
         request.state.client_fingerprint = build_client_fingerprint(request)
+        request.state.authenticated_actor_kind = None
+        request.state.authenticated_actor_key = None
+        request.state.concurrency_slot_class = None
 
         response = await call_next(request)
         response.headers[REQUEST_ID_HEADER] = request_id

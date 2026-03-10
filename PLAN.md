@@ -1058,3 +1058,15 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 
 **单元测试 (11)**: StripedLock/Semaphore/multi_lock/Guard/RateLimiter 纯 asyncio 测试
 **集成测试 (5)**: 并发扣款/并行验证/503/429 HTTP 级别测试
+
+### 当前 repo 实现口径
+
+- 所有带 `X-API-Key` 或 `X-Control-Plane-Token` 的请求都会先经过应用层并发守卫
+- 并发守卫分三层：
+  1. sliding-window rate limit
+  2. authenticated request global slot gate
+  3. authenticated write-only entity locks
+- housekeeping 使用独立预留槽位；认证 HTTP 请求不会占用这些预留容量
+- 匿名 public reads 不进入 authenticated concurrency gate
+- 当前实现仍是 process-local baseline，不包含 Redis / 分布式锁；这是 `P4` 的本地冻结版本，不是最终横向扩展方案
+- `/meta/runtime`、`/meta/observability`、`/meta/rollout-readiness`、`/meta/alerts` 都必须反映这层并发状态，而不能只在代码里存在

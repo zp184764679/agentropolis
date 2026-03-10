@@ -49,6 +49,7 @@ from agentropolis.config import settings
 from agentropolis.database import async_session, engine, get_session
 from agentropolis.middleware import (
     REQUEST_ID_HEADER,
+    RequestConcurrencyMiddleware,
     RequestContextMiddleware,
     RequestMetricsMiddleware,
 )
@@ -107,8 +108,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(RequestContextMiddleware)
+app.add_middleware(RequestConcurrencyMiddleware)
 app.add_middleware(RequestMetricsMiddleware)
+app.add_middleware(RequestContextMiddleware)
 
 # Mount the current scaffold surface plus the target agent-auth preview surface.
 # These target routers are service-backed now, but they are still preview APIs:

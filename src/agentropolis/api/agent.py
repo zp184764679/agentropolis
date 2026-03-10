@@ -25,6 +25,7 @@ from agentropolis.api.schemas import (
 )
 from agentropolis.database import get_session
 from agentropolis.models import Agent
+from agentropolis.services.concurrency import acquire_entity_locks, agent_lock_key
 from agentropolis.services.agent_svc import (
     drink as drink_agent,
     eat as eat_agent,
@@ -83,13 +84,14 @@ async def register_company(
 ):
     """Create the current agent's company and receive its company API key."""
     try:
-        result = await register_company_svc(
-            session,
-            req.company_name,
-            founder_agent_id=agent.id,
-        )
-        await session.commit()
-        return result
+        async with acquire_entity_locks([agent_lock_key(agent.id)]):
+            result = await register_company_svc(
+                session,
+                req.company_name,
+                founder_agent_id=agent.id,
+            )
+            await session.commit()
+            return result
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from None
@@ -171,14 +173,15 @@ async def eat(
 ):
     """Eat rations to replenish hunger."""
     try:
-        result = await eat_agent(session, agent.id, amount=amount)
-        await session.commit()
-        return {
-            "message": (
-                f"Ate {result['consumed']} RAT. Hunger is now "
-                f"{result['status']['hunger']:.1f}."
-            )
-        }
+        async with acquire_entity_locks([agent_lock_key(agent.id)]):
+            result = await eat_agent(session, agent.id, amount=amount)
+            await session.commit()
+            return {
+                "message": (
+                    f"Ate {result['consumed']} RAT. Hunger is now "
+                    f"{result['status']['hunger']:.1f}."
+                )
+            }
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from None
@@ -196,14 +199,15 @@ async def drink(
 ):
     """Drink water to replenish thirst."""
     try:
-        result = await drink_agent(session, agent.id, amount=amount)
-        await session.commit()
-        return {
-            "message": (
-                f"Drank {result['consumed']} DW. Thirst is now "
-                f"{result['status']['thirst']:.1f}."
-            )
-        }
+        async with acquire_entity_locks([agent_lock_key(agent.id)]):
+            result = await drink_agent(session, agent.id, amount=amount)
+            await session.commit()
+            return {
+                "message": (
+                    f"Drank {result['consumed']} DW. Thirst is now "
+                    f"{result['status']['thirst']:.1f}."
+                )
+            }
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from None
@@ -220,9 +224,10 @@ async def rest(
 ):
     """Rest to replenish energy."""
     try:
-        result = await rest_agent(session, agent.id)
-        await session.commit()
-        return {"message": f"Rested. Energy is now {result['energy']:.1f}."}
+        async with acquire_entity_locks([agent_lock_key(agent.id)]):
+            result = await rest_agent(session, agent.id)
+            await session.commit()
+            return {"message": f"Rested. Energy is now {result['energy']:.1f}."}
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from None

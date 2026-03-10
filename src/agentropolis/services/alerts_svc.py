@@ -62,9 +62,41 @@ async def build_alert_snapshot(session: AsyncSession, runtime_meta: dict) -> dic
             )
         )
 
+    concurrency = observability["concurrency"]
+    request_capacity = max(int(concurrency["request_slots"]["capacity"]), 1)
+    request_in_use = int(concurrency["request_slots"]["in_use"])
+    if request_in_use / request_capacity >= 0.8:
+        alerts.append(
+            _alert(
+                "concurrency_request_slot_saturation",
+                "warning",
+                "Authenticated request slot usage is above 80% of configured capacity.",
+                source="concurrency",
+            )
+        )
+    if int(concurrency["recent_failures"]["slot_timeouts"]) > 0:
+        alerts.append(
+            _alert(
+                "concurrency_slot_timeouts_present",
+                "critical",
+                "One or more authenticated requests timed out waiting for a concurrency slot.",
+                source="concurrency",
+            )
+        )
+    if int(concurrency["recent_failures"]["entity_lock_timeouts"]) > 0:
+        alerts.append(
+            _alert(
+                "concurrency_entity_lock_timeouts_present",
+                "warning",
+                "One or more authenticated mutations timed out on entity lock acquisition.",
+                source="concurrency",
+            )
+        )
+
     severity_by_gate = {
         "control_contract": "critical",
         "authz": "critical",
+        "concurrency_guard": "critical",
         "abuse_budget_guard": "critical",
         "observability": "warning",
         "recovery": "critical",
@@ -99,6 +131,7 @@ async def build_alert_snapshot(session: AsyncSession, runtime_meta: dict) -> dic
             "has_blocking_failures": bool(readiness["blocking_failures"]),
         },
         "sources": {
+            "alerts_endpoint": "/meta/alerts",
             "observability_endpoint": "/meta/observability",
             "rollout_readiness_endpoint": "/meta/rollout-readiness",
         },

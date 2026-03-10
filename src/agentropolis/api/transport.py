@@ -12,6 +12,7 @@ from agentropolis.api.preview_guard import (
 from agentropolis.api.schemas import TransportRequest, TransportStatusResponse
 from agentropolis.database import get_session
 from agentropolis.models import Agent
+from agentropolis.services.concurrency import acquire_entity_locks, agent_lock_key
 from agentropolis.services.transport_svc import (
     create_transport as create_transport_svc,
     get_my_transports as get_my_transports_svc,
@@ -39,16 +40,17 @@ async def create_transport(
 ):
     """Create a transport order to move items between regions."""
     try:
-        result = await create_transport_svc(
-            session,
-            req.from_region_id,
-            req.to_region_id,
-            req.items,
-            req.transport_type,
-            agent_id=agent.id,
-        )
-        await session.commit()
-        return result
+        async with acquire_entity_locks([agent_lock_key(agent.id)]):
+            result = await create_transport_svc(
+                session,
+                req.from_region_id,
+                req.to_region_id,
+                req.items,
+                req.transport_type,
+                agent_id=agent.id,
+            )
+            await session.commit()
+            return result
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from None

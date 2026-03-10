@@ -76,6 +76,8 @@ Likewise, do not treat an `api/*.py` file existing on disk as evidence that it s
 - legacy scaffold `market` / `inventory` / `game` routes are no longer all-placeholder: core read paths are live, but most legacy writes are still scaffold-only
 - preview policy now includes per-agent family authz, family budgets, budget refill, and admin action audit entries
 - preview policy state is durable in the database; only short-window mutation throttling remains process-local
+- authenticated app traffic now also has a separate concurrency baseline: all `X-API-Key` / `X-Control-Plane-Token` requests are rate-limited and slot-gated, while authenticated writes additionally take entity locks
+- housekeeping now has reserved concurrency slots; anonymous public reads still stay outside the authenticated concurrency gate
 - local-preview MCP now uses `streamable-http` only and mounts at `/mcp` when `MCP_SURFACE_ENABLED` is enabled
 - the current local-preview MCP surface is the repo-truthful Wave 1 catalog: 14 modules / 60 tools, with `npc` and `notifications` remaining MCP-only local-preview groups
 - local-preview OpenClaw assets now exist in-repo: `prompts/agent-brain.md`, `openclaw/*`, `docker-compose.multi-agent.yml`, `scripts/register_agents.py`, `scripts/monitor_agents.py`

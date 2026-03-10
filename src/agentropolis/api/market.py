@@ -20,6 +20,7 @@ from agentropolis.api.schemas import (
 )
 from agentropolis.database import get_session
 from agentropolis.models import Company
+from agentropolis.services.concurrency import acquire_entity_locks, company_lock_key
 from agentropolis.services import leaderboard as leaderboard_svc
 from agentropolis.services import market_engine
 
@@ -68,16 +69,17 @@ async def place_buy_order(
 ):
     """Place a buy order on the market."""
     try:
-        order_id = await market_engine.place_buy_order(
-            session,
-            company.id,
-            req.resource,
-            req.quantity,
-            req.price,
-        )
-        await session.commit()
-        orders = await market_engine.get_my_orders(session, company.id, status="ALL")
-        return next(order for order in orders if order["order_id"] == order_id)
+        async with acquire_entity_locks([company_lock_key(company.id)]):
+            order_id = await market_engine.place_buy_order(
+                session,
+                company.id,
+                req.resource,
+                req.quantity,
+                req.price,
+            )
+            await session.commit()
+            orders = await market_engine.get_my_orders(session, company.id, status="ALL")
+            return next(order for order in orders if order["order_id"] == order_id)
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(
@@ -95,16 +97,17 @@ async def place_sell_order(
 ):
     """Place a sell order on the market."""
     try:
-        order_id = await market_engine.place_sell_order(
-            session,
-            company.id,
-            req.resource,
-            req.quantity,
-            req.price,
-        )
-        await session.commit()
-        orders = await market_engine.get_my_orders(session, company.id, status="ALL")
-        return next(order for order in orders if order["order_id"] == order_id)
+        async with acquire_entity_locks([company_lock_key(company.id)]):
+            order_id = await market_engine.place_sell_order(
+                session,
+                company.id,
+                req.resource,
+                req.quantity,
+                req.price,
+            )
+            await session.commit()
+            orders = await market_engine.get_my_orders(session, company.id, status="ALL")
+            return next(order for order in orders if order["order_id"] == order_id)
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(
@@ -121,16 +124,17 @@ async def cancel_order(
     session: AsyncSession = Depends(get_session),
 ):
     """Cancel an open order."""
-    cancelled = await market_engine.cancel_order(session, company.id, req.order_id)
-    await session.commit()
-    if not cancelled:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Order not found or no longer cancellable.",
-            headers={ERROR_CODE_HEADER: "market_order_not_cancellable"},
-        )
-    orders = await market_engine.get_my_orders(session, company.id, status="ALL")
-    return next(order for order in orders if order["order_id"] == req.order_id)
+    async with acquire_entity_locks([company_lock_key(company.id)]):
+        cancelled = await market_engine.cancel_order(session, company.id, req.order_id)
+        await session.commit()
+        if not cancelled:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Order not found or no longer cancellable.",
+                headers={ERROR_CODE_HEADER: "market_order_not_cancellable"},
+            )
+        orders = await market_engine.get_my_orders(session, company.id, status="ALL")
+        return next(order for order in orders if order["order_id"] == req.order_id)
 
 
 @router.get("/orders", response_model=list[OrderResponse])

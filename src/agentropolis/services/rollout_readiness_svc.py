@@ -39,6 +39,12 @@ async def build_rollout_readiness_snapshot(session: AsyncSession, runtime_meta: 
             == "family_scoped",
             "DB-backed preview policy covers authenticated reads and writes by family.",
         ),
+        "concurrency_guard": _gate(
+            runtime_meta["concurrency_surface"]["enabled"]
+            and runtime_meta["concurrency_surface"]["authenticated_request_scope"] == "all"
+            and runtime_meta["concurrency_surface"]["housekeeping_reserved_slots"] > 0,
+            "Authenticated requests are gated by process-local rate limits and global slots, with reserved housekeeping capacity.",
+        ),
         "abuse_budget_guard": _gate(
             runtime_meta["preview_guard"]["policy_features"]["budget_refill_support"]
             and runtime_meta["preview_guard"]["persistent_policy_store"] == "database",

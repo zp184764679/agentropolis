@@ -22,6 +22,7 @@ from agentropolis.api.schemas import (
 )
 from agentropolis.database import get_session
 from agentropolis.models import Agent
+from agentropolis.services.concurrency import acquire_entity_locks, agent_lock_key
 from agentropolis.services.autopilot import (
     get_autonomy_config,
     get_standing_orders,
@@ -59,15 +60,16 @@ async def write_autonomy_config(
     session: AsyncSession = Depends(get_session),
 ):
     try:
-        payload = await update_autonomy_config(
-            session,
-            agent.id,
-            autopilot_enabled=req.autopilot_enabled,
-            mode=req.mode,
-            spending_limit_per_hour=req.spending_limit_per_hour,
-        )
-        await session.commit()
-        return payload
+        async with acquire_entity_locks([agent_lock_key(agent.id)]):
+            payload = await update_autonomy_config(
+                session,
+                agent.id,
+                autopilot_enabled=req.autopilot_enabled,
+                mode=req.mode,
+                spending_limit_per_hour=req.spending_limit_per_hour,
+            )
+            await session.commit()
+            return payload
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(
@@ -98,13 +100,14 @@ async def write_standing_orders(
     session: AsyncSession = Depends(get_session),
 ):
     try:
-        payload = await update_standing_orders(
-            session,
-            agent.id,
-            req.standing_orders.model_dump(),
-        )
-        await session.commit()
-        return {"agent_id": agent.id, "standing_orders": payload}
+        async with acquire_entity_locks([agent_lock_key(agent.id)]):
+            payload = await update_standing_orders(
+                session,
+                agent.id,
+                req.standing_orders.model_dump(),
+            )
+            await session.commit()
+            return {"agent_id": agent.id, "standing_orders": payload}
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(
@@ -134,16 +137,17 @@ async def create_autonomy_goal(
     session: AsyncSession = Depends(get_session),
 ):
     try:
-        payload = await create_goal(
-            session,
-            agent.id,
-            goal_type=req.goal_type,
-            priority=req.priority,
-            target=req.target,
-            notes=req.notes,
-        )
-        await session.commit()
-        return payload
+        async with acquire_entity_locks([agent_lock_key(agent.id)]):
+            payload = await create_goal(
+                session,
+                agent.id,
+                goal_type=req.goal_type,
+                priority=req.priority,
+                target=req.target,
+                notes=req.notes,
+            )
+            await session.commit()
+            return payload
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(
@@ -165,18 +169,19 @@ async def patch_goal(
     session: AsyncSession = Depends(get_session),
 ):
     try:
-        payload = await update_goal(
-            session,
-            agent.id,
-            goal_id,
-            status=req.status,
-            priority=req.priority,
-            target=req.target,
-            progress=req.progress,
-            notes=req.notes,
-        )
-        await session.commit()
-        return payload
+        async with acquire_entity_locks([agent_lock_key(agent.id)]):
+            payload = await update_goal(
+                session,
+                agent.id,
+                goal_id,
+                status=req.status,
+                priority=req.priority,
+                target=req.target,
+                progress=req.progress,
+                notes=req.notes,
+            )
+            await session.commit()
+            return payload
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(

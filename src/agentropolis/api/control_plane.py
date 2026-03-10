@@ -26,6 +26,11 @@ from agentropolis.api.schemas import (
     SuccessResponse,
 )
 from agentropolis.database import get_session
+from agentropolis.services.concurrency import (
+    acquire_entity_locks,
+    control_plane_global_lock_key,
+    preview_policy_lock_key,
+)
 
 router = APIRouter(prefix="/meta/control-plane", tags=["control-plane"])
 
@@ -68,20 +73,21 @@ async def update_control_plane_state(
     """Apply process-local runtime overrides for preview policy."""
     request_id, client_fingerprint = _request_context(request)
     try:
-        response = await update_preview_guard_state(
-            session,
-            surface_enabled=req.surface_enabled,
-            writes_enabled=req.writes_enabled,
-            warfare_mutations_enabled=req.warfare_mutations_enabled,
-            degraded_mode=req.degraded_mode,
-            audit_actor=admin_actor,
-            request_id=request_id,
-            client_fingerprint=client_fingerprint,
-            reason_code=req.reason_code,
-            note=req.note,
-        )
-        await session.commit()
-        return response
+        async with acquire_entity_locks([control_plane_global_lock_key()]):
+            response = await update_preview_guard_state(
+                session,
+                surface_enabled=req.surface_enabled,
+                writes_enabled=req.writes_enabled,
+                warfare_mutations_enabled=req.warfare_mutations_enabled,
+                degraded_mode=req.degraded_mode,
+                audit_actor=admin_actor,
+                request_id=request_id,
+                client_fingerprint=client_fingerprint,
+                reason_code=req.reason_code,
+                note=req.note,
+            )
+            await session.commit()
+            return response
     except Exception:
         await session.rollback()
         raise
@@ -108,19 +114,22 @@ async def upsert_agent_policy(
     """Create or replace a durable per-agent preview policy."""
     try:
         request_id, client_fingerprint = _request_context(request)
-        response = await upsert_agent_preview_policy(
-            session,
-            agent_id,
-            allowed_families=req.allowed_families,
-            family_budgets=req.family_budgets,
-            audit_actor=admin_actor,
-            request_id=request_id,
-            client_fingerprint=client_fingerprint,
-            reason_code=req.reason_code,
-            note=req.note,
-        )
-        await session.commit()
-        return response
+        async with acquire_entity_locks(
+            [control_plane_global_lock_key(), preview_policy_lock_key(agent_id)]
+        ):
+            response = await upsert_agent_preview_policy(
+                session,
+                agent_id,
+                allowed_families=req.allowed_families,
+                family_budgets=req.family_budgets,
+                audit_actor=admin_actor,
+                request_id=request_id,
+                client_fingerprint=client_fingerprint,
+                reason_code=req.reason_code,
+                note=req.note,
+            )
+            await session.commit()
+            return response
     except ValueError as exc:
         await session.rollback()
         raise _control_plane_error(
@@ -144,18 +153,21 @@ async def refill_agent_budget(
     """Increment durable per-agent preview family budgets."""
     try:
         request_id, client_fingerprint = _request_context(request)
-        response = await refill_agent_preview_budget(
-            session,
-            agent_id,
-            increments=req.increments,
-            audit_actor=admin_actor,
-            request_id=request_id,
-            client_fingerprint=client_fingerprint,
-            reason_code=req.reason_code,
-            note=req.note,
-        )
-        await session.commit()
-        return response
+        async with acquire_entity_locks(
+            [control_plane_global_lock_key(), preview_policy_lock_key(agent_id)]
+        ):
+            response = await refill_agent_preview_budget(
+                session,
+                agent_id,
+                increments=req.increments,
+                audit_actor=admin_actor,
+                request_id=request_id,
+                client_fingerprint=client_fingerprint,
+                reason_code=req.reason_code,
+                note=req.note,
+            )
+            await session.commit()
+            return response
     except ValueError as exc:
         await session.rollback()
         raise _control_plane_error(
@@ -179,24 +191,27 @@ async def delete_agent_policy(
 ):
     """Remove a durable per-agent preview policy."""
     request_id, client_fingerprint = _request_context(request)
-    existed = await clear_agent_preview_policy(
-        session,
-        agent_id,
-        audit_actor=admin_actor,
-        request_id=request_id,
-        client_fingerprint=client_fingerprint,
-        reason_code=reason_code,
-        note=note,
-    )
-    if not existed:
-        await session.rollback()
-        raise _control_plane_error(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Preview agent policy not found.",
-            error_code="control_plane_policy_not_found",
+    async with acquire_entity_locks(
+        [control_plane_global_lock_key(), preview_policy_lock_key(agent_id)]
+    ):
+        existed = await clear_agent_preview_policy(
+            session,
+            agent_id,
+            audit_actor=admin_actor,
+            request_id=request_id,
+            client_fingerprint=client_fingerprint,
+            reason_code=reason_code,
+            note=note,
         )
-    await session.commit()
-    return {"message": f"Preview agent policy cleared for agent {agent_id}."}
+        if not existed:
+            await session.rollback()
+            raise _control_plane_error(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Preview agent policy not found.",
+                error_code="control_plane_policy_not_found",
+            )
+        await session.commit()
+        return {"message": f"Preview agent policy cleared for agent {agent_id}."}
 
 
 @router.get("/audit", response_model=ControlPlaneAuditResponse)
@@ -232,15 +247,16 @@ async def reset_control_plane_rate_limits(
     """Clear process-local preview runtime counters without deleting durable policy."""
     request_id, client_fingerprint = _request_context(request)
     try:
-        await reset_preview_guard_runtime(
-            session,
-            audit_actor=admin_actor,
-            request_id=request_id,
-            client_fingerprint=client_fingerprint,
-            reason_code=req.reason_code,
-            note=req.note,
-        )
-        await session.commit()
+        async with acquire_entity_locks([control_plane_global_lock_key()]):
+            await reset_preview_guard_runtime(
+                session,
+                audit_actor=admin_actor,
+                request_id=request_id,
+                client_fingerprint=client_fingerprint,
+                reason_code=req.reason_code,
+                note=req.note,
+            )
+            await session.commit()
     except Exception:
         await session.rollback()
         raise

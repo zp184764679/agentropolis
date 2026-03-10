@@ -17,6 +17,11 @@ from agentropolis.api.schemas import (
 )
 from agentropolis.database import get_session
 from agentropolis.models import Agent
+from agentropolis.services.concurrency import (
+    acquire_entity_locks,
+    agent_lock_key,
+    guild_lock_key,
+)
 from agentropolis.services.guild_svc import (
     create_guild as create_guild_svc,
     deposit_to_treasury,
@@ -48,9 +53,10 @@ async def create_guild(
 ):
     """Create a new guild."""
     try:
-        result = await create_guild_svc(session, agent.id, req.name, req.home_region_id)
-        await session.commit()
-        return result
+        async with acquire_entity_locks([agent_lock_key(agent.id)]):
+            result = await create_guild_svc(session, agent.id, req.name, req.home_region_id)
+            await session.commit()
+            return result
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from None
@@ -89,9 +95,10 @@ async def join_guild(
 ):
     """Join a guild."""
     try:
-        result = await join_guild_svc(session, agent.id, guild_id)
-        await session.commit()
-        return {"message": f"Joined guild {result['guild_id']} as {result['rank']}."}
+        async with acquire_entity_locks([agent_lock_key(agent.id), guild_lock_key(guild_id)]):
+            result = await join_guild_svc(session, agent.id, guild_id)
+            await session.commit()
+            return {"message": f"Joined guild {result['guild_id']} as {result['rank']}."}
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from None
@@ -109,9 +116,10 @@ async def leave_guild(
 ):
     """Leave a guild."""
     try:
-        await leave_guild_svc(session, agent.id, guild_id)
-        await session.commit()
-        return {"message": f"Left guild {guild_id}."}
+        async with acquire_entity_locks([agent_lock_key(agent.id), guild_lock_key(guild_id)]):
+            await leave_guild_svc(session, agent.id, guild_id)
+            await session.commit()
+            return {"message": f"Left guild {guild_id}."}
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from None
@@ -130,17 +138,24 @@ async def promote_guild_member(
 ):
     """Promote or demote a guild member."""
     try:
-        result = await promote_member(
-            session,
-            agent.id,
-            req.agent_id,
-            guild_id,
-            req.new_rank,
-        )
-        await session.commit()
-        return {
-            "message": f"Agent {result['agent_id']} rank set to {result['new_rank']}."
-        }
+        async with acquire_entity_locks(
+            [
+                agent_lock_key(agent.id),
+                agent_lock_key(req.agent_id),
+                guild_lock_key(guild_id),
+            ]
+        ):
+            result = await promote_member(
+                session,
+                agent.id,
+                req.agent_id,
+                guild_id,
+                req.new_rank,
+            )
+            await session.commit()
+            return {
+                "message": f"Agent {result['agent_id']} rank set to {result['new_rank']}."
+            }
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from None
@@ -159,9 +174,10 @@ async def deposit_guild_treasury(
 ):
     """Deposit copper into the guild treasury."""
     try:
-        treasury = await deposit_to_treasury(session, agent.id, guild_id, req.amount)
-        await session.commit()
-        return {"message": f"Deposited {req.amount} copper. Treasury is now {treasury}."}
+        async with acquire_entity_locks([agent_lock_key(agent.id), guild_lock_key(guild_id)]):
+            treasury = await deposit_to_treasury(session, agent.id, guild_id, req.amount)
+            await session.commit()
+            return {"message": f"Deposited {req.amount} copper. Treasury is now {treasury}."}
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from None
@@ -179,9 +195,10 @@ async def disband(
 ):
     """Disband a guild and return treasury to the leader."""
     try:
-        await disband_guild(session, agent.id, guild_id)
-        await session.commit()
-        return {"message": f"Guild {guild_id} disbanded."}
+        async with acquire_entity_locks([agent_lock_key(agent.id), guild_lock_key(guild_id)]):
+            await disband_guild(session, agent.id, guild_id)
+            await session.commit()
+            return {"message": f"Guild {guild_id} disbanded."}
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from None

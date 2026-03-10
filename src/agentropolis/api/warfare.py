@@ -20,6 +20,12 @@ from agentropolis.api.schemas import (
 )
 from agentropolis.database import get_session
 from agentropolis.models import Agent
+from agentropolis.services.concurrency import (
+    acquire_entity_locks,
+    agent_lock_key,
+    building_lock_key,
+    contract_lock_key,
+)
 from agentropolis.services import warfare_svc
 
 router = APIRouter(
@@ -41,21 +47,25 @@ async def create_contract(
 ):
     """Create a mercenary contract. Escrow is deducted from your balance."""
     try:
-        created = await warfare_svc.create_contract(
-            session,
-            employer_agent_id=agent.id,
-            mission_type=req.mission_type,
-            target_region_id=req.target_region_id,
-            reward_per_agent=req.reward_per_agent,
-            max_agents=req.max_agents,
-            target_building_id=req.target_building_id,
-            target_transport_id=req.target_transport_id,
-            mission_duration_seconds=req.mission_duration_seconds,
-            expires_in_seconds=req.expires_in_seconds,
-        )
-        result = await warfare_svc.get_contract(session, created["contract_id"])
-        await session.commit()
-        return result
+        lock_keys = [agent_lock_key(agent.id)]
+        if req.target_building_id is not None:
+            lock_keys.append(building_lock_key(req.target_building_id))
+        async with acquire_entity_locks(lock_keys):
+            created = await warfare_svc.create_contract(
+                session,
+                employer_agent_id=agent.id,
+                mission_type=req.mission_type,
+                target_region_id=req.target_region_id,
+                reward_per_agent=req.reward_per_agent,
+                max_agents=req.max_agents,
+                target_building_id=req.target_building_id,
+                target_transport_id=req.target_transport_id,
+                mission_duration_seconds=req.mission_duration_seconds,
+                expires_in_seconds=req.expires_in_seconds,
+            )
+            result = await warfare_svc.get_contract(session, created["contract_id"])
+            await session.commit()
+            return result
     except ValueError as e:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from None
@@ -107,9 +117,10 @@ async def enlist_in_contract(
 ):
     """Enlist as a mercenary in a contract."""
     try:
-        result = await warfare_svc.enlist_in_contract(session, agent.id, contract_id)
-        await session.commit()
-        return {"message": f"Enlisted as {result['role']} ({result['enlisted_count']}/{result['max_agents']})"}
+        async with acquire_entity_locks([agent_lock_key(agent.id), contract_lock_key(contract_id)]):
+            result = await warfare_svc.enlist_in_contract(session, agent.id, contract_id)
+            await session.commit()
+            return {"message": f"Enlisted as {result['role']} ({result['enlisted_count']}/{result['max_agents']})"}
     except ValueError as e:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from None
@@ -133,9 +144,10 @@ async def activate_contract(
     if contract["employer_agent_id"] != agent.id:
         raise HTTPException(status_code=403, detail="Only the employer can activate")
     try:
-        result = await warfare_svc.activate_contract(session, contract_id)
-        await session.commit()
-        return {"message": f"Contract activated with {result['active_agents']} agents"}
+        async with acquire_entity_locks([agent_lock_key(agent.id), contract_lock_key(contract_id)]):
+            result = await warfare_svc.activate_contract(session, contract_id)
+            await session.commit()
+            return {"message": f"Contract activated with {result['active_agents']} agents"}
     except ValueError as e:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from None
@@ -153,9 +165,10 @@ async def cancel_contract(
 ):
     """Cancel a contract. Employer gets refund minus cancellation fee."""
     try:
-        result = await warfare_svc.cancel_contract(session, agent.id, contract_id)
-        await session.commit()
-        return {"message": f"Contract cancelled. Refund: {result['refund']}, fee: {result['fee']}"}
+        async with acquire_entity_locks([agent_lock_key(agent.id), contract_lock_key(contract_id)]):
+            result = await warfare_svc.cancel_contract(session, agent.id, contract_id)
+            await session.commit()
+            return {"message": f"Contract cancelled. Refund: {result['refund']}, fee: {result['fee']}"}
     except ValueError as e:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from None
@@ -179,15 +192,19 @@ async def execute_contract(
         raise HTTPException(status_code=403, detail="Only the employer can execute")
 
     try:
-        mission_type = contract["mission_type"]
-        if mission_type == "sabotage_building":
-            result = await warfare_svc.execute_sabotage(session, contract_id)
-        elif mission_type == "raid_transport":
-            result = await warfare_svc.execute_transport_raid(session, contract_id)
-        else:
-            raise HTTPException(status_code=400, detail=f"Cannot execute {mission_type} contracts")
-        await session.commit()
-        return result
+        lock_keys = [agent_lock_key(agent.id), contract_lock_key(contract_id)]
+        if contract.get("target_building_id") is not None:
+            lock_keys.append(building_lock_key(contract["target_building_id"]))
+        async with acquire_entity_locks(lock_keys):
+            mission_type = contract["mission_type"]
+            if mission_type == "sabotage_building":
+                result = await warfare_svc.execute_sabotage(session, contract_id)
+            elif mission_type == "raid_transport":
+                result = await warfare_svc.execute_transport_raid(session, contract_id)
+            else:
+                raise HTTPException(status_code=400, detail=f"Cannot execute {mission_type} contracts")
+            await session.commit()
+            return result
     except ValueError as e:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from None
@@ -205,9 +222,10 @@ async def garrison_building(
 ):
     """Assign yourself to garrison (defend) a building."""
     try:
-        result = await warfare_svc.garrison_building(session, agent.id, building_id)
-        await session.commit()
-        return result
+        async with acquire_entity_locks([agent_lock_key(agent.id), building_lock_key(building_id)]):
+            result = await warfare_svc.garrison_building(session, agent.id, building_id)
+            await session.commit()
+            return result
     except ValueError as e:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from None
@@ -225,9 +243,10 @@ async def ungarrison_building(
 ):
     """Remove yourself from a building's garrison."""
     try:
-        await warfare_svc.ungarrison_building(session, agent.id, building_id)
-        await session.commit()
-        return {"message": "Ungarrisoned from building"}
+        async with acquire_entity_locks([agent_lock_key(agent.id), building_lock_key(building_id)]):
+            await warfare_svc.ungarrison_building(session, agent.id, building_id)
+            await session.commit()
+            return {"message": "Ungarrisoned from building"}
     except ValueError as e:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from None
@@ -245,9 +264,10 @@ async def repair_building(
 ):
     """Repair a damaged building using BLD resources."""
     try:
-        result = await warfare_svc.repair_building(session, agent.id, building_id)
-        await session.commit()
-        return result
+        async with acquire_entity_locks([agent_lock_key(agent.id), building_lock_key(building_id)]):
+            result = await warfare_svc.repair_building(session, agent.id, building_id)
+            await session.commit()
+            return result
     except ValueError as e:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from None

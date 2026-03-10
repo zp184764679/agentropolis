@@ -36,6 +36,20 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["control_plane_surface"]["persistent"] is True
     assert meta["control_plane_surface"]["error_code_header"] == "X-Agentropolis-Error-Code"
     assert meta["control_plane_surface"]["error_code_catalog"] == "preview_guard.error_codes"
+    assert meta["concurrency_surface"]["enabled"] is True
+    assert meta["concurrency_surface"]["middleware"] == "RequestConcurrencyMiddleware"
+    assert meta["concurrency_surface"]["authenticated_request_scope"] == "all"
+    assert meta["concurrency_surface"]["entity_lock_scope"] == "writes_only"
+    assert meta["concurrency_surface"]["actor_scopes"] == ["agent", "company", "admin"]
+    assert meta["concurrency_surface"]["housekeeping_reserved_slots"] == 5
+    assert meta["concurrency_surface"]["max_concurrent"] == 25
+    assert meta["concurrency_surface"]["stripe_count"] == 256
+    assert meta["concurrency_surface"]["rate_limit_limits"]["agent"] == 120
+    assert meta["concurrency_surface"]["rate_limit_limits"]["company"] == 120
+    assert meta["concurrency_surface"]["rate_limit_limits"]["admin"] == 60
+    assert meta["concurrency_surface"]["error_codes"]["concurrency_rate_limited"] == (
+        "Authenticated request rate limit exceeded."
+    )
     assert meta["request_context"]["request_id_header"] == "X-Agentropolis-Request-ID"
     assert "budget_refill" in meta["control_plane_surface"]["features"]
     assert "db_persisted_policy" in meta["control_plane_surface"]["features"]
@@ -82,6 +96,7 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["observability_surface"]["endpoint"] == "/meta/observability"
     assert meta["observability_surface"]["request_metrics"] == "process_local_best_effort"
     assert meta["observability_surface"]["economy_health_snapshot"] is True
+    assert meta["observability_surface"]["concurrency_snapshot"] is True
     assert meta["observability_surface"]["export_script"] == "scripts/export_observability_snapshot.py"
     assert meta["alerts_surface"]["endpoint"] == "/meta/alerts"
     assert meta["alerts_surface"]["export_script"] == "scripts/export_alert_snapshot.py"
@@ -107,6 +122,7 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["recovery_surface"]["snapshot_script"] == "scripts/export_world_snapshot.py"
     assert meta["recovery_surface"]["repair_script"] == "scripts/repair_derived_state.py"
     assert "agentropolis world-snapshot" in meta["recovery_surface"]["cli_commands"]
+    assert "concurrency_guard" in meta["external_rollout_gates"]
 
 
 def test_sqlalchemy_mappers_and_metadata_create_on_sqlite() -> None:

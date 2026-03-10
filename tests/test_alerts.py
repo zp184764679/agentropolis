@@ -67,6 +67,7 @@ def test_alerts_endpoint_and_export_report_gate_and_housekeeping_state() -> None
             assert any(code.startswith("rollout_gate_blocked:") for code in codes)
             assert payload["summary"]["warning"] >= 1
             assert payload["sources"]["observability_endpoint"] == "/meta/observability"
+            assert payload["sources"]["rollout_readiness_endpoint"] == "/meta/rollout-readiness"
 
             exported = await build_alert_export(session_factory=session_factory)
             assert "alerts" in exported

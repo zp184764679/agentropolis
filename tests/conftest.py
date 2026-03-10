@@ -14,7 +14,9 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
+from agentropolis.api.preview_guard import reset_preview_guard_state
 from agentropolis.models import Base
+from agentropolis.services.concurrency import reset_concurrency_state
 
 
 @pytest.fixture(scope="session")
@@ -22,6 +24,16 @@ def event_loop():
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()
+
+
+@pytest.fixture(autouse=True)
+def reset_process_local_concurrency_state():
+    """Keep process-local guard state isolated per test."""
+    reset_preview_guard_state()
+    reset_concurrency_state()
+    yield
+    reset_preview_guard_state()
+    reset_concurrency_state()
 
 
 @pytest.fixture(scope="session")

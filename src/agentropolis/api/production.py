@@ -15,6 +15,7 @@ from agentropolis.api.schemas import (
 )
 from agentropolis.database import get_session
 from agentropolis.models import Company
+from agentropolis.services.concurrency import acquire_entity_locks, company_lock_key
 from agentropolis.services.production import (
     build_building as build_building_svc,
     get_building_types as get_building_types_svc,
@@ -66,14 +67,15 @@ async def start_production(
 ):
     """Start production on a building with a recipe."""
     try:
-        result = await start_production_svc(session, company.id, req.building_id, req.recipe_id)
-        await session.commit()
-        return {
-            "message": (
-                f"Started {result['recipe']} on building {result['building_id']} "
-                f"(eta {result['eta_ticks']} ticks)."
-            )
-        }
+        async with acquire_entity_locks([company_lock_key(company.id)]):
+            result = await start_production_svc(session, company.id, req.building_id, req.recipe_id)
+            await session.commit()
+            return {
+                "message": (
+                    f"Started {result['recipe']} on building {result['building_id']} "
+                    f"(eta {result['eta_ticks']} ticks)."
+                )
+            }
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(
@@ -90,11 +92,12 @@ async def stop_production(
     session: AsyncSession = Depends(get_session),
 ):
     """Stop production on a building."""
-    stopped = await stop_production_svc(session, company.id, building_id)
-    await session.commit()
-    if not stopped:
-        return {"message": f"Building {building_id} was already idle."}
-    return {"message": f"Stopped production on building {building_id}."}
+    async with acquire_entity_locks([company_lock_key(company.id)]):
+        stopped = await stop_production_svc(session, company.id, building_id)
+        await session.commit()
+        if not stopped:
+            return {"message": f"Building {building_id} was already idle."}
+        return {"message": f"Stopped production on building {building_id}."}
 
 
 @router.post("/build", response_model=SuccessResponse)
@@ -105,13 +108,14 @@ async def build_building(
 ):
     """Construct a new building."""
     try:
-        result = await build_building_svc(session, company.id, req.building_type)
-        await session.commit()
-        return {
-            "message": (
-                f"Constructed {result['building_type']} as building {result['building_id']}."
-            )
-        }
+        async with acquire_entity_locks([company_lock_key(company.id)]):
+            result = await build_building_svc(session, company.id, req.building_type)
+            await session.commit()
+            return {
+                "message": (
+                    f"Constructed {result['building_type']} as building {result['building_id']}."
+                )
+            }
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(

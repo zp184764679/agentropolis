@@ -72,6 +72,11 @@ def test_observability_endpoint_reports_request_and_housekeeping_data() -> None:
 
             payload = response.json()
             assert payload["requests"]["requests_total"] >= 3
+            assert payload["concurrency"]["authenticated_request_scope"] == "all"
+            assert payload["concurrency"]["entity_lock_scope"] == "writes_only"
+            assert payload["concurrency"]["request_slots"]["capacity"] >= 1
+            assert payload["concurrency"]["housekeeping_slots"]["capacity"] >= 1
+            assert payload["concurrency"]["rate_limits"]["agent"] >= 1
             assert payload["economy"]["thresholds"]["inflation_index"]["warning_above"] > 1.0
             assert payload["housekeeping"]["latest_sweep"]["sweep_count"] == 7
 

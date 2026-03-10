@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.middleware.metrics import get_request_metrics_snapshot
 from agentropolis.models import Agent, Company, GameState, HousekeepingLog
+from agentropolis.services.concurrency import get_concurrency_snapshot
 from agentropolis.services.economy_governance import build_economy_health_thresholds
 
 
@@ -40,6 +41,7 @@ async def build_observability_snapshot(session: AsyncSession) -> dict:
     worker_warning = thresholds["worker_satisfaction"]["warning_below"]
     return {
         "requests": get_request_metrics_snapshot(),
+        "concurrency": get_concurrency_snapshot(),
         "economy": {
             "active_agents": active_agents,
             "active_companies": active_companies,

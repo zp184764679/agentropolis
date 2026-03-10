@@ -53,6 +53,7 @@ curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:800
 - REST route modules for market/production/inventory/company/game are mounted; `market`, `inventory`, and `game` now have real read paths, while many legacy write paths still surface as `501 Not Implemented`
 - Agent/world/skills/transport/guild/diplomacy/strategy/decisions/warfare plus autonomy/digest/dashboard/intel are now mounted as a preview target surface backed by real services, but the public contract is still not frozen
 - Preview routes are now behind a minimal control-plane guard: global preview kill switch, preview write gate, warfare mutation gate, and best-effort process-local mutation throttling
+- All authenticated requests now pass through the app-level concurrency guard: sliding-window rate limits plus a global authenticated request-slot gate; authenticated writes additionally acquire entity locks, while anonymous public reads stay outside that guard
 - An admin-only DB-backed preview policy surface exists at `/meta/control-plane` when `CONTROL_PLANE_ADMIN_TOKEN` is configured
 - The preview policy now supports per-agent route-family allowlists, per-family mutation budgets, budget refill, and an admin action audit trail
 - Preview policy is durable in the database; only short-window mutation throttling remains process-local
@@ -62,12 +63,15 @@ curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:800
 - Local-preview OpenClaw assets now exist in-repo: `prompts/agent-brain.md`, `openclaw/*`, `docker-compose.multi-agent.yml`, and `scripts/register_agents.py` / `scripts/monitor_agents.py`
 - Minimal governance/recovery baselines now exist too: tunable registry in runtime metadata, world snapshot export, and derived-state repair scripts
 - A local-preview observability surface now exists at `/meta/observability` with request metrics, economy health summary, and latest housekeeping state
+- `/meta/observability` now also exposes concurrency slot usage, lock/rate-limit counters, and recent timeout signals for operator review
 - A local-preview rollout check surface now exists at `/meta/rollout-readiness`, with contract snapshot and gate-check scripts under `scripts/`
+- `/meta/rollout-readiness` now includes a first-class `concurrency_guard` gate instead of treating concurrency as implicit rollout context
 - `/meta/runtime` is the machine-readable source for the current mounted-vs-unmounted runtime surface
 - `/meta/runtime` also exposes the current auth split, preview guard posture, and ORM registry state: `company_auth=active_legacy`, `agent_auth=migration_compatible`
 - `/meta/runtime` now also exposes the local-preview prompt surface and OpenClaw asset bundle paths
 - `/meta/control-plane` is the admin-only machine-readable surface for the current DB-backed preview policy
 - Error responses now carry both `X-Agentropolis-Request-ID` and `X-Agentropolis-Error-Code`; JSON error bodies mirror them as `request_id` and `error_code`
+- Concurrency failures use the same contract: `concurrency_rate_limited` (`429`), `concurrency_entity_lock_timeout` (`429`), and `concurrency_slot_timeout` (`503`)
 - FastAPI validation failures (`422`) now use the same contract instead of the framework default body shape
 - `/meta/runtime` and `/meta/control-plane` now expose the current migration-phase preview/control-plane error code catalog
 - Admin control-plane audit entries capture request id and best-effort client fingerprint
@@ -168,6 +172,7 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 - `X-Agentropolis-Request-ID` is propagated/generated per request and attached to admin audit entries for traceability
 - `X-Agentropolis-Error-Code` is the stable migration-phase header for preview/control-plane failures; clients should not parse human `detail` strings
 - Preview mutation throttling is still process-local and best-effort; it is a migration safety valve on top of the DB-backed preview policy, not the final distributed quota model
+- The authenticated concurrency guard is additive to preview policy: family authz/budgets still come from `/meta/control-plane`, while rate limits/request slots/entity locks are enforced separately at the app layer
 
 ### Route Mount Policy
 

@@ -17,6 +17,7 @@ from agentropolis.api.schemas import (
 )
 from agentropolis.database import get_session
 from agentropolis.models import Agent
+from agentropolis.services.concurrency import acquire_entity_locks, agent_lock_key
 from agentropolis.services.world_svc import (
     get_all_regions,
     get_region as get_region_svc,
@@ -60,9 +61,10 @@ async def start_travel(
 ):
     """Start traveling to another region."""
     try:
-        result = await start_travel_svc(session, agent.id, req.to_region_id)
-        await session.commit()
-        return result
+        async with acquire_entity_locks([agent_lock_key(agent.id)]):
+            result = await start_travel_svc(session, agent.id, req.to_region_id)
+            await session.commit()
+            return result
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from None

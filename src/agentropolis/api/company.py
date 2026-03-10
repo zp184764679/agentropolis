@@ -13,6 +13,7 @@ from agentropolis.api.schemas import (
 )
 from agentropolis.database import get_session
 from agentropolis.models import Agent, Company
+from agentropolis.services.concurrency import acquire_entity_locks, agent_lock_key
 from agentropolis.services.company_svc import (
     get_company_status,
     get_company_workers,
@@ -30,13 +31,14 @@ async def register_company(
 ):
     """Register a new company and get your API key."""
     try:
-        result = await register_company_svc(
-            session,
-            req.company_name,
-            founder_agent_id=agent.id,
-        )
-        await session.commit()
-        return result
+        async with acquire_entity_locks([agent_lock_key(agent.id)]):
+            result = await register_company_svc(
+                session,
+                req.company_name,
+                founder_agent_id=agent.id,
+            )
+            await session.commit()
+            return result
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(

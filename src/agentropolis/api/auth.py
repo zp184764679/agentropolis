@@ -8,7 +8,7 @@ See `PLAN.md` proposed control-plane backlog for the target model.
 import hashlib
 from typing import Any
 
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import APIKeyHeader
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,25 +36,36 @@ def _require_api_key(api_key: str | None) -> str:
 
 async def get_current_company(
     api_key: str | None = Security(api_key_header),
+    request: Request = None,
     session: AsyncSession = Depends(get_session),
 ) -> Company:
     """Resolve API key to a Company in the legacy scaffold auth model."""
-    return await resolve_company_from_api_key(session, api_key)
+    company = await resolve_company_from_api_key(session, api_key)
+    if request is not None:
+        request.state.authenticated_actor_kind = "company"
+        request.state.authenticated_actor_key = f"company:{company.id}"
+    return company
 
 
 async def get_optional_current_company(
     api_key: str | None = Security(api_key_header),
+    request: Request = None,
     session: AsyncSession = Depends(get_session),
 ) -> Company | None:
     """Resolve API key to a Company when present, otherwise allow anonymous access."""
     if not api_key:
         return None
 
-    return await resolve_company_from_api_key(session, api_key)
+    company = await resolve_company_from_api_key(session, api_key)
+    if request is not None:
+        request.state.authenticated_actor_kind = "company"
+        request.state.authenticated_actor_key = f"company:{company.id}"
+    return company
 
 
 async def get_current_agent(
     api_key: str | None = Security(api_key_header),
+    request: Request = None,
     session: AsyncSession = Depends(get_session),
 ) -> Any:
     """Migration-safe Agent auth entrypoint.
@@ -64,7 +75,11 @@ async def get_current_agent(
     runtime it may intentionally return 501 when the Agent auth surface is not yet
     fully wired into models, schema, and database state.
     """
-    return await resolve_agent_from_api_key(session, api_key)
+    agent = await resolve_agent_from_api_key(session, api_key)
+    if request is not None:
+        request.state.authenticated_actor_kind = "agent"
+        request.state.authenticated_actor_key = f"agent:{agent.id}"
+    return agent
 
 
 async def resolve_company_from_api_key(

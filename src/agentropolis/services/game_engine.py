@@ -14,6 +14,7 @@ from agentropolis.config import settings
 from agentropolis.database import async_session
 from agentropolis.models import Agent, Company, GameState, HousekeepingLog
 from agentropolis.services.company_svc import check_bankruptcies, recalculate_all_net_worths
+from agentropolis.services.concurrency import acquire_housekeeping_slot
 from agentropolis.services.consumption import tick_consumption
 from agentropolis.services.currency_svc import update_game_state_economics
 from agentropolis.services.digest_svc import build_digest_housekeeping_summary
@@ -372,14 +373,15 @@ def _nxc_phase(session: AsyncSession, now: datetime):
 async def execute_tick(tick_number: int | None = None) -> dict:
     """Run one housekeeping sweep and commit it."""
     now = _coerce_now()
-    async with async_session() as session:
-        summary = await run_housekeeping_sweep(
-            session,
-            now=now,
-            tick_number=tick_number,
-        )
-        await session.commit()
-        return summary
+    async with acquire_housekeeping_slot():
+        async with async_session() as session:
+            summary = await run_housekeeping_sweep(
+                session,
+                now=now,
+                tick_number=tick_number,
+            )
+            await session.commit()
+            return summary
 
 
 async def run_housekeeping_sweep(
@@ -422,11 +424,12 @@ async def run_tick_loop(stop_event: asyncio.Event | None = None) -> None:
 
 async def record_price_history(current_tick: int) -> dict:
     """Compatibility helper for the old tick engine API."""
-    async with async_session() as session:
-        summary = await match_all_resources(session, current_tick=current_tick)
-        await session.commit()
-        return {
-            "current_tick": current_tick,
-            "market_matching": summary,
-            "mode": "inline_trade_candles",
-        }
+    async with acquire_housekeeping_slot():
+        async with async_session() as session:
+            summary = await match_all_resources(session, current_tick=current_tick)
+            await session.commit()
+            return {
+                "current_tick": current_tick,
+                "market_matching": summary,
+                "mode": "inline_trade_candles",
+            }

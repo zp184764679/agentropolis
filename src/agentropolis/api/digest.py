@@ -12,6 +12,7 @@ from agentropolis.api.preview_guard import (
 from agentropolis.api.schemas import DigestAckResponse, DigestResponse
 from agentropolis.database import get_session
 from agentropolis.models import Agent
+from agentropolis.services.concurrency import acquire_entity_locks, agent_lock_key
 from agentropolis.services.digest_svc import acknowledge_digest_for_agent, build_digest
 
 router = APIRouter(
@@ -38,6 +39,7 @@ async def acknowledge_digest(
     agent: Agent = Depends(get_current_agent),
     session: AsyncSession = Depends(get_session),
 ):
-    payload = await acknowledge_digest_for_agent(session, agent.id)
-    await session.commit()
-    return payload
+    async with acquire_entity_locks([agent_lock_key(agent.id)]):
+        payload = await acknowledge_digest_for_agent(session, agent.id)
+        await session.commit()
+        return payload

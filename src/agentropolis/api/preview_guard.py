@@ -524,6 +524,7 @@ async def allow_internal_preview_family_access(
 
 
 async def require_control_plane_admin(
+    request: Request,
     admin_token: str | None = Security(admin_token_header),
 ) -> str:
     """Protect mutable control-plane actions behind a static admin token."""
@@ -541,7 +542,10 @@ async def require_control_plane_admin(
             error_code="control_plane_admin_invalid",
         )
     token_fingerprint = hashlib.sha256(admin_token.encode()).hexdigest()[:8]
-    return f"control-plane-admin:{token_fingerprint}"
+    actor_key = f"control-plane-admin:{token_fingerprint}"
+    request.state.authenticated_actor_kind = "admin"
+    request.state.authenticated_actor_key = actor_key
+    return actor_key
 
 
 async def get_preview_guard_state(session: AsyncSession) -> dict[str, Any]:

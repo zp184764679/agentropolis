@@ -20,6 +20,7 @@ from agentropolis.api.schemas import (
 from agentropolis.database import get_session
 from agentropolis.models import Agent
 from agentropolis.models.strategy_profile import StrategyProfile
+from agentropolis.services.concurrency import acquire_entity_locks, agent_lock_key
 from agentropolis.services.strategy_svc import (
     create_or_update_profile,
     get_combat_modifiers,
@@ -75,17 +76,18 @@ async def update_profile(
 ):
     """Update your strategy profile. Only send fields you want to change."""
     try:
-        result = await create_or_update_profile(
-            session,
-            agent.id,
-            combat_doctrine=req.combat_doctrine,
-            risk_tolerance=req.risk_tolerance,
-            primary_focus=req.primary_focus,
-            secondary_focus=req.secondary_focus,
-            default_stance=req.default_stance,
-        )
-        await session.commit()
-        return result
+        async with acquire_entity_locks([agent_lock_key(agent.id)]):
+            result = await create_or_update_profile(
+                session,
+                agent.id,
+                combat_doctrine=req.combat_doctrine,
+                risk_tolerance=req.risk_tolerance,
+                primary_focus=req.primary_focus,
+                secondary_focus=req.secondary_focus,
+                default_stance=req.default_stance,
+            )
+            await session.commit()
+            return result
     except ValueError as e:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from None
