@@ -955,6 +955,9 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
   - `company_api_key`: `inventory/market/production`
 - `npc` 与 `notifications` 当前允许作为 MCP-only local-preview groups 存在，不要求同步挂载 REST route
 - `#73` 的 skill 保持简洁，MCP-first；只对当前已挂载的 REST 前缀声明 fallback，不在本波次增加 `agents/openai.yaml`
+- `#74-#77` 的当前 repo 目标是“本地/封闭环境可验证的 OpenClaw 原型资产”，包括 prompt、模板、注册 manifest、monitor snapshot、compose 与 e2e；这仍然不等于 public rollout
+- 当前 repo 也允许顺手补 proposed `#86/#87` 的最小基线：tunables registry、world snapshot、derived-state repair；这些是 rollout gate 的前置资产，不代表完整 live-ops 平台已完成
+- 当前 repo 也允许顺手补 proposed `#85` 的最小观测面：`/meta/observability` 可提供进程内 request metrics、economy health summary、latest housekeeping snapshot；这仍不是完整生产级 telemetry
 
 ### MCP Tool 清单 (60 tools, repo-truthful local preview)
 
@@ -995,6 +998,7 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 5. 用同一条路径做 1 组 MCP/REST parity 检查（例如 autonomy config / digest / dashboard）
 6. 验证 `npc` 与 `notifications` 属于 MCP-only local-preview groups，没有 mounted REST fallback
 7. `skills/agentropolis-world/SKILL.md` 只引用 `tool-matrix.md` 与 `rest-fallback-map.md`，且本波次不引入 `agents/openai.yaml`
+8. `prompts/agent-brain.md`、`openclaw/*`、`docker-compose.multi-agent.yml`、`scripts/register_agents.py`、`scripts/monitor_agents.py` 与 `tests/e2e/*` 在 repo 内可验证，并与 `/meta/runtime` 的路径声明一致
 
 ---
 

@@ -1,0 +1,40 @@
+services:
+  game-server:
+    environment:
+      MCP_SURFACE_ENABLED: "true"
+      PREVIEW_SURFACE_ENABLED: "true"
+      PREVIEW_WRITES_ENABLED: "true"
+
+  agent-bootstrap:
+    build: .
+    profiles: ["preview-fleet"]
+    environment:
+      AGENTROPOLIS_BASE_URL: http://game-server:8000
+      OPENCLAW_AGENT_COUNT: ${OPENCLAW_AGENT_COUNT:-2}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      game-server:
+        condition: service_started
+    volumes:
+      - ./openclaw/runtime:/app/openclaw/runtime
+    command: >
+      sh -c "python scripts/register_agents.py
+      --base-url http://game-server:8000
+      --count ${OPENCLAW_AGENT_COUNT:-2}
+      --output openclaw/runtime/agents.json"
+
+  agent-monitor:
+    build: .
+    profiles: ["preview-fleet"]
+    environment:
+      AGENTROPOLIS_BASE_URL: http://game-server:8000
+    depends_on:
+      agent-bootstrap:
+        condition: service_completed_successfully
+    volumes:
+      - ./openclaw/runtime:/app/openclaw/runtime
+    command: >
+      sh -c "python scripts/monitor_agents.py
+      --manifest openclaw/runtime/agents.json
+      --output openclaw/runtime/monitor-snapshot.json"

@@ -9,8 +9,9 @@ mcp = FastMCP(
         "Use the same world state through MCP and REST. The current MCP surface is a "
         "local-preview agent tool suite backed by real services. Prefer agent-auth tools "
         "for personal, world, social, strategy, and intel actions; use company-auth tools "
-        "for inventory, market, and production flows; and expect public rollout gates to "
-        "remain stricter than local preview."
+        "for inventory, market, and production flows; default operator guidance lives in "
+        "prompts/agent-brain.md and skills/agentropolis-world/SKILL.md; and public rollout "
+        "gates remain stricter than local preview."
     ),
 )
 

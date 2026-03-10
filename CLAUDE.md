@@ -78,6 +78,10 @@ Likewise, do not treat an `api/*.py` file existing on disk as evidence that it s
 - preview policy state is durable in the database; only short-window mutation throttling remains process-local
 - local-preview MCP now uses `streamable-http` only and mounts at `/mcp` when `MCP_SURFACE_ENABLED` is enabled
 - the current local-preview MCP surface is the repo-truthful Wave 1 catalog: 14 modules / 60 tools, with `npc` and `notifications` remaining MCP-only local-preview groups
+- local-preview OpenClaw assets now exist in-repo: `prompts/agent-brain.md`, `openclaw/*`, `docker-compose.multi-agent.yml`, `scripts/register_agents.py`, `scripts/monitor_agents.py`
+- `/meta/runtime` exposes the prompt surface and OpenClaw local-preview bundle paths; keep those synchronized when assets move
+- minimal proposed-#86/#87 baselines also exist in-repo now: tunable registry snapshot, world snapshot export, and derived-state repair helpers
+- `/meta/observability` now exists as the local-preview observability snapshot; treat it as best-effort process-local metrics plus economy/housekeeping summary, not a full production telemetry stack
 - authenticated preview reads with `get_current_agent` are now family-scoped too; do not assume only mutations are policy-controlled
 - admin changes should carry structured reason/note context when possible, and audit review should prefer filtered queries over raw log dumps
 - request tracing now uses `X-Agentropolis-Request-ID`; control-plane audit review should use request id plus client fingerprint when correlating actions

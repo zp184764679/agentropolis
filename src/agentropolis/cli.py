@@ -10,6 +10,7 @@ Dependencies: services/seed.py, services/seed_world.py, database.py
 """
 
 import asyncio
+import json
 
 import click
 from rich.console import Console
@@ -58,7 +59,51 @@ def run():
 @cli.command()
 def stats():
     """Show game statistics."""
-    raise NotImplementedError("Issue #14: Implement CLI stats command")
+    from agentropolis.services.economy_governance import build_governance_snapshot
+
+    snapshot = build_governance_snapshot()
+    console.print_json(json.dumps(snapshot))
+
+
+@cli.command("world-snapshot")
+@click.option(
+    "--output",
+    default="openclaw/runtime/world-snapshot.json",
+    show_default=True,
+    help="Snapshot output path.",
+)
+def world_snapshot(output: str):
+    """Export a world snapshot for local-preview recovery drills."""
+    from agentropolis.database import async_session
+    from agentropolis.services.recovery_svc import build_world_snapshot
+
+    async def _snapshot():
+        async with async_session() as session:
+            payload = await build_world_snapshot(session)
+            console.print_json(json.dumps(payload))
+            if output:
+                from pathlib import Path
+
+                target = Path(output)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    asyncio.run(_snapshot())
+
+
+@cli.command("repair-derived-state")
+def repair_derived_state():
+    """Recompute derived economy state such as net worth and inflation."""
+    from agentropolis.database import async_session
+    from agentropolis.services.recovery_svc import repair_derived_state as repair_derived_state_svc
+
+    async def _repair():
+        async with async_session() as session:
+            payload = await repair_derived_state_svc(session)
+            await session.commit()
+            console.print_json(json.dumps(payload))
+
+    asyncio.run(_repair())
 
 
 @cli.command()

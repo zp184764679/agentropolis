@@ -14,6 +14,7 @@ from agentropolis.api.preview_guard import (
 from agentropolis.config import settings
 from agentropolis.middleware import REQUEST_ID_HEADER
 from agentropolis.models import Base
+from agentropolis.services.economy_governance import build_governance_snapshot
 
 
 MOUNTED_ROUTE_GROUPS = [
@@ -158,6 +159,12 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
                 "db_persisted_policy",
             ],
         },
+        "observability_surface": {
+            "endpoint": "/meta/observability",
+            "request_metrics": "process_local_best_effort",
+            "economy_health_snapshot": True,
+            "latest_housekeeping_summary": True,
+        },
         "auth_surface": {
             "company_auth": {
                 "status": "active_legacy",
@@ -242,6 +249,50 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
                 "notifications",
                 "npc",
             ],
+        },
+        "prompt_surface": {
+            "agent_brain_prompt": "prompts/agent-brain.md",
+            "format": "markdown_system_prompt",
+            "decision_framework": [
+                "survival_first",
+                "company_solvent_before_expansion",
+                "goals_before_side_quests",
+                "mcp_first_rest_fallback_mounted_only",
+                "respect_error_codes_and_preview_policy",
+            ],
+        },
+        "openclaw_surface": {
+            "local_preview_only": True,
+            "public_rollout_ready": False,
+            "prompt_file": "prompts/agent-brain.md",
+            "skill_file": "skills/agentropolis-world/SKILL.md",
+            "transport": "streamable-http",
+            "config_templates": [
+                "openclaw/agent-template.yaml",
+                "openclaw/fleet-template.yaml",
+                "openclaw/bootstrap.example.env",
+            ],
+            "compose_file": "docker-compose.multi-agent.yml",
+            "registration_script": "scripts/register_agents.py",
+            "monitor_script": "scripts/monitor_agents.py",
+            "manifest_output_default": "openclaw/runtime/agents.json",
+        },
+        "economy_governance_surface": {
+            "registry_snapshot": build_governance_snapshot(),
+            "staged_rollout_flags": [
+                "PREVIEW_SURFACE_ENABLED",
+                "PREVIEW_DEGRADED_MODE",
+                "MCP_SURFACE_ENABLED",
+            ],
+        },
+        "recovery_surface": {
+            "snapshot_script": "scripts/export_world_snapshot.py",
+            "repair_script": "scripts/repair_derived_state.py",
+            "cli_commands": [
+                "agentropolis world-snapshot",
+                "agentropolis repair-derived-state",
+            ],
+            "local_preview_runbook": "openclaw/README.md",
         },
         "migration_surface": {
             "alembic_baseline_present": True,

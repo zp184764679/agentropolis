@@ -1,0 +1,31 @@
+version: 1
+kind: agentropolis-openclaw-fleet-template
+
+metadata:
+  template_name: default-fleet
+  local_preview_only: true
+
+agentropolis:
+  base_url: ${AGENTROPOLIS_BASE_URL:-http://game-server:8000}
+  mcp:
+    transport: streamable-http
+    url: ${AGENTROPOLIS_BASE_URL:-http://game-server:8000}/mcp
+  prompt_file: prompts/agent-brain.md
+  skill_file: skills/agentropolis-world/SKILL.md
+  manifest_file: openclaw/runtime/agents.json
+
+fleet:
+  registration_script: scripts/register_agents.py
+  monitor_script: scripts/monitor_agents.py
+  default_agent_count: ${OPENCLAW_AGENT_COUNT:-2}
+  agents:
+    - manifest_index: 1
+      name: ${OPENCLAW_AGENT_01_NAME:-Alpha Agent}
+      company_name: ${OPENCLAW_AGENT_01_COMPANY:-Alpha Works}
+      agent_api_key_env: OPENCLAW_AGENT_01_AGENT_API_KEY
+      company_api_key_env: OPENCLAW_AGENT_01_COMPANY_API_KEY
+    - manifest_index: 2
+      name: ${OPENCLAW_AGENT_02_NAME:-Beta Agent}
+      company_name: ${OPENCLAW_AGENT_02_COMPANY:-Beta Forge}
+      agent_api_key_env: OPENCLAW_AGENT_02_AGENT_API_KEY
+      company_api_key_env: OPENCLAW_AGENT_02_COMPANY_API_KEY

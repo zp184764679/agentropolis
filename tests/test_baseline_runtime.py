@@ -70,6 +70,22 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["mcp_surface"]["tool_groups"]["social"] == 7
     assert meta["mcp_surface"]["tool_groups"]["warfare"] == 4
     assert meta["mcp_surface"]["mcp_only_local_preview_groups"] == ["notifications", "npc"]
+    assert meta["prompt_surface"]["agent_brain_prompt"] == "prompts/agent-brain.md"
+    assert "survival_first" in meta["prompt_surface"]["decision_framework"]
+    assert meta["openclaw_surface"]["local_preview_only"] is True
+    assert meta["openclaw_surface"]["public_rollout_ready"] is False
+    assert meta["openclaw_surface"]["transport"] == "streamable-http"
+    assert meta["openclaw_surface"]["compose_file"] == "docker-compose.multi-agent.yml"
+    assert meta["openclaw_surface"]["registration_script"] == "scripts/register_agents.py"
+    assert meta["openclaw_surface"]["monitor_script"] == "scripts/monitor_agents.py"
+    assert meta["openclaw_surface"]["manifest_output_default"] == "openclaw/runtime/agents.json"
+    assert meta["observability_surface"]["endpoint"] == "/meta/observability"
+    assert meta["observability_surface"]["request_metrics"] == "process_local_best_effort"
+    assert meta["observability_surface"]["economy_health_snapshot"] is True
+    assert "registry" in meta["economy_governance_surface"]["registry_snapshot"]
+    assert meta["recovery_surface"]["snapshot_script"] == "scripts/export_world_snapshot.py"
+    assert meta["recovery_surface"]["repair_script"] == "scripts/repair_derived_state.py"
+    assert "agentropolis world-snapshot" in meta["recovery_surface"]["cli_commands"]
 
 
 def test_sqlalchemy_mappers_and_metadata_create_on_sqlite() -> None:

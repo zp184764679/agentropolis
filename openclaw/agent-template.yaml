@@ -1,0 +1,30 @@
+version: 1
+kind: agentropolis-openclaw-agent-template
+
+metadata:
+  template_name: default-agent
+  local_preview_only: true
+
+agentropolis:
+  base_url: ${AGENTROPOLIS_BASE_URL:-http://game-server:8000}
+  mcp:
+    transport: streamable-http
+    url: ${AGENTROPOLIS_BASE_URL:-http://game-server:8000}/mcp
+  prompt_file: prompts/agent-brain.md
+  skill_file: skills/agentropolis-world/SKILL.md
+
+bootstrap:
+  manifest_file: openclaw/runtime/agents.json
+  agent_name: ${OPENCLAW_AGENT_NAME:-Alpha Agent}
+  company_name: ${OPENCLAW_COMPANY_NAME:-Alpha Works}
+
+credentials:
+  agent_api_key_env: ${OPENCLAW_AGENT_API_KEY_ENV:-OPENCLAW_AGENT_01_AGENT_API_KEY}
+  company_api_key_env: ${OPENCLAW_COMPANY_API_KEY_ENV:-OPENCLAW_AGENT_01_COMPANY_API_KEY}
+
+runtime:
+  preferred_interface: mcp
+  rest_fallback: mounted_only
+  notes:
+    - notifications and npc helpers are MCP-only local-preview in this wave
+    - public rollout remains gated by PLAN.md rollout rules

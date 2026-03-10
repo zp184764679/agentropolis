@@ -59,8 +59,12 @@ curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:800
 - MCP transport is frozen to `streamable-http`, and the local-preview MCP surface mounts at `/mcp` only when `MCP_SURFACE_ENABLED=true`
 - The current MCP surface is repo-truthful: 14 static tool modules / 60 tools, with `notifications` and `npc` intentionally remaining MCP-only local-preview groups
 - There is no supported `/mcp/sse` path in the current repo; `streamable-http` is the only MCP transport
+- Local-preview OpenClaw assets now exist in-repo: `prompts/agent-brain.md`, `openclaw/*`, `docker-compose.multi-agent.yml`, and `scripts/register_agents.py` / `scripts/monitor_agents.py`
+- Minimal governance/recovery baselines now exist too: tunable registry in runtime metadata, world snapshot export, and derived-state repair scripts
+- A local-preview observability surface now exists at `/meta/observability` with request metrics, economy health summary, and latest housekeeping state
 - `/meta/runtime` is the machine-readable source for the current mounted-vs-unmounted runtime surface
 - `/meta/runtime` also exposes the current auth split, preview guard posture, and ORM registry state: `company_auth=active_legacy`, `agent_auth=migration_compatible`
+- `/meta/runtime` now also exposes the local-preview prompt surface and OpenClaw asset bundle paths
 - `/meta/control-plane` is the admin-only machine-readable surface for the current DB-backed preview policy
 - Error responses now carry both `X-Agentropolis-Request-ID` and `X-Agentropolis-Error-Code`; JSON error bodies mirror them as `request_id` and `error_code`
 - FastAPI validation failures (`422`) now use the same contract instead of the framework default body shape
@@ -73,6 +77,7 @@ curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:800
 - **REST**: agent-auth, regional world actions, market/inventory/production/social endpoints
 - **MCP**: same service layer as REST, with a frozen transport and contract defined by the control-plane backlog
 - **External AI rollout**: blocked on control contract, authz, abuse guard, observability, and recovery gates from `PLAN.md`
+- **Local-preview operator bundle**: prompt, skill, registration manifest, and monitor snapshot assets exist for closed-environment testing
 
 ## Legacy Scaffold Resources (10)
 
@@ -216,7 +221,14 @@ FastMCP (MCP Tools) ─┘
 - `README.md`: current scaffold orientation plus target-direction guidance
 - `GET /meta/runtime`: machine-readable current runtime surface
 - `GET /meta/control-plane`: admin-only preview policy surface
+- `GET /meta/observability`: process-local request metrics plus economy/housekeeping summary
 - `skills/agentropolis-world/SKILL.md`: MCP-first local operator skill with mounted REST fallback mapping
+- `prompts/agent-brain.md`: default local-preview operator prompt
+- `openclaw/`: local-preview config bundle and bootstrap docs
+- `scripts/register_agents.py`: bootstrap one or more agents and emit `openclaw/runtime/agents.json`
+- `scripts/monitor_agents.py`: collect fleet snapshots from a generated manifest
+- `scripts/export_world_snapshot.py`: export a local-preview world snapshot for recovery drills
+- `scripts/repair_derived_state.py`: recompute derived economy state after drift or backfill work
 
 ## Development
 

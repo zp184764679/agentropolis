@@ -32,6 +32,7 @@ from agentropolis.api.guild import router as guild_router
 from agentropolis.api.inventory import router as inventory_router
 from agentropolis.api.market_analysis import router as market_analysis_router
 from agentropolis.api.market import router as market_router
+from agentropolis.api.observability import router as observability_router
 from agentropolis.api.production import router as production_router
 from agentropolis.api.skills import router as skills_router
 from agentropolis.api.strategy import router as strategy_router
@@ -44,7 +45,11 @@ from agentropolis.api.preview_guard import (
 )
 from agentropolis.config import settings
 from agentropolis.database import async_session, engine, get_session
-from agentropolis.middleware import REQUEST_ID_HEADER, RequestContextMiddleware
+from agentropolis.middleware import (
+    REQUEST_ID_HEADER,
+    RequestContextMiddleware,
+    RequestMetricsMiddleware,
+)
 from agentropolis.runtime_meta import build_runtime_metadata
 from agentropolis.services.game_engine import run_tick_loop
 from agentropolis.services.seed import seed_game_data
@@ -101,6 +106,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(RequestContextMiddleware)
+app.add_middleware(RequestMetricsMiddleware)
 
 # Mount the current scaffold surface plus the target agent-auth preview surface.
 # These target routers are service-backed now, but they are still preview APIs:
@@ -111,6 +117,7 @@ app.include_router(inventory_router, prefix="/api")
 app.include_router(company_router, prefix="/api")
 app.include_router(game_router, prefix="/api")
 app.include_router(control_plane_router)
+app.include_router(observability_router)
 app.include_router(agent_router, prefix="/api")
 app.include_router(world_router, prefix="/api")
 app.include_router(skills_router, prefix="/api")
