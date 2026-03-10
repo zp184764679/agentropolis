@@ -35,6 +35,178 @@ AUTHORIZATION_ACTOR_KINDS = [
     "admin",
 ]
 
+AUTHORIZATION_RESOURCE_RULES = [
+    {
+        "resource": "public_runtime_metadata",
+        "owned_by": "system",
+        "principal_kinds": ["public"],
+        "allowed_actions": ["read"],
+        "scope_families": [],
+        "rest_prefixes": [
+            "/health",
+            "/meta/runtime",
+            "/meta/contract",
+            "/meta/observability",
+            "/meta/alerts",
+            "/meta/rollout-readiness",
+        ],
+        "mcp_modules": [],
+        "notes": "Public metadata routes are intentionally anonymous and do not participate in gameplay authz.",
+    },
+    {
+        "resource": "agent_identity_and_personal_state",
+        "owned_by": "agent",
+        "principal_kinds": ["agent"],
+        "allowed_actions": ["read", "mutate"],
+        "scope_families": [
+            "agent_self",
+            "world",
+            "transport",
+            "strategy",
+        ],
+        "rest_prefixes": [
+            "/api/agent",
+            "/api/world",
+            "/api/transport",
+            "/api/skills",
+            "/api/strategy",
+            "/api/agent/decisions",
+            "/api/autonomy",
+            "/api/digest",
+            "/api/dashboard",
+            "/api/intel",
+        ],
+        "mcp_modules": [
+            "agent",
+            "world",
+            "transport",
+            "skills",
+            "strategy",
+            "notifications",
+            "intel",
+        ],
+        "notes": "Agent keys only act as that agent and never upgrade into admin or company principals.",
+    },
+    {
+        "resource": "agent_owned_company_management",
+        "owned_by": "agent",
+        "principal_kinds": ["agent"],
+        "allowed_actions": ["create", "read"],
+        "scope_families": ["agent_self"],
+        "rest_prefixes": [
+            "/api/agent/company",
+            "/api/company/register",
+        ],
+        "mcp_modules": ["company"],
+        "notes": "Company creation is agent-auth first; legacy /api/company/register is a compatibility facade over the same ownership model.",
+    },
+    {
+        "resource": "company_operations",
+        "owned_by": "company",
+        "principal_kinds": ["company"],
+        "allowed_actions": ["read", "mutate"],
+        "scope_families": [
+            "company_inventory",
+            "company_market",
+            "company_production",
+        ],
+        "rest_prefixes": [
+            "/api/company/status",
+            "/api/company/workers",
+            "/api/inventory",
+            "/api/market",
+            "/api/production",
+        ],
+        "mcp_modules": [
+            "inventory",
+            "market",
+            "production",
+        ],
+        "notes": "Company keys are restricted to company-scoped economy surfaces and never substitute for agent identity.",
+    },
+    {
+        "resource": "social_and_warfare_resources",
+        "owned_by": "agent",
+        "principal_kinds": ["agent"],
+        "allowed_actions": ["read", "mutate"],
+        "scope_families": ["social", "warfare"],
+        "rest_prefixes": [
+            "/api/guild",
+            "/api/diplomacy",
+            "/api/warfare",
+        ],
+        "mcp_modules": [
+            "social",
+            "warfare",
+        ],
+        "notes": "Guilds, treaties, and warfare contracts are resources manipulated by agents; they are not standalone auth principals.",
+    },
+    {
+        "resource": "control_plane_admin",
+        "owned_by": "admin",
+        "principal_kinds": ["admin"],
+        "allowed_actions": ["read", "mutate"],
+        "scope_families": ["control_plane", "execution_admin"],
+        "rest_prefixes": [
+            "/meta/control-plane",
+            "/meta/execution",
+        ],
+        "mcp_modules": [],
+        "notes": "Admin tokens only govern runtime policy and repair flows; they do not grant gameplay powers.",
+    },
+]
+
+AUTHORIZATION_DELEGATION_RULES = [
+    {
+        "rule": "company_keys_do_not_upgrade_to_agent_identity",
+        "source_actor_kind": "company",
+        "delegated_actor_kind": None,
+        "applies_to_families": [
+            "agent_self",
+            "world",
+            "transport",
+            "social",
+            "strategy",
+            "warfare",
+        ],
+        "effect": "denied",
+        "notes": "Company API keys cannot access agent-auth preview families or social/warfare surfaces.",
+    },
+    {
+        "rule": "company_mutations_obey_founder_agent_preview_policy",
+        "source_actor_kind": "company",
+        "delegated_actor_kind": "agent",
+        "applies_to_families": [
+            "company_market",
+            "company_production",
+        ],
+        "effect": "delegated_preview_policy_check",
+        "notes": "Company-key market/production mutations inherit the founder agent's preview family budgets, operation budgets, and spend caps.",
+    },
+    {
+        "rule": "guild_and_treaty_resources_are_agent_mediated",
+        "source_actor_kind": "agent",
+        "delegated_actor_kind": None,
+        "applies_to_families": [
+            "social",
+            "warfare",
+        ],
+        "effect": "resource_not_principal",
+        "notes": "Guilds, treaties, and contracts remain resources; agents are the only gameplay principals that can mutate them.",
+    },
+    {
+        "rule": "admin_control_plane_is_separate_from_gameplay_identity",
+        "source_actor_kind": "admin",
+        "delegated_actor_kind": None,
+        "applies_to_families": [
+            "control_plane",
+            "execution_admin",
+        ],
+        "effect": "separate_runtime_principal",
+        "notes": "Admin tokens manage runtime policy and repair operations but do not substitute for agent/company gameplay credentials.",
+    },
+]
+
 REST_ROUTE_SCOPE_GROUPS = [
     {
         "prefix": "/health",
@@ -671,6 +843,24 @@ def build_dangerous_operation_catalog() -> list[dict]:
     return sorted(entries, key=lambda entry: entry["operation"])
 
 
+def build_authorization_scope_catalog() -> dict:
+    return {
+        "actor_kinds": list(AUTHORIZATION_ACTOR_KINDS),
+        "resource_rules": deepcopy(AUTHORIZATION_RESOURCE_RULES),
+        "delegation_rules": deepcopy(AUTHORIZATION_DELEGATION_RULES),
+        "rest_route_scopes": deepcopy(REST_ROUTE_SCOPE_GROUPS),
+        "mcp_tool_scopes": build_mcp_tool_scope_catalog(),
+        "dangerous_operations": build_dangerous_operation_catalog(),
+        "dangerous_operation_gates": [
+            "preview_policy_family_authz",
+            "authenticated_request_rate_limit",
+            "authenticated_request_slot_gate",
+            "entity_locks_for_writes",
+            "admin_token_for_control_plane",
+        ],
+    }
+
+
 def build_control_contract_catalog() -> dict:
     return {
         "version": CONTROL_CONTRACT_VERSION,
@@ -745,18 +935,6 @@ def build_control_contract_catalog() -> dict:
                 "manual_enqueue_route": "/meta/execution/jobs/housekeeping-backfill",
             },
         },
-        "authorization": {
-            "actor_kinds": list(AUTHORIZATION_ACTOR_KINDS),
-            "rest_route_scopes": deepcopy(REST_ROUTE_SCOPE_GROUPS),
-            "mcp_tool_scopes": build_mcp_tool_scope_catalog(),
-            "dangerous_operations": build_dangerous_operation_catalog(),
-            "dangerous_operation_gates": [
-                "preview_policy_family_authz",
-                "authenticated_request_rate_limit",
-                "authenticated_request_slot_gate",
-                "entity_locks_for_writes",
-                "admin_token_for_control_plane",
-            ],
-        },
+        "authorization": build_authorization_scope_catalog(),
         "error_taxonomy": build_error_taxonomy(),
     }

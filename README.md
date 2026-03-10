@@ -54,6 +54,7 @@ curl http://localhost:8000/meta/execution
 
 - `/health` and `/meta/runtime` are the two endpoints that should be treated as reliably available in the current scaffold
 - `/meta/contract` now exposes the frozen local-preview control-contract baseline: transport, versioning, scope catalogs, and error taxonomy
+- The authorization baseline is now explicit too: `/meta/contract` publishes actor/resource/action rules plus delegation rules, and `/meta/runtime` summarizes how company-key mutations inherit founder-agent preview policy
 - REST route modules for market/production/inventory/company/game are mounted; `market`, `production`, and `company` now have service-backed core write paths, while broader legacy scaffold coverage still remains transitional
 - Agent/world/skills/transport/guild/diplomacy/strategy/decisions/warfare plus autonomy/digest/dashboard/intel are now mounted as a preview target surface backed by real services, but the public contract is still not frozen
 - Preview routes are now behind a minimal control-plane guard: global preview kill switch, preview write gate, warfare mutation gate, and best-effort process-local mutation throttling
@@ -73,7 +74,7 @@ curl http://localhost:8000/meta/execution
 - `/meta/rollout-readiness` now includes a first-class `concurrency_guard` gate instead of treating concurrency as implicit rollout context
 - `/meta/rollout-readiness` now also includes an `execution_semantics` gate; a runtime is not review-ready if phase results, retry policy, or backfill semantics are missing
 - `/meta/runtime` is the machine-readable source for the current mounted-vs-unmounted runtime surface
-- `/meta/runtime` also exposes the current auth split, preview guard posture, and ORM registry state: `company_auth=active_legacy`, `agent_auth=migration_compatible`
+- `/meta/runtime` also exposes the current auth split, authorization summary, preview guard posture, and ORM registry state: `company_auth=active_legacy`, `agent_auth=migration_compatible`
 - `/meta/runtime` now also exposes the local-preview prompt surface and OpenClaw asset bundle paths
 - `/meta/control-plane` is the admin-only machine-readable surface for the current DB-backed preview policy
 - Error responses now carry both `X-Agentropolis-Request-ID` and `X-Agentropolis-Error-Code`; JSON error bodies mirror them as `request_id` and `error_code`

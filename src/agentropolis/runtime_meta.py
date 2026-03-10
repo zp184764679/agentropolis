@@ -11,6 +11,7 @@ from agentropolis.control_contract import (
     CONTRACT_VERSION_HEADER,
     CONTROL_CONTRACT_VERSION,
     IDEMPOTENCY_KEY_HEADER,
+    build_authorization_scope_catalog,
     build_dangerous_operation_catalog,
 )
 from agentropolis.api.preview_guard import (
@@ -139,6 +140,21 @@ UNMOUNTED_ROUTE_GROUPS = []
 
 def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
     """Return a machine-readable snapshot of the current runtime surface."""
+    authorization_catalog = build_authorization_scope_catalog()
+    rest_scope_families = sorted(
+        {
+            entry["scope_family"]
+            for entry in authorization_catalog["rest_route_scopes"]
+            if entry["scope_family"] is not None
+        }
+    )
+    mcp_scope_families = sorted(
+        {
+            entry["scope_family"]
+            for entry in authorization_catalog["mcp_tool_scopes"]
+            if entry["scope_family"] is not None
+        }
+    )
     return {
         "stage": "migration_scaffold",
         "reliable_endpoints": ["/health", "/meta/runtime", "/meta/contract", "/meta/execution"],
@@ -298,6 +314,24 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
                 "status": "migration_compatible",
                 "entrypoint": "get_current_agent",
             },
+        },
+        "authorization_surface": {
+            "catalog_source": "/meta/contract",
+            "actor_kinds": list(authorization_catalog["actor_kinds"]),
+            "resource_rule_count": len(authorization_catalog["resource_rules"]),
+            "delegation_rule_count": len(authorization_catalog["delegation_rules"]),
+            "rest_scope_families": rest_scope_families,
+            "mcp_scope_families": mcp_scope_families,
+            "company_act_as_rule": (
+                "Company API keys remain company-scoped only; company_market and "
+                "company_production mutations additionally inherit founder-agent "
+                "preview policy budgets and deny rules."
+            ),
+            "guild_actor_model": (
+                "Guilds, treaties, and warfare contracts are resources manipulated by "
+                "agents, not authentication principals."
+            ),
+            "delegation_rules": authorization_catalog["delegation_rules"],
         },
         "preview_guard": preview_guard_state
         or {

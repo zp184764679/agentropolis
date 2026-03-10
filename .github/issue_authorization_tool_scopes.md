@@ -5,6 +5,15 @@ Proposed Issue `#82` — define authorization boundaries and tool scopes for the
 Authentication alone is not enough. Agentropolis needs explicit actor/resource/action rules so that
 REST routes and MCP tools expose only the intended power to each caller.
 
+## Current Repo Baseline
+
+The repo now has a concrete baseline for this issue:
+
+- `/meta/contract` publishes actor kinds, route/tool scope groups, dangerous operations, resource rules, and delegation rules
+- `/meta/runtime` summarizes the current auth split plus authorization/delegation posture
+- company-key market/production mutations inherit founder-agent preview policy budgets and deny rules
+- cross-actor REST/MCP rejection coverage exists in `tests/test_authorization_scopes.py`
+
 ## Files
 
 - **Modify**: `src/agentropolis/api/auth.py`

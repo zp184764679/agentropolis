@@ -20,6 +20,10 @@ def api_key_headers(api_key: str) -> dict[str, str]:
     return {"X-API-Key": api_key}
 
 
+def admin_headers(token: str = "root-token") -> dict[str, str]:
+    return {"X-Control-Plane-Token": token}
+
+
 @asynccontextmanager
 async def seeded_client():
     engine = create_async_engine(
