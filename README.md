@@ -48,8 +48,8 @@ curl http://localhost:8000/meta/runtime
 
 - `/health` and `/meta/runtime` are the two endpoints that should be treated as reliably available in the current scaffold
 - REST route modules for market/production/inventory/company/game are mounted, but many handlers are still placeholders during the migration and currently surface as `501 Not Implemented`
+- Agent/world/skills/transport/guild/diplomacy are now mounted as a preview target surface backed by real services, but the public contract is still not frozen
 - MCP transport and public contract are still being frozen in the control-plane backlog
-- Core target route groups for agent/world/skills/transport are now service-backed on disk, but they remain intentionally unmounted until the public rollout gate is satisfied
 - Do not treat legacy company-auth or `/mcp/sse` examples as the final external integration contract
 - `/meta/runtime` is the machine-readable source for the current mounted-vs-unmounted runtime surface
 - `/meta/runtime` also exposes the current auth split and ORM registry state: `company_auth=active_legacy`, `agent_auth=migration_compatible`
@@ -88,6 +88,12 @@ These route modules are mounted in the current FastAPI app:
 - `/api/inventory`
 - `/api/company`
 - `/api/game`
+- `/api/agent`
+- `/api/world`
+- `/api/skills`
+- `/api/transport`
+- `/api/guild`
+- `/api/diplomacy`
 
 Treat them as scaffold surface, not as a frozen or fully implemented public API.
 Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque `500` errors.
@@ -103,8 +109,12 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 | `/api/inventory` | Yes | Placeholder-heavy | Legacy inventory scaffold |
 | `/api/company` | Yes | Placeholder-heavy | Legacy company registration/status surface |
 | `/api/game` | Yes | Placeholder-heavy | Legacy tick/game-state terminology still present |
-| `api/agent.py`, `api/world.py`, `api/skills.py`, `api/transport.py` | No | Importable, service-backed, unmounted | Core target route groups now call real services but remain outside the mounted public surface |
-| `api/guild.py`, `api/diplomacy.py` | No | Importable, mostly stubbed | Contract/types load, but these route groups still need service completion before mount review |
+| `/api/agent` | Yes | Preview, service-backed | Agent registration, status, vitals actions, and public profile are live on the preview surface |
+| `/api/world` | Yes | Preview, service-backed | Region queries and travel lifecycle are mounted, but broader world/event surface is still incomplete |
+| `/api/skills` | Yes | Preview, service-backed | Skill definitions and personal skill read APIs are mounted |
+| `/api/transport` | Yes | Preview, service-backed | Inter-region transport is mounted for agent-owned shipments |
+| `/api/guild` | Yes | Preview, service-backed | Guild create/join/leave/promotion/treasury flows are mounted |
+| `/api/diplomacy` | Yes | Preview, service-backed | Relationship and treaty flows are mounted |
 | `api/strategy.py`, `api/decisions.py`, `api/warfare.py` | No | Importable, partially implemented | These have real handler logic but are still outside the mounted public surface |
 | MCP server | No public contract yet | Not frozen | Transport and rollout contract still under control-plane backlog |
 

@@ -365,6 +365,15 @@ class GuildCreateRequest(BaseModel):
     home_region_id: int
 
 
+class GuildPromoteRequest(BaseModel):
+    agent_id: int
+    new_rank: str
+
+
+class GuildDepositRequest(BaseModel):
+    amount: int = Field(..., gt=0)
+
+
 class GuildMemberInfo(BaseModel):
     agent_id: int
     rank: str
@@ -393,6 +402,27 @@ class TreatyInfo(BaseModel):
     terms: dict = Field(default_factory=dict)
     is_active: bool = True
     expires_at: str | None = None
+
+
+class TreatyProposeRequest(BaseModel):
+    treaty_type: str
+    target_agent_id: int | None = None
+    target_guild_id: int | None = None
+    terms: dict | None = None
+    duration_hours: int | None = Field(default=24, ge=1)
+
+
+class RelationshipInfo(BaseModel):
+    agent_id: int
+    target_agent_id: int
+    relation_type: str
+    trust_score: int
+
+
+class RelationshipSetRequest(BaseModel):
+    target_agent_id: int
+    relation_type: str
+    trust_delta: int = 0
 
 
 class TransportRequest(BaseModel):

@@ -41,45 +41,45 @@ MOUNTED_ROUTE_GROUPS = [
         "state": "placeholder-heavy",
         "auth_model": "mixed_legacy",
     },
-]
-
-UNMOUNTED_ROUTE_GROUPS = [
     {
         "module": "agent",
         "prefix": "/api/agent",
-        "state": "importable_service_backed_unmounted",
+        "state": "preview_service_backed",
         "auth_model": "target_agent_auth",
     },
     {
         "module": "world",
         "prefix": "/api/world",
-        "state": "importable_service_backed_unmounted",
+        "state": "preview_service_backed",
         "auth_model": "target_agent_auth",
     },
     {
         "module": "skills",
         "prefix": "/api/skills",
-        "state": "importable_service_backed_unmounted",
-        "auth_model": "target_agent_auth",
-    },
-    {
-        "module": "guild",
-        "prefix": "/api/guild",
-        "state": "importable_stubbed",
-        "auth_model": "target_agent_auth",
-    },
-    {
-        "module": "diplomacy",
-        "prefix": "/api/diplomacy",
-        "state": "importable_stubbed",
+        "state": "preview_service_backed",
         "auth_model": "target_agent_auth",
     },
     {
         "module": "transport",
         "prefix": "/api/transport",
-        "state": "importable_service_backed_unmounted",
+        "state": "preview_service_backed",
         "auth_model": "target_agent_auth",
     },
+    {
+        "module": "guild",
+        "prefix": "/api/guild",
+        "state": "preview_service_backed",
+        "auth_model": "target_agent_auth",
+    },
+    {
+        "module": "diplomacy",
+        "prefix": "/api/diplomacy",
+        "state": "preview_service_backed",
+        "auth_model": "target_agent_auth",
+    },
+]
+
+UNMOUNTED_ROUTE_GROUPS = [
     {
         "module": "strategy",
         "prefix": "/api/strategy",

@@ -9,6 +9,10 @@ from agentropolis.runtime_meta import build_runtime_metadata
 
 def test_runtime_metadata_reports_target_registry() -> None:
     meta = build_runtime_metadata()
+    mounted = {
+        group["module"]: group["state"]
+        for group in meta["rest_surface"]["mounted_route_groups"]
+    }
     unmounted = {
         group["module"]: group["state"]
         for group in meta["rest_surface"]["unmounted_route_groups"]
@@ -18,8 +22,9 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["orm_surface"]["target_models_registered"] is True
     assert meta["orm_surface"]["metadata_table_count"] >= 39
     assert meta["migration_surface"]["alembic_baseline_present"] is True
-    assert unmounted["agent"] == "importable_service_backed_unmounted"
-    assert unmounted["transport"] == "importable_service_backed_unmounted"
+    assert mounted["agent"] == "preview_service_backed"
+    assert mounted["transport"] == "preview_service_backed"
+    assert unmounted["strategy"] == "importable_partially_implemented"
 
 
 def test_sqlalchemy_mappers_and_metadata_create_on_sqlite() -> None:
