@@ -4,6 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
+from agentropolis.api.preview_guard import (
+    require_agent_preview_write,
+    require_preview_surface,
+)
 from agentropolis.api.schemas import (
     RelationshipInfo,
     RelationshipSetRequest,
@@ -20,10 +24,18 @@ from agentropolis.services.diplomacy_svc import (
     set_relationship as set_relationship_svc,
 )
 
-router = APIRouter(prefix="/diplomacy", tags=["diplomacy"])
+router = APIRouter(
+    prefix="/diplomacy",
+    tags=["diplomacy"],
+    dependencies=[Depends(require_preview_surface)],
+)
 
 
-@router.post("/treaty/propose", response_model=TreatyInfo)
+@router.post(
+    "/treaty/propose",
+    response_model=TreatyInfo,
+    dependencies=[Depends(require_agent_preview_write)],
+)
 async def propose_treaty(
     req: TreatyProposeRequest,
     agent: Agent = Depends(get_current_agent),
@@ -47,7 +59,11 @@ async def propose_treaty(
         raise HTTPException(status_code=400, detail=str(exc)) from None
 
 
-@router.post("/treaty/{treaty_id}/accept", response_model=TreatyInfo)
+@router.post(
+    "/treaty/{treaty_id}/accept",
+    response_model=TreatyInfo,
+    dependencies=[Depends(require_agent_preview_write)],
+)
 async def accept_treaty(
     treaty_id: int,
     agent: Agent = Depends(get_current_agent),
@@ -83,7 +99,11 @@ async def list_relationships(
     return await get_relationships(session, agent.id)
 
 
-@router.post("/relationship", response_model=RelationshipInfo)
+@router.post(
+    "/relationship",
+    response_model=RelationshipInfo,
+    dependencies=[Depends(require_agent_preview_write)],
+)
 async def set_relationship(
     req: RelationshipSetRequest,
     agent: Agent = Depends(get_current_agent),

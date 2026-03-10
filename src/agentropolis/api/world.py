@@ -4,6 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
+from agentropolis.api.preview_guard import (
+    require_agent_preview_write,
+    require_preview_surface,
+)
 from agentropolis.api.schemas import (
     RegionInfo,
     TravelRequest,
@@ -19,7 +23,11 @@ from agentropolis.services.world_svc import (
     start_travel as start_travel_svc,
 )
 
-router = APIRouter(prefix="/world", tags=["world"])
+router = APIRouter(
+    prefix="/world",
+    tags=["world"],
+    dependencies=[Depends(require_preview_surface)],
+)
 
 
 @router.get("/map", response_model=WorldMapResponse)
@@ -37,7 +45,11 @@ async def get_region(region_id: int, session: AsyncSession = Depends(get_session
         raise HTTPException(status_code=404, detail=str(exc)) from None
 
 
-@router.post("/travel", response_model=TravelStatus)
+@router.post(
+    "/travel",
+    response_model=TravelStatus,
+    dependencies=[Depends(require_agent_preview_write)],
+)
 async def start_travel(
     req: TravelRequest,
     agent: Agent = Depends(get_current_agent),

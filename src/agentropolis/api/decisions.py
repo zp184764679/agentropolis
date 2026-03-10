@@ -4,12 +4,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
+from agentropolis.api.preview_guard import require_preview_surface
 from agentropolis.api.schemas import DecisionAnalysisResponse, DecisionLogResponse
 from agentropolis.database import get_session
 from agentropolis.models import Agent
 from agentropolis.services.decision_log_svc import get_decision_analysis, get_recent_decisions
 
-router = APIRouter(prefix="/agent/decisions", tags=["decisions"])
+router = APIRouter(
+    prefix="/agent/decisions",
+    tags=["decisions"],
+    dependencies=[Depends(require_preview_surface)],
+)
 
 
 @router.get("", response_model=DecisionLogResponse)

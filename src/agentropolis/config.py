@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     # API Key
     API_KEY_LENGTH: int = 32
 
+    # Preview control-plane guard
+    PREVIEW_SURFACE_ENABLED: bool = True
+    PREVIEW_WRITES_ENABLED: bool = True
+    WARFARE_MUTATIONS_ENABLED: bool = True
+    PREVIEW_MUTATION_WINDOW_SECONDS: int = 60
+    PREVIEW_AGENT_MUTATIONS_PER_WINDOW: int = 60
+    PREVIEW_REGISTRATIONS_PER_WINDOW_PER_HOST: int = 10
+
     # Target world kernel defaults
     AGENT_BASE_CARRY_KG: int = 50
     AGENT_CARRY_PER_STRENGTH_LEVEL: int = 10

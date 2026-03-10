@@ -49,10 +49,11 @@ curl http://localhost:8000/meta/runtime
 - `/health` and `/meta/runtime` are the two endpoints that should be treated as reliably available in the current scaffold
 - REST route modules for market/production/inventory/company/game are mounted, but many handlers are still placeholders during the migration and currently surface as `501 Not Implemented`
 - Agent/world/skills/transport/guild/diplomacy/strategy/decisions/warfare are now mounted as a preview target surface backed by real services, but the public contract is still not frozen
+- Preview routes are now behind a minimal control-plane guard: global preview kill switch, preview write gate, warfare mutation gate, and best-effort process-local mutation throttling
 - MCP transport and public contract are still being frozen in the control-plane backlog
 - Do not treat legacy company-auth or `/mcp/sse` examples as the final external integration contract
 - `/meta/runtime` is the machine-readable source for the current mounted-vs-unmounted runtime surface
-- `/meta/runtime` also exposes the current auth split and ORM registry state: `company_auth=active_legacy`, `agent_auth=migration_compatible`
+- `/meta/runtime` also exposes the current auth split, preview guard posture, and ORM registry state: `company_auth=active_legacy`, `agent_auth=migration_compatible`
 - Fresh-database bootstrap now assumes `alembic upgrade head` followed by scaffold/world seed on startup
 
 ## Target Interface Direction
@@ -122,6 +123,13 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 | `/api/agent/decisions` | Yes | Preview, service-backed | Decision journal and analysis are mounted |
 | `/api/warfare` | Yes | Preview, service-backed | Contract lifecycle, garrison, repair, and regional threat queries are mounted |
 | MCP server | No public contract yet | Not frozen | Transport and rollout contract still under control-plane backlog |
+
+### Preview Guardrails
+
+- `PREVIEW_SURFACE_ENABLED`: disables all mounted preview route groups without affecting legacy scaffold routes
+- `PREVIEW_WRITES_ENABLED`: puts preview mutations into read-only mode while keeping preview reads available
+- `WARFARE_MUTATIONS_ENABLED`: independently freezes warfare mutations without disabling preview read APIs
+- Preview mutation throttling is currently process-local and best-effort; it is a migration safety valve, not the final distributed quota model
 
 ### Route Mount Policy
 

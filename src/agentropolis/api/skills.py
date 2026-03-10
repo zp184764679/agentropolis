@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
+from agentropolis.api.preview_guard import require_preview_surface
 from agentropolis.api.schemas import AgentSkillInfo, SkillInfo
 from agentropolis.database import get_session
 from agentropolis.models import Agent
@@ -12,7 +13,11 @@ from agentropolis.services.skill_svc import (
     get_all_skill_definitions,
 )
 
-router = APIRouter(prefix="/skills", tags=["skills"])
+router = APIRouter(
+    prefix="/skills",
+    tags=["skills"],
+    dependencies=[Depends(require_preview_surface)],
+)
 
 
 @router.get("/definitions", response_model=list[SkillInfo])

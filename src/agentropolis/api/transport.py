@@ -4,6 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
+from agentropolis.api.preview_guard import (
+    require_agent_preview_write,
+    require_preview_surface,
+)
 from agentropolis.api.schemas import TransportRequest, TransportStatusResponse
 from agentropolis.database import get_session
 from agentropolis.models import Agent
@@ -13,10 +17,18 @@ from agentropolis.services.transport_svc import (
     get_transport_status as get_transport_status_svc,
 )
 
-router = APIRouter(prefix="/transport", tags=["transport"])
+router = APIRouter(
+    prefix="/transport",
+    tags=["transport"],
+    dependencies=[Depends(require_preview_surface)],
+)
 
 
-@router.post("/create", response_model=TransportStatusResponse)
+@router.post(
+    "/create",
+    response_model=TransportStatusResponse,
+    dependencies=[Depends(require_agent_preview_write)],
+)
 async def create_transport(
     req: TransportRequest,
     agent: Agent = Depends(get_current_agent),
