@@ -4,6 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
+from agentropolis.api.preview_guard import (
+    require_preview_surface,
+    require_warfare_preview_write,
+)
 from agentropolis.api.schemas import (
     ContractExecutionResponse,
     ContractCreateRequest,
@@ -18,10 +22,18 @@ from agentropolis.database import get_session
 from agentropolis.models import Agent
 from agentropolis.services import warfare_svc
 
-router = APIRouter(prefix="/warfare", tags=["warfare"])
+router = APIRouter(
+    prefix="/warfare",
+    tags=["warfare"],
+    dependencies=[Depends(require_preview_surface)],
+)
 
 
-@router.post("/contracts", response_model=ContractDetailResponse)
+@router.post(
+    "/contracts",
+    response_model=ContractDetailResponse,
+    dependencies=[Depends(require_warfare_preview_write)],
+)
 async def create_contract(
     req: ContractCreateRequest,
     agent: Agent = Depends(get_current_agent),
@@ -83,7 +95,11 @@ async def get_contract(
     return result
 
 
-@router.post("/contracts/{contract_id}/enlist", response_model=SuccessResponse)
+@router.post(
+    "/contracts/{contract_id}/enlist",
+    response_model=SuccessResponse,
+    dependencies=[Depends(require_warfare_preview_write)],
+)
 async def enlist_in_contract(
     contract_id: int,
     agent: Agent = Depends(get_current_agent),
@@ -99,7 +115,11 @@ async def enlist_in_contract(
         raise HTTPException(status_code=400, detail=str(e)) from None
 
 
-@router.post("/contracts/{contract_id}/activate", response_model=SuccessResponse)
+@router.post(
+    "/contracts/{contract_id}/activate",
+    response_model=SuccessResponse,
+    dependencies=[Depends(require_warfare_preview_write)],
+)
 async def activate_contract(
     contract_id: int,
     agent: Agent = Depends(get_current_agent),
@@ -121,7 +141,11 @@ async def activate_contract(
         raise HTTPException(status_code=400, detail=str(e)) from None
 
 
-@router.post("/contracts/{contract_id}/cancel", response_model=SuccessResponse)
+@router.post(
+    "/contracts/{contract_id}/cancel",
+    response_model=SuccessResponse,
+    dependencies=[Depends(require_warfare_preview_write)],
+)
 async def cancel_contract(
     contract_id: int,
     agent: Agent = Depends(get_current_agent),
@@ -137,7 +161,11 @@ async def cancel_contract(
         raise HTTPException(status_code=400, detail=str(e)) from None
 
 
-@router.post("/contracts/{contract_id}/execute", response_model=ContractExecutionResponse)
+@router.post(
+    "/contracts/{contract_id}/execute",
+    response_model=ContractExecutionResponse,
+    dependencies=[Depends(require_warfare_preview_write)],
+)
 async def execute_contract(
     contract_id: int,
     agent: Agent = Depends(get_current_agent),
@@ -165,7 +193,11 @@ async def execute_contract(
         raise HTTPException(status_code=400, detail=str(e)) from None
 
 
-@router.post("/garrison/{building_id}", response_model=GarrisonResponse)
+@router.post(
+    "/garrison/{building_id}",
+    response_model=GarrisonResponse,
+    dependencies=[Depends(require_warfare_preview_write)],
+)
 async def garrison_building(
     building_id: int,
     agent: Agent = Depends(get_current_agent),
@@ -181,7 +213,11 @@ async def garrison_building(
         raise HTTPException(status_code=400, detail=str(e)) from None
 
 
-@router.delete("/garrison/{building_id}", response_model=SuccessResponse)
+@router.delete(
+    "/garrison/{building_id}",
+    response_model=SuccessResponse,
+    dependencies=[Depends(require_warfare_preview_write)],
+)
 async def ungarrison_building(
     building_id: int,
     agent: Agent = Depends(get_current_agent),
@@ -197,7 +233,11 @@ async def ungarrison_building(
         raise HTTPException(status_code=400, detail=str(e)) from None
 
 
-@router.post("/repair/{building_id}", response_model=RepairResponse)
+@router.post(
+    "/repair/{building_id}",
+    response_model=RepairResponse,
+    dependencies=[Depends(require_warfare_preview_write)],
+)
 async def repair_building(
     building_id: int,
     agent: Agent = Depends(get_current_agent),

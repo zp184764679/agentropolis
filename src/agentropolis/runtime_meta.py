@@ -7,6 +7,7 @@ file presence alone.
 
 from __future__ import annotations
 
+from agentropolis.api.preview_guard import build_preview_guard_metadata
 from agentropolis.models import Base
 
 
@@ -116,6 +117,7 @@ def build_runtime_metadata() -> dict:
                 "entrypoint": "get_current_agent",
             },
         },
+        "preview_guard": build_preview_guard_metadata(),
         "orm_surface": {
             "metadata_table_count": len(Base.metadata.tables),
             "target_models_registered": True,

@@ -15,6 +15,9 @@ def test_runtime_metadata_reports_target_registry() -> None:
     }
 
     assert meta["auth_surface"]["agent_auth"]["status"] == "migration_compatible"
+    assert meta["preview_guard"]["surface_enabled"] is True
+    assert meta["preview_guard"]["writes_enabled"] is True
+    assert meta["preview_guard"]["rate_limit_store"] == "process_local_best_effort"
     assert meta["orm_surface"]["target_models_registered"] is True
     assert meta["orm_surface"]["metadata_table_count"] >= 39
     assert meta["migration_surface"]["alembic_baseline_present"] is True

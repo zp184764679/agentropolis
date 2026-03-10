@@ -4,6 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
+from agentropolis.api.preview_guard import (
+    require_agent_preview_write,
+    require_preview_surface,
+)
 from agentropolis.api.schemas import (
     GuildCreateRequest,
     GuildDepositRequest,
@@ -24,10 +28,18 @@ from agentropolis.services.guild_svc import (
     promote_member,
 )
 
-router = APIRouter(prefix="/guild", tags=["guild"])
+router = APIRouter(
+    prefix="/guild",
+    tags=["guild"],
+    dependencies=[Depends(require_preview_surface)],
+)
 
 
-@router.post("/create", response_model=GuildInfo)
+@router.post(
+    "/create",
+    response_model=GuildInfo,
+    dependencies=[Depends(require_agent_preview_write)],
+)
 async def create_guild(
     req: GuildCreateRequest,
     agent: Agent = Depends(get_current_agent),
@@ -64,7 +76,11 @@ async def list_all_guilds(
     return await list_guilds(session, region_id=region_id)
 
 
-@router.post("/{guild_id}/join", response_model=SuccessResponse)
+@router.post(
+    "/{guild_id}/join",
+    response_model=SuccessResponse,
+    dependencies=[Depends(require_agent_preview_write)],
+)
 async def join_guild(
     guild_id: int,
     agent: Agent = Depends(get_current_agent),
@@ -80,7 +96,11 @@ async def join_guild(
         raise HTTPException(status_code=400, detail=str(exc)) from None
 
 
-@router.post("/{guild_id}/leave", response_model=SuccessResponse)
+@router.post(
+    "/{guild_id}/leave",
+    response_model=SuccessResponse,
+    dependencies=[Depends(require_agent_preview_write)],
+)
 async def leave_guild(
     guild_id: int,
     agent: Agent = Depends(get_current_agent),
@@ -96,7 +116,11 @@ async def leave_guild(
         raise HTTPException(status_code=400, detail=str(exc)) from None
 
 
-@router.post("/{guild_id}/promote", response_model=SuccessResponse)
+@router.post(
+    "/{guild_id}/promote",
+    response_model=SuccessResponse,
+    dependencies=[Depends(require_agent_preview_write)],
+)
 async def promote_guild_member(
     guild_id: int,
     req: GuildPromoteRequest,
@@ -121,7 +145,11 @@ async def promote_guild_member(
         raise HTTPException(status_code=400, detail=str(exc)) from None
 
 
-@router.post("/{guild_id}/deposit", response_model=SuccessResponse)
+@router.post(
+    "/{guild_id}/deposit",
+    response_model=SuccessResponse,
+    dependencies=[Depends(require_agent_preview_write)],
+)
 async def deposit_guild_treasury(
     guild_id: int,
     req: GuildDepositRequest,
@@ -138,7 +166,11 @@ async def deposit_guild_treasury(
         raise HTTPException(status_code=400, detail=str(exc)) from None
 
 
-@router.post("/{guild_id}/disband", response_model=SuccessResponse)
+@router.post(
+    "/{guild_id}/disband",
+    response_model=SuccessResponse,
+    dependencies=[Depends(require_agent_preview_write)],
+)
 async def disband(
     guild_id: int,
     agent: Agent = Depends(get_current_agent),

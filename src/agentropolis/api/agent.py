@@ -5,6 +5,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
+from agentropolis.api.preview_guard import (
+    require_agent_preview_write,
+    require_preview_registration_write,
+    require_preview_surface,
+)
 from agentropolis.api.schemas import (
     AgentPublicProfile,
     AgentRegisterRequest,
@@ -24,10 +29,18 @@ from agentropolis.services.agent_svc import (
 from agentropolis.services.strategy_svc import get_public_profile
 from agentropolis.services.trait_svc import get_agent_traits
 
-router = APIRouter(prefix="/agent", tags=["agent"])
+router = APIRouter(
+    prefix="/agent",
+    tags=["agent"],
+    dependencies=[Depends(require_preview_surface)],
+)
 
 
-@router.post("/register", response_model=AgentRegisterResponse)
+@router.post(
+    "/register",
+    response_model=AgentRegisterResponse,
+    dependencies=[Depends(require_preview_registration_write)],
+)
 async def register_agent(
     req: AgentRegisterRequest, session: AsyncSession = Depends(get_session)
 ):
@@ -56,7 +69,11 @@ async def get_status(
         raise HTTPException(status_code=404, detail=str(exc)) from None
 
 
-@router.post("/eat", response_model=SuccessResponse)
+@router.post(
+    "/eat",
+    response_model=SuccessResponse,
+    dependencies=[Depends(require_agent_preview_write)],
+)
 async def eat(
     amount: int = 1,
     agent: Agent = Depends(get_current_agent),
@@ -77,7 +94,11 @@ async def eat(
         raise HTTPException(status_code=400, detail=str(exc)) from None
 
 
-@router.post("/drink", response_model=SuccessResponse)
+@router.post(
+    "/drink",
+    response_model=SuccessResponse,
+    dependencies=[Depends(require_agent_preview_write)],
+)
 async def drink(
     amount: int = 1,
     agent: Agent = Depends(get_current_agent),
@@ -98,7 +119,11 @@ async def drink(
         raise HTTPException(status_code=400, detail=str(exc)) from None
 
 
-@router.post("/rest", response_model=SuccessResponse)
+@router.post(
+    "/rest",
+    response_model=SuccessResponse,
+    dependencies=[Depends(require_agent_preview_write)],
+)
 async def rest(
     agent: Agent = Depends(get_current_agent),
     session: AsyncSession = Depends(get_session),
