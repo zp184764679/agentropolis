@@ -48,7 +48,7 @@ curl http://localhost:8000/meta/runtime
 
 - `/health` and `/meta/runtime` are the two endpoints that should be treated as reliably available in the current scaffold
 - REST route modules for market/production/inventory/company/game are mounted, but many handlers are still placeholders during the migration and currently surface as `501 Not Implemented`
-- Agent/world/skills/transport/guild/diplomacy are now mounted as a preview target surface backed by real services, but the public contract is still not frozen
+- Agent/world/skills/transport/guild/diplomacy/strategy/decisions/warfare are now mounted as a preview target surface backed by real services, but the public contract is still not frozen
 - MCP transport and public contract are still being frozen in the control-plane backlog
 - Do not treat legacy company-auth or `/mcp/sse` examples as the final external integration contract
 - `/meta/runtime` is the machine-readable source for the current mounted-vs-unmounted runtime surface
@@ -94,6 +94,9 @@ These route modules are mounted in the current FastAPI app:
 - `/api/transport`
 - `/api/guild`
 - `/api/diplomacy`
+- `/api/strategy`
+- `/api/agent/decisions`
+- `/api/warfare`
 
 Treat them as scaffold surface, not as a frozen or fully implemented public API.
 Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque `500` errors.
@@ -115,7 +118,9 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 | `/api/transport` | Yes | Preview, service-backed | Inter-region transport is mounted for agent-owned shipments |
 | `/api/guild` | Yes | Preview, service-backed | Guild create/join/leave/promotion/treasury flows are mounted |
 | `/api/diplomacy` | Yes | Preview, service-backed | Relationship and treaty flows are mounted |
-| `api/strategy.py`, `api/decisions.py`, `api/warfare.py` | No | Importable, partially implemented | These have real handler logic but are still outside the mounted public surface |
+| `/api/strategy` | Yes | Preview, service-backed | Strategy profile, dashboard, and standing-order scouting are mounted |
+| `/api/agent/decisions` | Yes | Preview, service-backed | Decision journal and analysis are mounted |
+| `/api/warfare` | Yes | Preview, service-backed | Contract lifecycle, garrison, repair, and regional threat queries are mounted |
 | MCP server | No public contract yet | Not frozen | Transport and rollout contract still under control-plane backlog |
 
 ### Route Mount Policy
@@ -159,6 +164,7 @@ FastMCP (MCP Tools) ─┘
 - Tick-oriented names remain in schemas, services, and model fields even where the target runtime is housekeeping/lazy-settlement based
 - MCP transport wording is not frozen across code, docs, and roadmap yet
 - Some route files exist on disk but are not mounted in `main.py`
+- Preview route groups now include strategy/decisions/warfare; they are mounted but still not contract-frozen for external rollout
 - Resource/seed examples still reflect the older scaffold economy, not the full target-world design
 
 ## Documentation Map

@@ -13,10 +13,6 @@ def test_runtime_metadata_reports_target_registry() -> None:
         group["module"]: group["state"]
         for group in meta["rest_surface"]["mounted_route_groups"]
     }
-    unmounted = {
-        group["module"]: group["state"]
-        for group in meta["rest_surface"]["unmounted_route_groups"]
-    }
 
     assert meta["auth_surface"]["agent_auth"]["status"] == "migration_compatible"
     assert meta["orm_surface"]["target_models_registered"] is True
@@ -24,7 +20,9 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["migration_surface"]["alembic_baseline_present"] is True
     assert mounted["agent"] == "preview_service_backed"
     assert mounted["transport"] == "preview_service_backed"
-    assert unmounted["strategy"] == "importable_partially_implemented"
+    assert mounted["strategy"] == "preview_service_backed"
+    assert mounted["warfare"] == "preview_service_backed"
+    assert meta["rest_surface"]["unmounted_route_groups"] == []
 
 
 def test_sqlalchemy_mappers_and_metadata_create_on_sqlite() -> None:

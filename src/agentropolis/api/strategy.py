@@ -72,6 +72,7 @@ async def update_profile(
         await session.commit()
         return result
     except ValueError as e:
+        await session.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from None
 
 

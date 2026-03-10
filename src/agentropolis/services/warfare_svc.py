@@ -42,6 +42,14 @@ REPUTATION_PENALTY = {
 COMBAT_XP_BASE = 20
 
 
+def _normalize_timestamp(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value
+
+
 # ─── Combat Power Calculations ──────────────────────────────────────────────
 
 
@@ -377,7 +385,7 @@ async def enlist_in_contract(
         raise ValueError("Contract not found")
     if contract.status != ContractStatus.OPEN:
         raise ValueError(f"Contract is {contract.status}, not open for enlistment")
-    if contract.expires_at < now:
+    if (_normalize_timestamp(contract.expires_at) or now) < now:
         raise ValueError("Contract has expired")
     if contract.employer_agent_id == agent_id:
         raise ValueError("Cannot enlist in your own contract")
@@ -446,7 +454,7 @@ async def activate_contract(
         raise ValueError("Contract not found")
     if contract.status != ContractStatus.OPEN:
         raise ValueError(f"Contract is {contract.status}, cannot activate")
-    if contract.expires_at < now:
+    if (_normalize_timestamp(contract.expires_at) or now) < now:
         raise ValueError("Contract has expired")
 
     enlisted = [p for p in contract.participants if p.status == ParticipantStatus.ENLISTED]
@@ -1176,7 +1184,11 @@ async def settle_building_durability(
         await session.flush()
         return {"building_id": building_id, "repaired": 0}
 
-    elapsed_seconds = (now - building.last_durability_at).total_seconds()
+    last_durability_at = _normalize_timestamp(building.last_durability_at)
+    if last_durability_at is None:
+        return {"building_id": building_id, "repaired": 0}
+
+    elapsed_seconds = (now - last_durability_at).total_seconds()
     if elapsed_seconds <= 0:
         return {"building_id": building_id, "repaired": 0}
 
