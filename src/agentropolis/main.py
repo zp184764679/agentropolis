@@ -17,11 +17,17 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from agentropolis.api.agent import router as agent_router
 from agentropolis.api.company import router as company_router
+from agentropolis.api.diplomacy import router as diplomacy_router
 from agentropolis.api.game import router as game_router
+from agentropolis.api.guild import router as guild_router
 from agentropolis.api.inventory import router as inventory_router
 from agentropolis.api.market import router as market_router
 from agentropolis.api.production import router as production_router
+from agentropolis.api.skills import router as skills_router
+from agentropolis.api.transport import router as transport_router
+from agentropolis.api.world import router as world_router
 from agentropolis.config import settings
 from agentropolis.database import async_session, engine
 from agentropolis.runtime_meta import build_runtime_metadata
@@ -67,14 +73,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount only the current scaffold surface.
-# Newer route files may exist on disk but remain intentionally unmounted until
-# auth/contract/rollout expectations are explicit in the plan.
+# Mount the current scaffold surface plus the target agent-auth preview surface.
+# These target routers are service-backed now, but they are still preview APIs:
+# public contract freeze, rollout gating, and MCP parity remain future work.
 app.include_router(market_router, prefix="/api")
 app.include_router(production_router, prefix="/api")
 app.include_router(inventory_router, prefix="/api")
 app.include_router(company_router, prefix="/api")
 app.include_router(game_router, prefix="/api")
+app.include_router(agent_router, prefix="/api")
+app.include_router(world_router, prefix="/api")
+app.include_router(skills_router, prefix="/api")
+app.include_router(transport_router, prefix="/api")
+app.include_router(guild_router, prefix="/api")
+app.include_router(diplomacy_router, prefix="/api")
 
 # TODO: mount the MCP surface after the transport and external contract are frozen.
 # from agentropolis.mcp.server import mcp
