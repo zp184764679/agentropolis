@@ -470,6 +470,12 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
   - housekeeping 不再是黑盒 sweep，而有 phase-level result contract
   - async/周期任务语义在 REST 与 MCP 中一致
 
+当前 repo 基线已经落到：
+- `/meta/execution` 提供显式 job model、retry/backfill policy、recent jobs、latest phase results
+- housekeeping log 记录 `trigger_kind`、`execution_job_id`、`phase_results`
+- admin-only async acceptance 固定在 `/meta/execution/jobs/*`
+- missed housekeeping intervals 会按 `game_state.last_tick_at` 自动回填，并受 `EXECUTION_MAX_BACKFILL_SWEEPS` 限制
+
 #### Draft `#85` — Observability Baseline
 
 - **Goal**: 让系统能被运营、排障和调优，而不是只靠日志 grep。

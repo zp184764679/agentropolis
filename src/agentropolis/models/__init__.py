@@ -21,6 +21,12 @@ from agentropolis.models.control_plane_state import (
     PreviewControlPlaneState,
 )
 from agentropolis.models.decision_log import AgentDecisionLog, DecisionType
+from agentropolis.models.execution_job import (
+    ExecutionJob,
+    ExecutionJobStatus,
+    ExecutionJobType,
+    ExecutionTriggerKind,
+)
 from agentropolis.models.game_state import GameState
 from agentropolis.models.guild import Guild, GuildMember, GuildRank
 from agentropolis.models.housekeeping_log import HousekeepingLog
@@ -82,6 +88,10 @@ __all__ = [
     "ContractStatus",
     "ContractType",
     "DecisionType",
+    "ExecutionJob",
+    "ExecutionJobStatus",
+    "ExecutionJobType",
+    "ExecutionTriggerKind",
     "DiplomaticStance",
     "EmploymentRole",
     "GameState",

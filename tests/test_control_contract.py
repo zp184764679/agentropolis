@@ -76,6 +76,12 @@ def test_control_contract_catalog_matches_runtime_and_mcp_registry() -> None:
     assert catalog["transport"]["mcp"] == "streamable-http"
     assert catalog["headers"]["contract_version"] == CONTRACT_VERSION_HEADER
     assert catalog["headers"]["request_id"] == "X-Agentropolis-Request-ID"
+    assert catalog["execution_semantics"]["job_model"]["states"][-1] == "dead_letter"
+    assert catalog["execution_semantics"]["backfill_policy"]["auto_gap_detection"] is True
+    assert any(
+        entry["route"] == "/meta/execution/jobs/housekeeping-backfill"
+        for entry in catalog["execution_semantics"]["async_acceptance"]
+    )
     assert catalog["error_taxonomy"]["auth_api_key_missing"] == (
         "X-API-Key header is required for this operation."
     )
@@ -99,6 +105,7 @@ def test_control_contract_catalog_matches_runtime_and_mcp_registry() -> None:
     assert market_tool["dangerous_operation_codes"] == ["place_buy_order"]
     assert scope_names == registry_names
     assert any(group["prefix"] == "/meta/contract" for group in catalog["authorization"]["rest_route_scopes"])
+    assert any(group["prefix"] == "/meta/execution" for group in catalog["authorization"]["rest_route_scopes"])
     assert runtime_meta["control_contract_surface"]["endpoint"] == "/meta/contract"
     assert runtime_meta["control_contract_surface"]["version"] == CONTROL_CONTRACT_VERSION
 

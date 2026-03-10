@@ -29,6 +29,7 @@ from agentropolis.api.dashboard import router as dashboard_router
 from agentropolis.api.digest import router as digest_router
 from agentropolis.api.diplomacy import router as diplomacy_router
 from agentropolis.api.decisions import router as decisions_router
+from agentropolis.api.execution import router as execution_router
 from agentropolis.api.game import router as game_router
 from agentropolis.api.guild import router as guild_router
 from agentropolis.api.inventory import router as inventory_router
@@ -123,6 +124,7 @@ app.include_router(company_router, prefix="/api")
 app.include_router(game_router, prefix="/api")
 app.include_router(control_plane_router)
 app.include_router(contract_router)
+app.include_router(execution_router)
 app.include_router(alerts_router)
 app.include_router(observability_router)
 app.include_router(rollout_readiness_router)

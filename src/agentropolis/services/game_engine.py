@@ -19,6 +19,10 @@ from agentropolis.services.consumption import tick_consumption
 from agentropolis.services.currency_svc import update_game_state_economics
 from agentropolis.services.digest_svc import build_digest_housekeeping_summary
 from agentropolis.services.employment_svc import settle_all_wages
+from agentropolis.services.execution_svc import (
+    run_due_execution_jobs,
+    schedule_missed_housekeeping_backfills,
+)
 from agentropolis.services.event_svc import expire_events
 from agentropolis.services.goal_svc import compute_all_goal_progress
 from agentropolis.services.market_engine import match_all_resources
@@ -120,12 +124,72 @@ async def _mark_runtime_stopped(session: AsyncSession) -> None:
 
 async def _run_phase(name: str, fn) -> tuple[dict, float, dict | None]:
     started = monotonic()
-    try:
-        result = await fn()
-        return result, monotonic() - started, None
-    except Exception as exc:
-        logger.exception("Housekeeping phase %s failed", name)
-        return {}, monotonic() - started, {"phase": name, "detail": str(exc)}
+    max_attempts = max(1, int(settings.EXECUTION_PHASE_MAX_ATTEMPTS))
+    attempt_history: list[dict] = []
+    for attempt in range(1, max_attempts + 1):
+        try:
+            result = await fn()
+            attempt_history.append({"attempt": attempt, "status": "completed"})
+            return (
+                {
+                    "status": "completed",
+                    "attempts": attempt,
+                    "max_attempts": max_attempts,
+                    "retry_used": attempt > 1,
+                    "attempt_history": attempt_history,
+                    "result": result,
+                    "last_error": None,
+                },
+                monotonic() - started,
+                None,
+            )
+        except Exception as exc:
+            logger.exception("Housekeeping phase %s failed on attempt %s", name, attempt)
+            detail = str(exc)
+            attempt_history.append(
+                {
+                    "attempt": attempt,
+                    "status": "failed",
+                    "detail": detail,
+                    "retryable": attempt < max_attempts,
+                }
+            )
+            if attempt >= max_attempts:
+                return (
+                    {
+                        "status": "failed",
+                        "attempts": attempt,
+                        "max_attempts": max_attempts,
+                        "retry_used": attempt > 1,
+                        "attempt_history": attempt_history,
+                        "result": {},
+                        "last_error": {
+                            "phase": name,
+                            "detail": detail,
+                            "attempt": attempt,
+                        },
+                        "manual_repair_path": [
+                            "/meta/execution/jobs/housekeeping-backfill",
+                            "/meta/execution/jobs/{job_id}/retry",
+                            "agentropolis repair-derived-state",
+                        ],
+                    },
+                    monotonic() - started,
+                    {"phase": name, "detail": detail, "attempt": attempt},
+                )
+    return (
+        {
+            "status": "failed",
+            "attempts": max_attempts,
+            "max_attempts": max_attempts,
+            "retry_used": False,
+            "attempt_history": attempt_history,
+            "result": {},
+            "last_error": {"phase": name, "detail": "phase_failed"},
+        },
+        monotonic() - started,
+        {"phase": name, "detail": "phase_failed"},
+    )
 
 
 async def _execute_housekeeping_sweep(
@@ -133,6 +197,8 @@ async def _execute_housekeeping_sweep(
     *,
     now: datetime,
     requested_tick: int | None = None,
+    trigger_kind: str = "scheduled",
+    execution_job_id: int | None = None,
 ) -> dict:
     state = await _get_or_create_game_state(session)
     previous_tick = int(state.current_tick or 0)
@@ -140,93 +206,116 @@ async def _execute_housekeeping_sweep(
     period_start = _normalize_timestamp(state.last_tick_at, now)
 
     phase_timings: dict[str, float] = {}
+    phase_results: dict[str, dict] = {}
     errors: list[dict] = []
 
-    consumption_summary, timing, error = await _run_phase(
+    consumption_phase, timing, error = await _run_phase(
         "consumption",
         lambda: tick_consumption(session),
     )
+    consumption_summary = dict(consumption_phase["result"] or {})
     phase_timings["consumption"] = round(timing, 6)
+    phase_results["consumption"] = consumption_phase
     if error:
         errors.append(error)
 
-    production_summary, timing, error = await _run_phase(
+    production_phase, timing, error = await _run_phase(
         "production",
         lambda: settle_all_buildings(session, now=now),
     )
+    production_summary = dict(production_phase["result"] or {})
     phase_timings["production"] = round(timing, 6)
+    phase_results["production"] = production_phase
     if error:
         errors.append(error)
 
-    trade_summary, timing, error = await _run_phase(
+    trade_phase, timing, error = await _run_phase(
         "market_matching",
         lambda: match_all_resources(session, current_tick=current_tick),
     )
+    trade_summary = dict(trade_phase["result"] or {})
     phase_timings["market_matching"] = round(timing, 6)
+    phase_results["market_matching"] = trade_phase
     if error:
         errors.append(error)
 
-    wages_summary, timing, error = await _run_phase(
+    wages_phase, timing, error = await _run_phase(
         "wages",
         lambda: settle_all_wages(session, now=now),
     )
+    wages_summary = dict(wages_phase["result"] or {})
     phase_timings["wages"] = round(timing, 6)
+    phase_results["wages"] = wages_phase
     if error:
         errors.append(error)
 
-    vitals_summary, timing, error = await _run_phase(
+    vitals_phase, timing, error = await _run_phase(
         "agent_vitals",
         lambda: settle_all_agent_vitals(session, now=now),
     )
+    vitals_summary = dict(vitals_phase["result"] or {})
     phase_timings["agent_vitals"] = round(timing, 6)
+    phase_results["agent_vitals"] = vitals_phase
     if error:
         errors.append(error)
 
-    autonomy_summary, timing, error = await _run_phase(
+    autonomy_phase, timing, error = await _run_phase(
         "autonomy",
         _autonomy_phase(session, now, current_tick),
     )
+    autonomy_summary = dict(autonomy_phase["result"] or {})
     phase_timings["autonomy"] = round(timing, 6)
+    phase_results["autonomy"] = autonomy_phase
     if error:
         errors.append(error)
 
-    digest_summary, timing, error = await _run_phase(
+    digest_phase, timing, error = await _run_phase(
         "digest",
         _digest_phase(session, now),
     )
+    digest_summary = dict(digest_phase["result"] or {})
     phase_timings["digest"] = round(timing, 6)
+    phase_results["digest"] = digest_phase
     if error:
         errors.append(error)
 
-    logistics_summary, timing, error = await _run_phase(
+    logistics_phase, timing, error = await _run_phase(
         "logistics",
         _logistics_phase(session, now),
     )
+    logistics_summary = dict(logistics_phase["result"] or {})
     phase_timings["logistics"] = round(timing, 6)
+    phase_results["logistics"] = logistics_phase
     if error:
         errors.append(error)
 
-    analytics_summary, timing, error = await _run_phase(
+    analytics_phase, timing, error = await _run_phase(
         "analytics",
         _analytics_phase(session, now),
     )
+    analytics_summary = dict(analytics_phase["result"] or {})
     phase_timings["analytics"] = round(timing, 6)
+    phase_results["analytics"] = analytics_phase
     if error:
         errors.append(error)
 
-    admin_summary, timing, error = await _run_phase(
+    admin_phase, timing, error = await _run_phase(
         "admin",
         _admin_phase(session),
     )
+    admin_summary = dict(admin_phase["result"] or {})
     phase_timings["admin"] = round(timing, 6)
+    phase_results["admin"] = admin_phase
     if error:
         errors.append(error)
 
-    nxc_summary, timing, error = await _run_phase(
+    nxc_phase, timing, error = await _run_phase(
         "nxc",
         _nxc_phase(session, now),
     )
+    nxc_summary = dict(nxc_phase["result"] or {})
     phase_timings["nxc"] = round(timing, 6)
+    phase_results["nxc"] = nxc_phase
     if error:
         errors.append(error)
 
@@ -244,6 +333,8 @@ async def _execute_housekeeping_sweep(
         completed_at=now,
         sweep_count=current_tick,
         duration_seconds=sweep_duration,
+        trigger_kind=trigger_kind,
+        execution_job_id=execution_job_id,
         consumption_summary=consumption_summary,
         production_summary=production_summary,
         trade_summary=trade_summary,
@@ -255,6 +346,7 @@ async def _execute_housekeeping_sweep(
         admin_summary=admin_summary,
         nxc_summary=nxc_summary,
         phase_timings=phase_timings,
+        phase_results=phase_results,
         active_companies=await _active_company_count(session),
         error_count=len(errors),
         errors=errors or None,
@@ -266,6 +358,8 @@ async def _execute_housekeeping_sweep(
         "current_tick": current_tick,
         "period_start": period_start.isoformat(),
         "period_end": now.isoformat(),
+        "trigger_kind": trigger_kind,
+        "execution_job_id": execution_job_id,
         "consumption": consumption_summary,
         "production": production_summary,
         "trade": trade_summary,
@@ -276,6 +370,7 @@ async def _execute_housekeeping_sweep(
         "analytics": analytics_summary,
         "admin": admin_summary,
         "nxc": nxc_summary,
+        "phase_results": phase_results,
         "error_count": len(errors),
     }
 
@@ -379,6 +474,7 @@ async def execute_tick(tick_number: int | None = None) -> dict:
                 session,
                 now=now,
                 tick_number=tick_number,
+                trigger_kind="scheduled",
             )
             await session.commit()
             return summary
@@ -389,13 +485,58 @@ async def run_housekeeping_sweep(
     *,
     now: datetime | None = None,
     tick_number: int | None = None,
+    trigger_kind: str = "scheduled",
+    execution_job_id: int | None = None,
 ) -> dict:
     """Run one housekeeping sweep against a provided session."""
     return await _execute_housekeeping_sweep(
         session,
         now=_coerce_now(now),
         requested_tick=tick_number,
+        trigger_kind=trigger_kind,
+        execution_job_id=execution_job_id,
     )
+
+
+async def _scheduled_sweep_due(session: AsyncSession, *, now: datetime) -> bool:
+    state = await _get_or_create_game_state(session)
+    interval_seconds = max(int(state.tick_interval_seconds or settings.TICK_INTERVAL_SECONDS), 1)
+    if state.last_tick_at is None:
+        return True
+    last_tick_at = _normalize_timestamp(state.last_tick_at, now)
+    return (now - last_tick_at).total_seconds() >= interval_seconds
+
+
+async def run_housekeeping_iteration(*, now: datetime | None = None, session_factory=async_session) -> dict:
+    effective_now = _coerce_now(now)
+    async with acquire_housekeeping_slot():
+        async with session_factory() as session:
+            backfill_summary = await schedule_missed_housekeeping_backfills(session, now=effective_now)
+            await session.commit()
+
+        execution_jobs = await run_due_execution_jobs(
+            now=effective_now,
+            limit=int(settings.EXECUTION_JOB_DRAIN_LIMIT),
+            session_factory=session_factory,
+        )
+
+        scheduled_sweep = None
+        async with session_factory() as session:
+            if await _scheduled_sweep_due(session, now=effective_now):
+                scheduled_sweep = await run_housekeeping_sweep(
+                    session,
+                    now=effective_now,
+                    trigger_kind="scheduled",
+                )
+                await session.commit()
+            else:
+                await session.rollback()
+
+        return {
+            "backfill": backfill_summary,
+            "execution_jobs": execution_jobs,
+            "scheduled_sweep": scheduled_sweep,
+        }
 
 
 async def run_tick_loop(stop_event: asyncio.Event | None = None) -> None:
@@ -409,13 +550,14 @@ async def run_tick_loop(stop_event: asyncio.Event | None = None) -> None:
 
     try:
         while not stop_event.is_set():
+            await run_housekeeping_iteration()
             try:
                 await asyncio.wait_for(
                     stop_event.wait(),
                     timeout=float(settings.TICK_INTERVAL_SECONDS),
                 )
             except asyncio.TimeoutError:
-                await execute_tick()
+                continue
     finally:
         async with async_session() as session:
             await _mark_runtime_stopped(session)

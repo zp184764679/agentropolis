@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Float, Integer
+from sqlalchemy import JSON, DateTime, Float, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from agentropolis.models.base import Base
@@ -17,6 +17,8 @@ class HousekeepingLog(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     sweep_count: Mapped[int] = mapped_column(Integer, default=0)
     duration_seconds: Mapped[float] = mapped_column(Float, default=0.0)
+    trigger_kind: Mapped[str] = mapped_column(String(24), nullable=False, default="scheduled")
+    execution_job_id: Mapped[int | None] = mapped_column(Integer, index=True)
 
     # Phase summaries (JSON blobs)
     consumption_summary: Mapped[dict | None] = mapped_column(JSON)
@@ -32,6 +34,7 @@ class HousekeepingLog(Base):
 
     # Per-phase wall-clock timings (seconds) for bottleneck diagnosis
     phase_timings: Mapped[dict | None] = mapped_column(JSON)
+    phase_results: Mapped[dict | None] = mapped_column(JSON)
 
     # Stats
     active_companies: Mapped[int] = mapped_column(Integer, default=0)

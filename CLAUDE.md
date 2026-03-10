@@ -84,6 +84,7 @@ Likewise, do not treat an `api/*.py` file existing on disk as evidence that it s
 - `/meta/runtime` exposes the prompt surface and OpenClaw local-preview bundle paths; keep those synchronized when assets move
 - minimal proposed-#86/#87 baselines also exist in-repo now: tunable registry snapshot, world snapshot export, and derived-state repair helpers
 - `/meta/observability` now exists as the local-preview observability snapshot; treat it as best-effort process-local metrics plus economy/housekeeping summary, not a full production telemetry stack
+- `/meta/execution` now exists as the execution/job-model snapshot; use it to answer when work is accepted, pending, retried, dead-lettered, or backfilled
 - `/meta/rollout-readiness` now exists as the local-preview rollout gate summary; use it with the contract snapshot and runbooks before claiming a runtime is ready for wider exposure
 - operator exports now have a bundle path too: contract snapshot, alerts snapshot, observability snapshot, rollout readiness, gate summary, and world snapshot can be assembled together; prefer review bundles over ad hoc screenshots/log dumps
 - authenticated preview reads with `get_current_agent` are now family-scoped too; do not assume only mutations are policy-controlled
@@ -93,6 +94,9 @@ Likewise, do not treat an `api/*.py` file existing on disk as evidence that it s
 - the frozen local-preview contract baseline now also has a dedicated `/meta/contract` surface and `X-Agentropolis-Contract-Version`; keep auth/concurrency/control-plane failures aligned with that catalog
 - the current migration-phase preview/control-plane error-code catalog is exposed through runtime metadata; keep it aligned with any new guard/control-plane failures
 - request validation failures should follow the same `error_code + request_id` contract; do not rely on raw FastAPI default 422 payloads
+- contract version is now `2026-03-preview.3`; if execution semantics change, update `README.md`, `PLAN.md`, `CLAUDE.md`, `/meta/runtime`, and `/meta/contract` together
+- housekeeping is no longer just a blind sweep: it writes `trigger_kind`, optional `execution_job_id`, and per-phase `phase_results` with retry history
+- asynchronous admin repair/backfill work now lives under `/meta/execution/jobs/*`; these are the only accepted/pending job-model routes in the current repo
 - when correlating audit with client failures, prefer `/meta/control-plane/audit?request_id=...` over scanning the full in-memory log
 - 当前阶段：主线执行仍从 Wave 1 (#16 Foundation) 开始
 - OpenClaw / 外部玩家 rollout 不是“API 能跑”就开放，必须先满足 PLAN.md 中的 control-contract、concurrency、observability、recovery gate
@@ -157,7 +161,8 @@ src/agentropolis/
 │   ├── autopilot.py     # Reflex survival + canonical standing orders (#64)
 │   ├── market_analysis_svc.py # Aggregated market intelligence (#65)
 │   ├── goal_svc.py      # Goal CRUD + progress computation (#66)
-│   └── digest_svc.py    # Morning briefing / activity digest (#67)
+│   ├── digest_svc.py    # Morning briefing / activity digest (#67)
+│   └── execution_svc.py # Execution job model, retry, dead-letter, backfill (#84)
 ├── api/
 │   ├── schemas.py       # Pydantic schemas (API contract)
 │   ├── auth.py          # API key → Agent resolution
@@ -221,6 +226,8 @@ src/agentropolis/
 - Random event generation
 - Writes HousekeepingLog
 - **NXC tasks**: update_active_refineries, adjust_difficulty (hourly), check_halving
+- Records per-phase result envelopes with retry history
+- Can be supplemented by accepted admin jobs for backfill / derived-state repair
 
 ## NXC (Nexus Crystal) Economy
 

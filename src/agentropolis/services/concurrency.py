@@ -309,3 +309,7 @@ def preview_policy_lock_key(agent_id: int) -> str:
 
 def control_plane_global_lock_key() -> str:
     return "control-plane:global"
+
+
+def execution_job_lock_key(job_id: int) -> str:
+    return f"execution-job:{job_id}"

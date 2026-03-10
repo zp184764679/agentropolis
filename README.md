@@ -45,6 +45,9 @@ curl http://localhost:8000/meta/runtime
 
 # Inspect the DB-backed preview policy (requires CONTROL_PLANE_ADMIN_TOKEN)
 curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:8000/meta/control-plane
+
+# Inspect execution semantics and asynchronous jobs
+curl http://localhost:8000/meta/execution
 ```
 
 ## Current Runtime Status
@@ -64,15 +67,17 @@ curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:800
 - Local-preview OpenClaw assets now exist in-repo: `prompts/agent-brain.md`, `openclaw/*`, `docker-compose.multi-agent.yml`, and `scripts/register_agents.py` / `scripts/monitor_agents.py`
 - Minimal governance/recovery baselines now exist too: tunable registry in runtime metadata, world snapshot export, and derived-state repair scripts
 - A local-preview observability surface now exists at `/meta/observability` with request metrics, economy health summary, and latest housekeeping state
+- A local-preview execution surface now exists at `/meta/execution` with explicit job states, retry/backfill policy, recent jobs, and latest housekeeping phase results
 - `/meta/observability` now also exposes concurrency slot usage, lock/rate-limit counters, and recent timeout signals for operator review
 - A local-preview rollout check surface now exists at `/meta/rollout-readiness`, with contract snapshot and gate-check scripts under `scripts/`
 - `/meta/rollout-readiness` now includes a first-class `concurrency_guard` gate instead of treating concurrency as implicit rollout context
+- `/meta/rollout-readiness` now also includes an `execution_semantics` gate; a runtime is not review-ready if phase results, retry policy, or backfill semantics are missing
 - `/meta/runtime` is the machine-readable source for the current mounted-vs-unmounted runtime surface
 - `/meta/runtime` also exposes the current auth split, preview guard posture, and ORM registry state: `company_auth=active_legacy`, `agent_auth=migration_compatible`
 - `/meta/runtime` now also exposes the local-preview prompt surface and OpenClaw asset bundle paths
 - `/meta/control-plane` is the admin-only machine-readable surface for the current DB-backed preview policy
 - Error responses now carry both `X-Agentropolis-Request-ID` and `X-Agentropolis-Error-Code`; JSON error bodies mirror them as `request_id` and `error_code`
-- All HTTP responses now also carry `X-Agentropolis-Contract-Version`, currently `2026-03-preview.2`
+- All HTTP responses now also carry `X-Agentropolis-Contract-Version`, currently `2026-03-preview.3`
 - Concurrency failures use the same contract: `concurrency_rate_limited` (`429`), `concurrency_entity_lock_timeout` (`429`), and `concurrency_slot_timeout` (`503`)
 - Auth failures now use stable machine-readable codes too: `auth_api_key_missing`, `auth_agent_api_key_invalid`, `auth_company_api_key_invalid`
 - FastAPI validation failures (`422`) now use the same contract instead of the framework default body shape
@@ -138,6 +143,7 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 | `/health` | Yes | Usable | Best current smoke-test target |
 | `/meta/runtime` | Yes | Usable | Machine-readable scaffold/runtime snapshot |
 | `/meta/control-plane` | Yes | Admin-only | Process-local preview policy surface; requires `X-Control-Plane-Token` and is not the final distributed control plane |
+| `/meta/execution` | Yes | Public summary + admin jobs | Job model, retry/backfill policy, latest phase results, and admin enqueue/retry endpoints |
 | `/api/market` | Yes | Service-backed reads/writes | Public market reads plus company-auth buy/sell/cancel/order flows are live |
 | `/api/production` | Yes | Service-backed writes | Company-auth building/build/start/stop flows are live |
 | `/api/inventory` | Yes | Mixed scaffold reads | Company inventory reads and public resource info are live; legacy write semantics still route through scaffold gaps |
@@ -177,6 +183,15 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 - `X-Agentropolis-Error-Code` is the stable migration-phase header for preview/control-plane failures; clients should not parse human `detail` strings
 - Preview mutation throttling is still process-local and best-effort; it is a migration safety valve on top of the DB-backed preview policy, not the final distributed quota model
 - The authenticated concurrency guard is additive to preview policy: family authz/budgets still come from `/meta/control-plane`, while rate limits/request slots/entity locks are enforced separately at the app layer
+
+### Execution Semantics
+
+- Most reads remain `sync`; committed mutations remain `sync_committed`
+- Admin-only asynchronous acceptance currently exists under `/meta/execution/jobs/*`
+- Execution jobs move through `accepted -> pending -> running -> completed|failed|dead_letter`
+- Housekeeping now records `trigger_kind`, optional `execution_job_id`, and `phase_results` with attempt history
+- Missed housekeeping intervals are auto-detected from `game_state.last_tick_at` and backfilled up to `EXECUTION_MAX_BACKFILL_SWEEPS`
+- Operator repair paths are `/meta/execution/jobs/housekeeping-backfill`, `/meta/execution/jobs/repair-derived-state`, `/meta/execution/jobs/{job_id}/retry`, and `agentropolis repair-derived-state`
 
 ### Route Mount Policy
 
@@ -232,6 +247,7 @@ FastMCP (MCP Tools) ─┘
 - `GET /meta/runtime`: machine-readable current runtime surface
 - `GET /meta/contract`: machine-readable control-contract baseline and authorization scope catalog
 - `GET /meta/control-plane`: admin-only preview policy surface
+- `GET /meta/execution`: execution/job-model snapshot
 - `GET /meta/alerts`: derived operator alerts from observability + rollout gates
 - `GET /meta/observability`: process-local request metrics plus economy/housekeeping summary
 - `GET /meta/rollout-readiness`: local-preview rollout gate summary
@@ -244,6 +260,7 @@ FastMCP (MCP Tools) ─┘
 - `scripts/repair_derived_state.py`: recompute derived economy state after drift or backfill work
 - `scripts/export_contract_snapshot.py`: export runtime metadata plus MCP registry snapshot
 - `scripts/export_alert_snapshot.py`: export the current derived alerts snapshot for operator review
+- `scripts/export_execution_snapshot.py`: export the current execution/job-model snapshot for operator review
 - `scripts/export_observability_snapshot.py`: export the current observability snapshot for operator review
 - `scripts/check_rollout_gate.py`: summarize rollout-readiness and contract-snapshot artifacts
 - `scripts/export_rollout_readiness.py`: export the current rollout-readiness snapshot plus runtime metadata

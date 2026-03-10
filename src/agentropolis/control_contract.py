@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+from agentropolis.config import settings
 from agentropolis.services.concurrency import (
     CONCURRENCY_ERROR_CODES,
     ERROR_CODE_HEADER,
 )
+from agentropolis.services.execution_svc import EXECUTION_ERROR_CODES
 
-CONTROL_CONTRACT_VERSION = "2026-03-preview.2"
+CONTROL_CONTRACT_VERSION = "2026-03-preview.3"
 CONTRACT_VERSION_HEADER = "X-Agentropolis-Contract-Version"
 IDEMPOTENCY_KEY_HEADER = "X-Idempotency-Key"
 REQUEST_ID_HEADER = "X-Agentropolis-Request-ID"
@@ -89,6 +91,20 @@ REST_ROUTE_SCOPE_GROUPS = [
         "idempotency_policy": "safe_read",
         "execution_semantics": "sync",
         "dangerous_operations": [],
+    },
+    {
+        "prefix": "/meta/execution",
+        "actor_kind": "mixed_public_admin",
+        "scope_family": "execution_admin",
+        "read_policy": "public_snapshot_plus_admin_job_inspection",
+        "write_policy": "admin_token_plus_entity_lock",
+        "idempotency_policy": "accepted_jobs_with_optional_dedupe_key",
+        "execution_semantics": "mixed_sync_read_async_admin_jobs",
+        "dangerous_operations": [
+            "execution_enqueue_housekeeping_backfill",
+            "execution_enqueue_derived_state_repair",
+            "execution_retry_job",
+        ],
     },
     {
         "prefix": "/meta/alerts",
@@ -605,6 +621,7 @@ def build_error_taxonomy() -> dict[str, str]:
     merged.update(AUTH_ERROR_CODES)
     merged.update(preview_error_codes)
     merged.update(CONCURRENCY_ERROR_CODES)
+    merged.update(EXECUTION_ERROR_CODES)
     return merged
 
 
@@ -688,8 +705,45 @@ def build_control_contract_catalog() -> dict:
         "execution_semantics": {
             "default": "sync",
             "state_mutations": "sync_committed",
-            "async_acceptance": [],
-            "housekeeping_follow_up": "best_effort_background",
+            "async_acceptance": [
+                {
+                    "route": "/meta/execution/jobs/housekeeping-backfill",
+                    "status_code": 202,
+                    "job_state": "accepted",
+                },
+                {
+                    "route": "/meta/execution/jobs/repair-derived-state",
+                    "status_code": 202,
+                    "job_state": "accepted",
+                },
+                {
+                    "route": "/meta/execution/jobs/{job_id}/retry",
+                    "status_code": 202,
+                    "job_state": "accepted",
+                },
+            ],
+            "job_model": {
+                "states": [
+                    "accepted",
+                    "pending",
+                    "running",
+                    "completed",
+                    "failed",
+                    "dead_letter",
+                ],
+                "retry_delay_seconds": int(settings.EXECUTION_JOB_RETRY_DELAY_SECONDS),
+                "default_max_attempts": int(settings.EXECUTION_JOB_MAX_ATTEMPTS),
+            },
+            "housekeeping_follow_up": "phase_retry_then_backfill_job_or_manual_repair",
+            "phase_contract": {
+                "max_attempts": int(settings.EXECUTION_PHASE_MAX_ATTEMPTS),
+                "result_envelope": "status_attempt_history_result_last_error",
+            },
+            "backfill_policy": {
+                "auto_gap_detection": True,
+                "max_backfill_sweeps": int(settings.EXECUTION_MAX_BACKFILL_SWEEPS),
+                "manual_enqueue_route": "/meta/execution/jobs/housekeeping-backfill",
+            },
         },
         "authorization": {
             "actor_kinds": list(AUTHORIZATION_ACTOR_KINDS),

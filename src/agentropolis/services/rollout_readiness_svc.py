@@ -56,6 +56,13 @@ async def build_rollout_readiness_snapshot(session: AsyncSession, runtime_meta: 
             and runtime_meta["preview_guard"]["persistent_policy_store"] == "database",
             "Preview family budgets, operation budgets, denylist rules, and spending caps are durable; short-window rate limits remain process-local.",
         ),
+        "execution_semantics": _gate(
+            runtime_meta["execution_surface"]["endpoint"] == "/meta/execution"
+            and runtime_meta["execution_surface"]["phase_contract"]["max_attempts"] >= 1
+            and runtime_meta["execution_surface"]["backfill_policy"]["auto_gap_detection"] is True
+            and observability["execution"]["housekeeping_phase_contract"]["phase_results_logged"] is True,
+            "Periodic work exposes an explicit job model, phase result envelope, retry policy, and housekeeping backfill path.",
+        ),
         "observability": _gate(
             observability["requests"]["requests_total"] >= 0
             and runtime_meta["observability_surface"]["endpoint"] == "/meta/observability",

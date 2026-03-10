@@ -318,6 +318,58 @@ class ControlPlaneAuditResponse(BaseModel):
     entries: list[ControlPlaneAuditEntry] = Field(default_factory=list)
 
 
+class ExecutionJobResponse(BaseModel):
+    job_id: int
+    job_type: str
+    status: str
+    trigger_kind: str
+    dedupe_key: str | None = None
+    payload: dict = Field(default_factory=dict)
+    result_summary: dict | None = None
+    attempt_history: list[dict] = Field(default_factory=list)
+    attempts: int
+    max_attempts: int
+    available_at: str | None = None
+    started_at: str | None = None
+    finished_at: str | None = None
+    last_error: str | None = None
+    dead_letter_reason: str | None = None
+    accepted_at: str | None = None
+    updated_at: str | None = None
+
+
+class ExecutionJobListResponse(BaseModel):
+    jobs: list[ExecutionJobResponse] = Field(default_factory=list)
+
+
+class ExecutionBackfillRequest(BaseModel):
+    requested_tick: int = Field(..., ge=1)
+    period_end: str | None = None
+    reason_code: str | None = Field(default=None, min_length=2, max_length=64)
+    note: str | None = Field(default=None, min_length=2, max_length=280)
+
+
+class ExecutionRepairRequest(BaseModel):
+    reason_code: str | None = Field(default=None, min_length=2, max_length=64)
+    note: str | None = Field(default=None, min_length=2, max_length=280)
+
+
+class ExecutionPhaseContractResponse(BaseModel):
+    phase_results_logged: bool
+    phase_max_attempts: int
+    latest_sweep: dict | None = None
+
+
+class ExecutionSnapshotResponse(BaseModel):
+    job_states: list[str] = Field(default_factory=list)
+    job_types: list[str] = Field(default_factory=list)
+    counts: dict = Field(default_factory=dict)
+    retry_policy: dict = Field(default_factory=dict)
+    backfill_policy: dict = Field(default_factory=dict)
+    housekeeping_phase_contract: ExecutionPhaseContractResponse
+    recent_jobs: list[ExecutionJobResponse] = Field(default_factory=list)
+
+
 # ─── Target World / Agent Surface ───────────────────────────────────────────
 
 

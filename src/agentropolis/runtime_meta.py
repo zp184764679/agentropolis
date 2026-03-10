@@ -141,7 +141,7 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
     """Return a machine-readable snapshot of the current runtime surface."""
     return {
         "stage": "migration_scaffold",
-        "reliable_endpoints": ["/health", "/meta/runtime", "/meta/contract"],
+        "reliable_endpoints": ["/health", "/meta/runtime", "/meta/contract", "/meta/execution"],
         "request_context": {
             "request_id_header": REQUEST_ID_HEADER,
             "client_fingerprint_source": "best_effort_request_client",
@@ -223,12 +223,49 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
             "preview_policy_snapshot": True,
             "export_script": "scripts/export_observability_snapshot.py",
         },
+        "execution_surface": {
+            "endpoint": "/meta/execution",
+            "admin_job_endpoints": [
+                "/meta/execution/jobs",
+                "/meta/execution/jobs/housekeeping-backfill",
+                "/meta/execution/jobs/repair-derived-state",
+                "/meta/execution/jobs/{job_id}/retry",
+            ],
+            "job_states": [
+                "accepted",
+                "pending",
+                "running",
+                "completed",
+                "failed",
+                "dead_letter",
+            ],
+            "job_types": [
+                "housekeeping_backfill",
+                "derived_state_repair",
+            ],
+            "phase_contract": {
+                "max_attempts": int(settings.EXECUTION_PHASE_MAX_ATTEMPTS),
+                "result_envelope": "status_attempt_history_result_last_error",
+            },
+            "retry_policy": {
+                "default_max_attempts": int(settings.EXECUTION_JOB_MAX_ATTEMPTS),
+                "retry_delay_seconds": int(settings.EXECUTION_JOB_RETRY_DELAY_SECONDS),
+                "drain_limit_per_iteration": int(settings.EXECUTION_JOB_DRAIN_LIMIT),
+            },
+            "backfill_policy": {
+                "auto_gap_detection": True,
+                "max_backfill_sweeps": int(settings.EXECUTION_MAX_BACKFILL_SWEEPS),
+                "source_of_truth": "game_state.last_tick_at_vs_runtime_now",
+            },
+            "export_script": "scripts/export_execution_snapshot.py",
+        },
         "rollout_readiness_surface": {
             "endpoint": "/meta/rollout-readiness",
             "contract_snapshot_script": "scripts/export_contract_snapshot.py",
             "gate_check_script": "scripts/check_rollout_gate.py",
             "runbooks": [
                 "docs/local-preview-rollout.md",
+                "docs/execution-model.md",
                 "docs/recovery-runbook.md",
             ],
         },
@@ -381,6 +418,7 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
             "authz",
             "concurrency_guard",
             "abuse_budget_guard",
+            "execution_semantics",
             "observability",
             "recovery",
             "contract_parity",
@@ -393,6 +431,7 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
         ],
         "operator_bundle_surface": {
             "alerts_script": "scripts/export_alert_snapshot.py",
+            "execution_script": "scripts/export_execution_snapshot.py",
             "observability_script": "scripts/export_observability_snapshot.py",
             "rollout_readiness_script": "scripts/export_rollout_readiness.py",
             "review_bundle_script": "scripts/build_review_bundle.py",
@@ -408,6 +447,7 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
                 "agentropolis contract-snapshot",
                 "agentropolis check-rollout-gate",
                 "agentropolis alerts-snapshot",
+                "agentropolis execution-snapshot",
                 "agentropolis observability-snapshot",
                 "agentropolis rollout-readiness",
                 "agentropolis build-review-bundle",

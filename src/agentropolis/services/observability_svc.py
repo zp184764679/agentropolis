@@ -9,6 +9,7 @@ from agentropolis.middleware.metrics import get_request_metrics_snapshot
 from agentropolis.models import Agent, Company, GameState, HousekeepingLog, PreviewAgentPolicy
 from agentropolis.services.concurrency import get_concurrency_snapshot
 from agentropolis.services.economy_governance import build_economy_health_thresholds
+from agentropolis.services.execution_svc import build_execution_snapshot
 
 
 async def build_observability_snapshot(session: AsyncSession) -> dict:
@@ -40,6 +41,7 @@ async def build_observability_snapshot(session: AsyncSession) -> dict:
     inflation_index = float(state.inflation_index) if state is not None else 1.0
     worker_warning = thresholds["worker_satisfaction"]["warning_below"]
     preview_budget_thresholds = thresholds["preview_budget"]
+    execution_snapshot = await build_execution_snapshot(session, recent_limit=10)
     policy_result = await session.execute(select(PreviewAgentPolicy))
     policies = list(policy_result.scalars().all())
     exhausted_family_budget_policies = 0
@@ -104,6 +106,8 @@ async def build_observability_snapshot(session: AsyncSession) -> dict:
             "latest_sweep": (
                 {
                     "sweep_count": latest_housekeeping.sweep_count,
+                    "trigger_kind": latest_housekeeping.trigger_kind,
+                    "execution_job_id": latest_housekeeping.execution_job_id,
                     "completed_at": (
                         latest_housekeeping.completed_at.isoformat()
                         if latest_housekeeping.completed_at
@@ -119,4 +123,5 @@ async def build_observability_snapshot(session: AsyncSession) -> dict:
             "tick_interval_seconds": int(state.tick_interval_seconds) if state is not None else 0,
             "is_running": bool(state.is_running) if state is not None else False,
         },
+        "execution": execution_snapshot,
     }

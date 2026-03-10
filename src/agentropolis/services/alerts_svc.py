@@ -122,11 +122,32 @@ async def build_alert_snapshot(session: AsyncSession, runtime_meta: dict) -> dic
             )
         )
 
+    execution = observability["execution"]
+    if int(execution["counts"]["by_status"].get("dead_letter", 0)) > 0:
+        alerts.append(
+            _alert(
+                "execution_dead_letters_present",
+                "critical",
+                "One or more execution jobs are dead-lettered and require operator repair or retry.",
+                source="execution",
+            )
+        )
+    if int(execution["counts"]["by_status"].get("failed", 0)) > 0:
+        alerts.append(
+            _alert(
+                "execution_retry_queue_present",
+                "warning",
+                "One or more execution jobs are waiting for retry.",
+                source="execution",
+            )
+        )
+
     severity_by_gate = {
         "control_contract": "critical",
         "authz": "critical",
         "concurrency_guard": "critical",
         "abuse_budget_guard": "critical",
+        "execution_semantics": "critical",
         "observability": "warning",
         "recovery": "critical",
         "contract_parity": "warning",

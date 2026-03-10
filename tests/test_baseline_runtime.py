@@ -61,7 +61,7 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["request_context"]["request_id_header"] == "X-Agentropolis-Request-ID"
     assert meta["control_contract_surface"]["endpoint"] == "/meta/contract"
     assert meta["control_contract_surface"]["minimum_contract_frozen"] is True
-    assert meta["control_contract_surface"]["version"] == "2026-03-preview.2"
+    assert meta["control_contract_surface"]["version"] == "2026-03-preview.3"
     assert meta["control_contract_surface"]["version_header"] == "X-Agentropolis-Contract-Version"
     assert meta["control_contract_surface"]["idempotency_key_header"] == "X-Idempotency-Key"
     assert meta["control_contract_surface"]["scope_catalog_available"] is True
@@ -118,13 +118,32 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["observability_surface"]["concurrency_snapshot"] is True
     assert meta["observability_surface"]["preview_policy_snapshot"] is True
     assert meta["observability_surface"]["export_script"] == "scripts/export_observability_snapshot.py"
+    assert meta["execution_surface"]["endpoint"] == "/meta/execution"
+    assert meta["execution_surface"]["job_states"] == [
+        "accepted",
+        "pending",
+        "running",
+        "completed",
+        "failed",
+        "dead_letter",
+    ]
+    assert meta["execution_surface"]["job_types"] == [
+        "housekeeping_backfill",
+        "derived_state_repair",
+    ]
+    assert meta["execution_surface"]["phase_contract"]["max_attempts"] == 2
+    assert meta["execution_surface"]["retry_policy"]["default_max_attempts"] == 3
+    assert meta["execution_surface"]["backfill_policy"]["auto_gap_detection"] is True
+    assert meta["execution_surface"]["export_script"] == "scripts/export_execution_snapshot.py"
     assert meta["alerts_surface"]["endpoint"] == "/meta/alerts"
     assert meta["alerts_surface"]["export_script"] == "scripts/export_alert_snapshot.py"
     assert meta["alerts_surface"]["sources"] == ["/meta/observability", "/meta/rollout-readiness"]
     assert meta["rollout_readiness_surface"]["endpoint"] == "/meta/rollout-readiness"
     assert meta["rollout_readiness_surface"]["contract_snapshot_script"] == "scripts/export_contract_snapshot.py"
     assert meta["rollout_readiness_surface"]["gate_check_script"] == "scripts/check_rollout_gate.py"
+    assert "docs/execution-model.md" in meta["rollout_readiness_surface"]["runbooks"]
     assert meta["operator_bundle_surface"]["alerts_script"] == "scripts/export_alert_snapshot.py"
+    assert meta["operator_bundle_surface"]["execution_script"] == "scripts/export_execution_snapshot.py"
     assert meta["operator_bundle_surface"]["observability_script"] == "scripts/export_observability_snapshot.py"
     assert meta["operator_bundle_surface"]["rollout_readiness_script"] == "scripts/export_rollout_readiness.py"
     assert meta["operator_bundle_surface"]["review_bundle_script"] == "scripts/build_review_bundle.py"
@@ -137,12 +156,14 @@ def test_runtime_metadata_reports_target_registry() -> None:
     ]
     assert "agentropolis check-rollout-gate" in meta["operator_bundle_surface"]["cli_commands"]
     assert "agentropolis alerts-snapshot" in meta["operator_bundle_surface"]["cli_commands"]
+    assert "agentropolis execution-snapshot" in meta["operator_bundle_surface"]["cli_commands"]
     assert "agentropolis observability-snapshot" in meta["operator_bundle_surface"]["cli_commands"]
     assert "registry" in meta["economy_governance_surface"]["registry_snapshot"]
     assert meta["recovery_surface"]["snapshot_script"] == "scripts/export_world_snapshot.py"
     assert meta["recovery_surface"]["repair_script"] == "scripts/repair_derived_state.py"
     assert "agentropolis world-snapshot" in meta["recovery_surface"]["cli_commands"]
     assert "concurrency_guard" in meta["external_rollout_gates"]
+    assert "execution_semantics" in meta["external_rollout_gates"]
 
 
 def test_sqlalchemy_mappers_and_metadata_create_on_sqlite() -> None:

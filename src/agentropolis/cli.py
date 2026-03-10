@@ -223,6 +223,29 @@ def observability_snapshot(output: str):
     asyncio.run(_snapshot())
 
 
+@cli.command("execution-snapshot")
+@click.option(
+    "--output",
+    default="openclaw/runtime/execution.json",
+    show_default=True,
+    help="Execution snapshot output path.",
+)
+def execution_snapshot(output: str):
+    """Export the current execution/job-model snapshot."""
+    from scripts.export_execution_snapshot import build_execution_export
+
+    async def _snapshot():
+        payload = await build_execution_export()
+        from pathlib import Path
+
+        target = Path(output)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        console.print_json(json.dumps(payload))
+
+    asyncio.run(_snapshot())
+
+
 @cli.command("build-review-bundle")
 @click.option(
     "--output-dir",

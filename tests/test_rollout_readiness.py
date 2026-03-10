@@ -68,7 +68,9 @@ def test_rollout_readiness_endpoint_and_artifacts_exist() -> None:
             assert "admin_token_configured" in payload["gates"]
             assert "control_contract" in payload["gates"]
             assert "concurrency_guard" in payload["gates"]
+            assert "execution_semantics" in payload["gates"]
             assert payload["gates"]["concurrency_guard"]["ready"] is True
+            assert payload["gates"]["execution_semantics"]["ready"] is True
             assert isinstance(payload["blocking_failures"], list)
 
     asyncio.run(scenario())
@@ -79,8 +81,10 @@ def test_rollout_readiness_endpoint_and_artifacts_exist() -> None:
 
     expected_paths = [
         Path("scripts/export_contract_snapshot.py"),
+        Path("scripts/export_execution_snapshot.py"),
         Path("scripts/check_rollout_gate.py"),
         Path("docs/local-preview-rollout.md"),
+        Path("docs/execution-model.md"),
         Path("docs/recovery-runbook.md"),
     ]
     for path in expected_paths:

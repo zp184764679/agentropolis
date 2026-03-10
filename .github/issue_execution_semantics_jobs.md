@@ -11,6 +11,8 @@ and how periodic work is observed and repaired.
 - **Modify**: `src/agentropolis/services/game_engine.py`
 - **Modify**: `src/agentropolis/main.py`
 - **Modify**: `src/agentropolis/services/*` for task result envelopes
+- **Add**: `src/agentropolis/services/execution_svc.py`
+- **Add**: `src/agentropolis/api/execution.py`
 - **Modify**: contract docs in `PLAN.md` / `docs/`
 
 ## Scope
@@ -29,11 +31,11 @@ and how periodic work is observed and repaired.
 
 ## Acceptance Criteria
 
-- [ ] The docs answer “when is this operation successful?”
-- [ ] Housekeeping phases expose explicit results, not just side effects
-- [ ] Failed periodic work has retry or manual-repair guidance
-- [ ] REST and MCP async semantics match
-- [ ] Backfill behavior is defined for missed or delayed periodic tasks
+- [x] The docs answer “when is this operation successful?”
+- [x] Housekeeping phases expose explicit results, not just side effects
+- [x] Failed periodic work has retry or manual-repair guidance
+- [x] REST and MCP async semantics match
+- [x] Backfill behavior is defined for missed or delayed periodic tasks
 
 ## Dependencies
 

@@ -79,5 +79,8 @@ def test_observability_endpoint_reports_request_and_housekeeping_data() -> None:
             assert payload["concurrency"]["rate_limits"]["agent"] >= 1
             assert payload["economy"]["thresholds"]["inflation_index"]["warning_above"] > 1.0
             assert payload["housekeeping"]["latest_sweep"]["sweep_count"] == 7
+            assert payload["housekeeping"]["latest_sweep"]["trigger_kind"] == "scheduled"
+            assert payload["execution"]["job_states"][-1] == "dead_letter"
+            assert payload["execution"]["housekeeping_phase_contract"]["phase_results_logged"] is True
 
     asyncio.run(scenario())
