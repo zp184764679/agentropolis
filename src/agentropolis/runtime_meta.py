@@ -7,6 +7,9 @@ file presence alone.
 
 from __future__ import annotations
 
+import hashlib
+from pathlib import Path
+
 from agentropolis.control_contract import (
     CONTRACT_VERSION_HEADER,
     CONTROL_CONTRACT_VERSION,
@@ -138,6 +141,31 @@ MOUNTED_ROUTE_GROUPS = [
 ]
 
 UNMOUNTED_ROUTE_GROUPS = []
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _asset_fingerprint(relative_path: str) -> dict:
+    target = _REPO_ROOT / relative_path
+    if not target.exists():
+        return {
+            "path": relative_path,
+            "exists": False,
+            "bytes": 0,
+            "sha256": None,
+        }
+
+    payload = target.read_bytes()
+    return {
+        "path": relative_path,
+        "exists": True,
+        "bytes": len(payload),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+    }
+
+
+def _asset_manifest(*paths: str) -> list[dict]:
+    return [_asset_fingerprint(path) for path in paths]
 
 def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
     """Return a machine-readable snapshot of the current runtime surface."""
@@ -429,6 +457,7 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
         "prompt_surface": {
             "agent_brain_prompt": "prompts/agent-brain.md",
             "format": "markdown_system_prompt",
+            "prompt_asset": _asset_fingerprint("prompts/agent-brain.md"),
             "decision_framework": [
                 "survival_first",
                 "company_solvent_before_expansion",
@@ -448,6 +477,18 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
                 "openclaw/fleet-template.yaml",
                 "openclaw/bootstrap.example.env",
             ],
+            "asset_fingerprints": _asset_manifest(
+                "prompts/agent-brain.md",
+                "skills/agentropolis-world/SKILL.md",
+                "skills/agentropolis-world/references/tool-matrix.md",
+                "skills/agentropolis-world/references/rest-fallback-map.md",
+                "openclaw/agent-template.yaml",
+                "openclaw/fleet-template.yaml",
+                "openclaw/bootstrap.example.env",
+                "docker-compose.multi-agent.yml",
+                "scripts/register_agents.py",
+                "scripts/monitor_agents.py",
+            ),
             "compose_file": "docker-compose.multi-agent.yml",
             "registration_script": "scripts/register_agents.py",
             "monitor_script": "scripts/monitor_agents.py",

@@ -66,6 +66,7 @@ curl http://localhost:8000/meta/execution
 - The current MCP surface is repo-truthful: 14 static tool modules / 60 tools, with `notifications` and `npc` intentionally remaining MCP-only local-preview groups
 - There is no supported `/mcp/sse` path in the current repo; `streamable-http` is the only MCP transport
 - Local-preview OpenClaw assets now exist in-repo: `prompts/agent-brain.md`, `openclaw/*`, `docker-compose.multi-agent.yml`, and `scripts/register_agents.py` / `scripts/monitor_agents.py`
+- `/meta/runtime` now also fingerprints the local-preview prompt, skill, reference files, and OpenClaw templates so operator bundles can prove which asset revision was reviewed
 - Economy governance and recovery baselines now exist too: governed tunable registry, staged rollout flags, regression catalog, governance export, recovery plan export, housekeeping replay, world snapshot export, and derived-state repair scripts
 - A local-preview observability surface now exists at `/meta/observability` with request metrics, MCP metrics, economy health, agent-behavior summaries, execution lag, and latest housekeeping state
 - A local-preview execution surface now exists at `/meta/execution` with explicit job states, retry/backfill policy, recent jobs, and latest housekeeping phase results
