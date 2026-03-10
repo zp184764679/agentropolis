@@ -19,7 +19,7 @@ MOUNTED_ROUTE_GROUPS = [
     {
         "module": "market",
         "prefix": "/api/market",
-        "state": "placeholder-heavy",
+        "state": "mixed_scaffold_reads",
         "auth_model": "legacy_company_auth",
     },
     {
@@ -31,7 +31,7 @@ MOUNTED_ROUTE_GROUPS = [
     {
         "module": "inventory",
         "prefix": "/api/inventory",
-        "state": "placeholder-heavy",
+        "state": "mixed_scaffold_reads",
         "auth_model": "legacy_company_auth",
     },
     {
@@ -43,7 +43,7 @@ MOUNTED_ROUTE_GROUPS = [
     {
         "module": "game",
         "prefix": "/api/game",
-        "state": "placeholder-heavy",
+        "state": "mixed_scaffold_reads",
         "auth_model": "mixed_legacy",
     },
     {

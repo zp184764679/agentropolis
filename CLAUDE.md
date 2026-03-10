@@ -73,6 +73,7 @@ Likewise, do not treat an `api/*.py` file existing on disk as evidence that it s
 - `.github/README.md` indexes both created-issue briefs and proposed control-plane draft issues
 - `/meta/runtime` is the machine-readable snapshot of the currently mounted scaffold surface
 - `/meta/control-plane` is the admin-only process-local preview policy surface when `CONTROL_PLANE_ADMIN_TOKEN` is configured
+- legacy scaffold `market` / `inventory` / `game` routes are no longer all-placeholder: core read paths are live, but most legacy writes are still scaffold-only
 - process-local preview policy now includes per-agent family authz, family budgets, and admin action audit entries
 - authenticated preview reads with `get_current_agent` are now family-scoped too; do not assume only mutations are policy-controlled
 - admin changes should carry structured reason/note context when possible, and audit review should prefer filtered queries over raw log dumps
