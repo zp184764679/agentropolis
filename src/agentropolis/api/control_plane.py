@@ -1,8 +1,9 @@
 """Admin-only preview control-plane endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from agentropolis.api.preview_guard import (
+    ERROR_CODE_HEADER,
     clear_agent_preview_policy,
     get_control_plane_admin_snapshot,
     list_control_plane_audit,
@@ -31,6 +32,19 @@ def _request_context(request: Request) -> tuple[str | None, str | None]:
     request_id = getattr(request.state, "request_id", None)
     client_fingerprint = getattr(request.state, "client_fingerprint", None)
     return request_id, client_fingerprint
+
+
+def _control_plane_error(
+    *,
+    status_code: int,
+    detail: str,
+    error_code: str,
+) -> HTTPException:
+    return HTTPException(
+        status_code=status_code,
+        detail=detail,
+        headers={ERROR_CODE_HEADER: error_code},
+    )
 
 
 @router.get("", response_model=PreviewControlPlaneResponse)
@@ -92,7 +106,11 @@ async def upsert_agent_policy(
             note=req.note,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from None
+        raise _control_plane_error(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+            error_code="control_plane_policy_invalid",
+        ) from None
 
 
 @router.post("/agents/{agent_id}/refill-budget", response_model=PreviewAgentPolicyResponse)
@@ -115,7 +133,11 @@ async def refill_agent_budget(
             note=req.note,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from None
+        raise _control_plane_error(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+            error_code="control_plane_budget_refill_invalid",
+        ) from None
 
 
 @router.delete("/agents/{agent_id}/policy", response_model=SuccessResponse)
@@ -137,7 +159,11 @@ async def delete_agent_policy(
         note=note,
     )
     if not existed:
-        raise HTTPException(status_code=404, detail="Preview agent policy not found.")
+        raise _control_plane_error(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Preview agent policy not found.",
+            error_code="control_plane_policy_not_found",
+        )
     return {"message": f"Preview agent policy cleared for agent {agent_id}."}
 
 
@@ -147,6 +173,7 @@ async def get_control_plane_audit(
     action: str | None = Query(default=None),
     target_agent_id: int | None = Query(default=None),
     reason_code: str | None = Query(default=None),
+    request_id: str | None = Query(default=None),
     _admin_actor: str = Depends(require_control_plane_admin),
 ):
     """List recent admin actions against the process-local preview policy."""
@@ -156,6 +183,7 @@ async def get_control_plane_audit(
             action=action,
             target_agent_id=target_agent_id,
             reason_code=reason_code,
+            request_id=request_id,
         )
     }
 

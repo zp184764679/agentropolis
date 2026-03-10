@@ -237,6 +237,7 @@ class PreviewControlPlaneResponse(BaseModel):
     agent_policy_count: int = 0
     audit_log_size: int = 0
     rate_limit_store: str
+    error_codes: dict[str, str] = Field(default_factory=dict)
     admin_api: dict = Field(default_factory=dict)
     agent_policies: list["PreviewAgentPolicyResponse"] = Field(default_factory=list)
     recent_audit_entries: list["ControlPlaneAuditEntry"] = Field(default_factory=list)

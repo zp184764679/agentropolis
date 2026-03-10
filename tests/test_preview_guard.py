@@ -12,6 +12,7 @@ from sqlalchemy.pool import StaticPool
 
 from agentropolis.api.auth import get_current_agent
 from agentropolis.api.preview_guard import (
+    ERROR_CODE_HEADER,
     get_preview_guard_state,
     make_agent_preview_write_guard,
     require_agent_preview_write,
@@ -20,11 +21,28 @@ from agentropolis.api.preview_guard import (
 from agentropolis.config import settings
 from agentropolis.database import get_session
 from agentropolis.main import app
+from agentropolis.middleware import REQUEST_ID_HEADER
 from agentropolis.models import Base
 
 
 def _admin_headers(token: str = "root-token") -> dict[str, str]:
     return {"X-Control-Plane-Token": token}
+
+
+def _assert_error_contract(
+    response,
+    *,
+    status_code: int,
+    error_code: str,
+    detail: str,
+) -> None:
+    body = response.json()
+    assert response.status_code == status_code
+    assert body["detail"] == detail
+    assert body["error_code"] == error_code
+    assert response.headers[ERROR_CODE_HEADER] == error_code
+    assert response.headers[REQUEST_ID_HEADER]
+    assert body["request_id"] == response.headers[REQUEST_ID_HEADER]
 
 
 @asynccontextmanager
@@ -121,8 +139,12 @@ def test_preview_surface_kill_switch_blocks_reads(
         async with _preview_client() as client:
             response = await client.get("/api/world/map")
 
-        assert response.status_code == 503
-        assert response.json()["detail"] == "Preview surface is disabled by runtime policy."
+        _assert_error_contract(
+            response,
+            status_code=503,
+            error_code="preview_surface_disabled",
+            detail="Preview surface is disabled by runtime policy.",
+        )
 
     asyncio.run(scenario())
 
@@ -137,8 +159,12 @@ def test_control_plane_admin_endpoint_requires_token(
         async with _preview_client() as client:
             response = await client.get("/meta/control-plane")
 
-        assert response.status_code == 401
-        assert response.json()["detail"] == "Invalid control-plane admin token."
+        _assert_error_contract(
+            response,
+            status_code=401,
+            error_code="control_plane_admin_invalid",
+            detail="Invalid control-plane admin token.",
+        )
 
     asyncio.run(scenario())
 
@@ -151,8 +177,8 @@ def test_request_context_header_is_generated_for_runtime_surface() -> None:
             response = await client.get("/health")
 
         assert response.status_code == 200
-        assert "X-Agentropolis-Request-ID" in response.headers
-        assert response.headers["X-Agentropolis-Request-ID"]
+        assert REQUEST_ID_HEADER in response.headers
+        assert response.headers[REQUEST_ID_HEADER]
 
     asyncio.run(scenario())
 
@@ -168,7 +194,7 @@ def test_request_context_header_preserves_incoming_value() -> None:
             )
 
         assert response.status_code == 200
-        assert response.headers["X-Agentropolis-Request-ID"] == "req-explicit-001"
+        assert response.headers[REQUEST_ID_HEADER] == "req-explicit-001"
 
     asyncio.run(scenario())
 
@@ -212,6 +238,25 @@ def test_control_plane_admin_endpoint_updates_runtime_policy(
         asyncio.run(scenario())
     finally:
         reset_preview_guard_state()
+
+
+def test_control_plane_snapshot_exposes_error_code_catalog(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "CONTROL_PLANE_ADMIN_TOKEN", "root-token")
+    reset_preview_guard_state()
+
+    async def scenario() -> None:
+        async with _preview_client() as client:
+            response = await client.get("/meta/control-plane", headers=_admin_headers())
+
+        assert response.status_code == 200
+        assert response.json()["admin_api"]["error_code_header"] == ERROR_CODE_HEADER
+        assert response.json()["error_codes"]["preview_surface_disabled"] == (
+            "Global preview surface kill switch is active."
+        )
+
+    asyncio.run(scenario())
 
 
 def test_control_plane_admin_reset_clears_overrides(
@@ -269,6 +314,7 @@ def test_control_plane_agent_policy_blocks_unauthorized_family(
         assert response.json()["detail"] == (
             "Preview world access is not allowed for agent 7."
         )
+        assert response.json()["error_code"] == "preview_world_access_denied"
 
     asyncio.run(scenario())
 
@@ -294,6 +340,7 @@ def test_control_plane_agent_policy_blocks_authenticated_reads(
         assert response.json()["detail"] == (
             "Preview strategy access is not allowed for agent 7."
         )
+        assert response.json()["error_code"] == "preview_strategy_access_denied"
 
     asyncio.run(scenario())
 
@@ -520,6 +567,8 @@ def test_preview_write_gate_blocks_registration(
 
         assert response.status_code == 503
         assert response.json()["detail"] == "Preview write operations are disabled by runtime policy."
+        assert response.json()["error_code"] == "preview_writes_disabled"
+        assert response.headers[ERROR_CODE_HEADER] == "preview_writes_disabled"
 
     asyncio.run(scenario())
 
@@ -542,9 +591,100 @@ def test_warfare_toggle_blocks_preview_mutations(
                 },
             )
 
-        assert response.status_code == 503
-        assert response.json()["detail"] == (
-            "Warfare preview mutations are disabled by runtime policy."
+        _assert_error_contract(
+            response,
+            status_code=503,
+            error_code="preview_warfare_mutations_disabled",
+            detail="Warfare preview mutations are disabled by runtime policy.",
         )
+
+    asyncio.run(scenario())
+
+
+def test_placeholder_routes_expose_not_implemented_error_code() -> None:
+    reset_preview_guard_state()
+
+    async def scenario() -> None:
+        async with _preview_client() as client:
+            response = await client.get("/api/market/prices")
+
+        _assert_error_contract(
+            response,
+            status_code=501,
+            error_code="not_implemented",
+            detail="Issue #8: Implement market API endpoints",
+        )
+        assert response.json()["status"] == "not_implemented"
+
+    asyncio.run(scenario())
+
+
+def test_control_plane_policy_validation_returns_stable_error_code(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "CONTROL_PLANE_ADMIN_TOKEN", "root-token")
+    reset_preview_guard_state()
+
+    async def scenario() -> None:
+        async with _preview_client() as client:
+            response = await client.put(
+                "/meta/control-plane/agents/7/policy",
+                headers=_admin_headers(),
+                json={"allowed_families": ["unknown-family"]},
+            )
+
+        _assert_error_contract(
+            response,
+            status_code=400,
+            error_code="control_plane_policy_invalid",
+            detail="Unknown preview policy family: unknown-family",
+        )
+
+    asyncio.run(scenario())
+
+
+def test_control_plane_audit_filtering_by_request_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "CONTROL_PLANE_ADMIN_TOKEN", "root-token")
+    reset_preview_guard_state()
+
+    async def scenario() -> None:
+        async with _preview_client() as client:
+            first = await client.put(
+                "/meta/control-plane",
+                headers={
+                    **_admin_headers(),
+                    REQUEST_ID_HEADER: "req-audit-first",
+                },
+                json={"degraded_mode": True},
+            )
+            assert first.status_code == 200
+
+            second = await client.put(
+                "/meta/control-plane/agents/9/policy",
+                headers={
+                    **_admin_headers(),
+                    REQUEST_ID_HEADER: "req-audit-second",
+                },
+                json={
+                    "allowed_families": ["strategy"],
+                    "reason_code": "seed_policy",
+                    "note": "preview-only policy",
+                },
+            )
+            assert second.status_code == 200
+
+            audit = await client.get(
+                "/meta/control-plane/audit",
+                headers=_admin_headers(),
+                params={"request_id": "req-audit-second"},
+            )
+
+            assert audit.status_code == 200
+            entries = audit.json()["entries"]
+            assert len(entries) == 1
+            assert entries[0]["request_id"] == "req-audit-second"
+            assert entries[0]["action"] == "upsert_agent_preview_policy"
 
     asyncio.run(scenario())
