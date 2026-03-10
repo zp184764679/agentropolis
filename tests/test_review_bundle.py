@@ -26,7 +26,9 @@ def test_operator_bundle_surface_is_exposed_in_runtime_meta() -> None:
     meta = build_contract_snapshot()["runtime_meta"]
     assert meta["operator_bundle_surface"]["alerts_script"] == "scripts/export_alert_snapshot.py"
     assert meta["operator_bundle_surface"]["execution_script"] == "scripts/export_execution_snapshot.py"
+    assert meta["operator_bundle_surface"]["governance_script"] == "scripts/export_governance_snapshot.py"
     assert meta["operator_bundle_surface"]["observability_script"] == "scripts/export_observability_snapshot.py"
+    assert meta["operator_bundle_surface"]["recovery_plan_script"] == "scripts/export_recovery_plan.py"
     assert meta["operator_bundle_surface"]["rollout_readiness_script"] == "scripts/export_rollout_readiness.py"
     assert meta["operator_bundle_surface"]["review_bundle_script"] == "scripts/build_review_bundle.py"
     assert meta["operator_bundle_surface"]["gate_check_script"] == "scripts/check_rollout_gate.py"
@@ -38,7 +40,9 @@ def test_operator_bundle_surface_is_exposed_in_runtime_meta() -> None:
     ]
     assert "agentropolis check-rollout-gate" in meta["operator_bundle_surface"]["cli_commands"]
     assert "agentropolis execution-snapshot" in meta["operator_bundle_surface"]["cli_commands"]
+    assert "agentropolis governance-snapshot" in meta["operator_bundle_surface"]["cli_commands"]
     assert "agentropolis observability-snapshot" in meta["operator_bundle_surface"]["cli_commands"]
+    assert "agentropolis recovery-plan" in meta["operator_bundle_surface"]["cli_commands"]
     assert "agentropolis build-review-bundle" in meta["operator_bundle_surface"]["cli_commands"]
 
 
@@ -80,6 +84,7 @@ def test_rollout_export_and_review_bundle_build_files() -> None:
             alerts_path = Path(bundle["artifacts"]["alerts"])
             observability_path = Path(bundle["artifacts"]["observability"])
             execution_path = Path(bundle["artifacts"]["execution"])
+            recovery_plan_path = Path(bundle["artifacts"]["recovery_plan"])
             world_path = Path(bundle["artifacts"]["world_snapshot"])
             gate_check_path = Path(bundle["artifacts"]["gate_check"])
 
@@ -89,6 +94,7 @@ def test_rollout_export_and_review_bundle_build_files() -> None:
             assert alerts_path.exists()
             assert observability_path.exists()
             assert execution_path.exists()
+            assert recovery_plan_path.exists()
             assert world_path.exists()
             assert gate_check_path.exists()
 
@@ -100,6 +106,7 @@ def test_rollout_export_and_review_bundle_build_files() -> None:
             assert summary["artifacts"]["alerts"].endswith("alerts.json")
             assert summary["artifacts"]["observability"].endswith("observability.json")
             assert summary["artifacts"]["execution"].endswith("execution.json")
+            assert summary["artifacts"]["recovery_plan"].endswith("recovery-plan.json")
             gate_check = json.loads(gate_check_path.read_text(encoding="utf-8"))
             assert gate_check["tool_count"] >= 60
         finally:

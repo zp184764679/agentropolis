@@ -77,8 +77,10 @@ async def build_rollout_readiness_snapshot(session: AsyncSession, runtime_meta: 
         ),
         "recovery": _gate(
             runtime_meta["recovery_surface"]["snapshot_script"] == "scripts/export_world_snapshot.py"
-            and runtime_meta["recovery_surface"]["repair_script"] == "scripts/repair_derived_state.py",
-            "World snapshot export and derived-state repair tooling exist.",
+            and runtime_meta["recovery_surface"]["repair_script"] == "scripts/repair_derived_state.py"
+            and runtime_meta["recovery_surface"]["replay_script"] == "scripts/replay_housekeeping.py"
+            and runtime_meta["recovery_surface"]["plan_script"] == "scripts/export_recovery_plan.py",
+            "World snapshot, replay, repair, and recovery-plan tooling exist.",
         ),
         "contract_parity": _gate(
             runtime_meta["target_direction"]["rest_mcp_parity_target"] is True

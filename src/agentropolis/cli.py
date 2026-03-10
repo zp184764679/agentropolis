@@ -85,6 +85,26 @@ def governance_snapshot(output: str):
     console.print_json(json.dumps(payload))
 
 
+@cli.command("recovery-plan")
+@click.option(
+    "--output",
+    default="openclaw/runtime/recovery-plan.json",
+    show_default=True,
+    help="Recovery-plan output path.",
+)
+def recovery_plan(output: str):
+    """Export the current recovery plan."""
+    from pathlib import Path
+
+    from scripts.export_recovery_plan import build_recovery_plan_export
+
+    payload = build_recovery_plan_export()
+    target = Path(output)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    console.print_json(json.dumps(payload))
+
+
 @cli.command("world-snapshot")
 @click.option(
     "--output",
@@ -109,6 +129,27 @@ def world_snapshot(output: str):
                 target.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     asyncio.run(_snapshot())
+
+
+@cli.command("replay-housekeeping")
+@click.option("--start-tick", type=int, required=True, help="First tick to replay.")
+@click.option("--sweeps", type=int, required=True, help="Number of sweeps to replay.")
+def replay_housekeeping(start_tick: int, sweeps: int):
+    """Replay housekeeping sweeps for local-preview recovery drills."""
+    from agentropolis.database import async_session
+    from agentropolis.services.recovery_svc import replay_housekeeping_range
+
+    async def _replay():
+        async with async_session() as session:
+            payload = await replay_housekeeping_range(
+                session,
+                start_tick=start_tick,
+                sweeps=sweeps,
+            )
+            await session.commit()
+            console.print_json(json.dumps(payload))
+
+    asyncio.run(_replay())
 
 
 @cli.command("repair-derived-state")

@@ -34,6 +34,7 @@ This issue defines the minimum recovery toolkit for a persistent AI world.
 - [ ] Repair/backfill scripts exist for common drift classes
 - [ ] Migration safety boundaries are documented
 - [ ] Data repair no longer depends on ad hoc manual SQL alone
+- [ ] Recovery plan and replay path can be exported without reading service internals
 
 ## Dependencies
 

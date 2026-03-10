@@ -156,7 +156,9 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert "docs/execution-model.md" in meta["rollout_readiness_surface"]["runbooks"]
     assert meta["operator_bundle_surface"]["alerts_script"] == "scripts/export_alert_snapshot.py"
     assert meta["operator_bundle_surface"]["execution_script"] == "scripts/export_execution_snapshot.py"
+    assert meta["operator_bundle_surface"]["governance_script"] == "scripts/export_governance_snapshot.py"
     assert meta["operator_bundle_surface"]["observability_script"] == "scripts/export_observability_snapshot.py"
+    assert meta["operator_bundle_surface"]["recovery_plan_script"] == "scripts/export_recovery_plan.py"
     assert meta["operator_bundle_surface"]["rollout_readiness_script"] == "scripts/export_rollout_readiness.py"
     assert meta["operator_bundle_surface"]["review_bundle_script"] == "scripts/build_review_bundle.py"
     assert meta["operator_bundle_surface"]["gate_check_script"] == "scripts/check_rollout_gate.py"
@@ -181,6 +183,12 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert "agentropolis governance-snapshot" in meta["economy_governance_surface"]["cli_commands"]
     assert meta["recovery_surface"]["snapshot_script"] == "scripts/export_world_snapshot.py"
     assert meta["recovery_surface"]["repair_script"] == "scripts/repair_derived_state.py"
+    assert meta["recovery_surface"]["replay_script"] == "scripts/replay_housekeeping.py"
+    assert meta["recovery_surface"]["plan_script"] == "scripts/export_recovery_plan.py"
+    assert meta["recovery_surface"]["recovery_strategy"] == "snapshot_replay_repair"
+    assert meta["recovery_surface"]["migration_safety_doc"] == "docs/recovery-runbook.md"
+    assert "agentropolis recovery-plan" in meta["recovery_surface"]["cli_commands"]
+    assert "agentropolis replay-housekeeping" in meta["recovery_surface"]["cli_commands"]
     assert "agentropolis world-snapshot" in meta["recovery_surface"]["cli_commands"]
     assert "concurrency_guard" in meta["external_rollout_gates"]
     assert "execution_semantics" in meta["external_rollout_gates"]

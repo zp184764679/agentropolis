@@ -14,6 +14,7 @@ from scripts.check_rollout_gate import build_rollout_gate_summary
 from scripts.export_alert_snapshot import build_alert_export
 from scripts.export_contract_snapshot import build_contract_snapshot
 from scripts.export_execution_snapshot import build_execution_export
+from scripts.export_recovery_plan import build_recovery_plan_export
 from scripts.export_observability_snapshot import build_observability_export
 from scripts.export_rollout_readiness import build_rollout_readiness_export
 from scripts.export_world_snapshot import _run as export_world_snapshot_run
@@ -91,6 +92,13 @@ async def build_review_bundle(
         encoding="utf-8",
     )
 
+    recovery_plan_payload = build_recovery_plan_export()
+    recovery_plan_path = target_dir / "recovery-plan.json"
+    recovery_plan_path.write_text(
+        json.dumps(recovery_plan_payload, indent=2, ensure_ascii=True),
+        encoding="utf-8",
+    )
+
     world_snapshot_path = await export_world_snapshot_run(
         str(target_dir / "world-snapshot.json"),
         housekeeping_limit,
@@ -118,6 +126,7 @@ async def build_review_bundle(
             "observability": observability_path.as_posix(),
             "execution": execution_path.as_posix(),
             "alerts": alerts_path.as_posix(),
+            "recovery_plan": recovery_plan_path.as_posix(),
             "world_snapshot": world_snapshot_path.as_posix(),
             "gate_check": gate_summary_path.as_posix(),
             "manifest_present": manifest_path.exists(),

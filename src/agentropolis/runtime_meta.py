@@ -428,8 +428,18 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
         "recovery_surface": {
             "snapshot_script": "scripts/export_world_snapshot.py",
             "repair_script": "scripts/repair_derived_state.py",
+            "replay_script": "scripts/replay_housekeeping.py",
+            "plan_script": "scripts/export_recovery_plan.py",
+            "recovery_strategy": "snapshot_replay_repair",
+            "migration_safety_doc": "docs/recovery-runbook.md",
+            "repair_classes": [
+                "derived_state",
+                "housekeeping_replay",
+            ],
             "cli_commands": [
+                "agentropolis recovery-plan",
                 "agentropolis world-snapshot",
+                "agentropolis replay-housekeeping",
                 "agentropolis repair-derived-state",
             ],
             "local_preview_runbook": "openclaw/README.md",
@@ -462,7 +472,9 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
         "operator_bundle_surface": {
             "alerts_script": "scripts/export_alert_snapshot.py",
             "execution_script": "scripts/export_execution_snapshot.py",
+            "governance_script": "scripts/export_governance_snapshot.py",
             "observability_script": "scripts/export_observability_snapshot.py",
+            "recovery_plan_script": "scripts/export_recovery_plan.py",
             "rollout_readiness_script": "scripts/export_rollout_readiness.py",
             "review_bundle_script": "scripts/build_review_bundle.py",
             "gate_check_script": "scripts/check_rollout_gate.py",
@@ -478,7 +490,9 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
                 "agentropolis check-rollout-gate",
                 "agentropolis alerts-snapshot",
                 "agentropolis execution-snapshot",
+                "agentropolis governance-snapshot",
                 "agentropolis observability-snapshot",
+                "agentropolis recovery-plan",
                 "agentropolis rollout-readiness",
                 "agentropolis build-review-bundle",
             ],

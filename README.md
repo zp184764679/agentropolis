@@ -65,7 +65,7 @@ curl http://localhost:8000/meta/execution
 - The current MCP surface is repo-truthful: 14 static tool modules / 60 tools, with `notifications` and `npc` intentionally remaining MCP-only local-preview groups
 - There is no supported `/mcp/sse` path in the current repo; `streamable-http` is the only MCP transport
 - Local-preview OpenClaw assets now exist in-repo: `prompts/agent-brain.md`, `openclaw/*`, `docker-compose.multi-agent.yml`, and `scripts/register_agents.py` / `scripts/monitor_agents.py`
-- Economy governance and recovery baselines now exist too: governed tunable registry, staged rollout flags, regression catalog, governance export, world snapshot export, and derived-state repair scripts
+- Economy governance and recovery baselines now exist too: governed tunable registry, staged rollout flags, regression catalog, governance export, recovery plan export, housekeeping replay, world snapshot export, and derived-state repair scripts
 - A local-preview observability surface now exists at `/meta/observability` with request metrics, MCP metrics, economy health, agent-behavior summaries, execution lag, and latest housekeeping state
 - A local-preview execution surface now exists at `/meta/execution` with explicit job states, retry/backfill policy, recent jobs, and latest housekeeping phase results
 - `/meta/observability` now also exposes concurrency slot usage, lock/rate-limit counters, request/MCP slow-call signals, and recent execution-lag indicators for operator review
@@ -256,6 +256,8 @@ FastMCP (MCP Tools) ─┘
 - `openclaw/`: local-preview config bundle and bootstrap docs
 - `scripts/register_agents.py`: bootstrap one or more agents and emit `openclaw/runtime/agents.json`
 - `scripts/monitor_agents.py`: collect fleet snapshots from a generated manifest
+- `scripts/export_recovery_plan.py`: export the current recovery plan for operator review
+- `scripts/replay_housekeeping.py`: replay housekeeping sweeps in a controlled recovery drill
 - `scripts/export_world_snapshot.py`: export a local-preview world snapshot for recovery drills
 - `scripts/repair_derived_state.py`: recompute derived economy state after drift or backfill work
 - `scripts/export_contract_snapshot.py`: export runtime metadata plus MCP registry snapshot
@@ -268,6 +270,8 @@ FastMCP (MCP Tools) ─┘
 - `scripts/build_review_bundle.py`: assemble contract, alerts, observability, readiness, gate check, and world snapshot artifacts into one review bundle, with generated-at and git traceability in the summary
 - `agentropolis check-rollout-gate`: summarize exported contract + readiness artifacts from the CLI
 - `agentropolis governance-snapshot`: export the current balance-governance snapshot from the CLI
+- `agentropolis recovery-plan`: export the current recovery plan from the CLI
+- `agentropolis replay-housekeeping`: replay housekeeping sweeps in a controlled recovery drill
 - `docs/local-preview-rollout.md`: closed-environment rollout runbook
 - `docs/recovery-runbook.md`: minimum recovery drill runbook
 
