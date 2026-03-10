@@ -214,6 +214,106 @@ def test_control_plane_admin_reset_clears_overrides(
     asyncio.run(scenario())
 
 
+def test_control_plane_agent_policy_blocks_unauthorized_family(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "CONTROL_PLANE_ADMIN_TOKEN", "root-token")
+    reset_preview_guard_state()
+
+    async def scenario() -> None:
+        async with _preview_client(agent_id=7) as client:
+            policy = await client.put(
+                "/meta/control-plane/agents/7/policy",
+                headers=_admin_headers(),
+                json={"allowed_families": ["agent_self"]},
+            )
+            assert policy.status_code == 200
+
+            response = await client.post(
+                "/api/world/travel",
+                json={"to_region_id": 2},
+            )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == (
+            "Preview world access is not allowed for agent 7."
+        )
+
+    asyncio.run(scenario())
+
+
+def test_control_plane_agent_policy_consumes_family_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "CONTROL_PLANE_ADMIN_TOKEN", "root-token")
+    reset_preview_guard_state()
+
+    async def scenario() -> None:
+        async with _preview_client(agent_id=7) as client:
+            policy = await client.put(
+                "/meta/control-plane/agents/7/policy",
+                headers=_admin_headers(),
+                json={"family_budgets": {"transport": 1}},
+            )
+            assert policy.status_code == 200
+            assert policy.json()["family_budgets"]["transport"] == 1
+
+            transport_guard = make_agent_preview_write_guard("transport")
+            actor = SimpleNamespace(id=7)
+
+            await transport_guard(actor)
+
+            with pytest.raises(HTTPException) as excinfo:
+                await transport_guard(actor)
+
+            assert excinfo.value.status_code == 403
+            assert excinfo.value.detail == "Preview transport budget exhausted for agent 7."
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        reset_preview_guard_state()
+
+
+def test_control_plane_audit_log_records_admin_actions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "CONTROL_PLANE_ADMIN_TOKEN", "root-token")
+    reset_preview_guard_state()
+
+    async def scenario() -> None:
+        async with _preview_client() as client:
+            updated = await client.put(
+                "/meta/control-plane",
+                headers=_admin_headers(),
+                json={"degraded_mode": True},
+            )
+            assert updated.status_code == 200
+
+            policy = await client.put(
+                "/meta/control-plane/agents/9/policy",
+                headers=_admin_headers(),
+                json={"allowed_families": ["strategy"], "family_budgets": {"strategy": 2}},
+            )
+            assert policy.status_code == 200
+
+            audit = await client.get(
+                "/meta/control-plane/audit",
+                headers=_admin_headers(),
+                params={"limit": 5},
+            )
+            assert audit.status_code == 200
+
+            entries = audit.json()["entries"]
+            actions = {entry["action"] for entry in entries}
+
+            assert "update_preview_runtime_policy" in actions
+            assert "upsert_agent_preview_policy" in actions
+            assert all(entry["actor"].startswith("control-plane-admin:") for entry in entries)
+
+    asyncio.run(scenario())
+
+
 def test_preview_write_gate_blocks_registration(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

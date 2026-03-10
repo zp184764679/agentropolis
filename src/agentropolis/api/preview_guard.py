@@ -13,6 +13,9 @@ It is not a replacement for the planned distributed authz/quota/budget system.
 from __future__ import annotations
 
 from collections import defaultdict, deque
+from datetime import UTC, datetime
+import hashlib
+from itertools import count
 from threading import Lock
 from time import monotonic
 from typing import Any
@@ -32,6 +35,9 @@ _policy_overrides: dict[str, bool | None] = {
     "warfare_mutations_enabled": None,
     "degraded_mode": None,
 }
+_agent_policy_overrides: dict[int, dict[str, Any]] = {}
+_audit_log: deque[dict[str, Any]] = deque(maxlen=200)
+_audit_counter = count(1)
 
 admin_token_header = APIKeyHeader(name="X-Control-Plane-Token", auto_error=False)
 _FAMILY_LIMIT_ATTRS = {
@@ -42,6 +48,10 @@ _FAMILY_LIMIT_ATTRS = {
     "strategy": "PREVIEW_STRATEGY_MUTATIONS_PER_WINDOW",
     "warfare": "PREVIEW_WARFARE_MUTATIONS_PER_WINDOW",
 }
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).isoformat()
 
 
 def _record_window_event(
@@ -107,6 +117,107 @@ def _preview_degraded_mode() -> bool:
 def _family_limit(family: str) -> int:
     attr = _FAMILY_LIMIT_ATTRS.get(family, "PREVIEW_AGENT_MUTATIONS_PER_WINDOW")
     return int(getattr(settings, attr))
+
+
+def _validate_family(family: str) -> str:
+    if family not in _FAMILY_LIMIT_ATTRS:
+        raise ValueError(f"Unknown preview policy family: {family}")
+    return family
+
+
+def _normalize_allowed_families(families: list[str] | None) -> list[str] | None:
+    if families is None:
+        return None
+    return sorted({_validate_family(family) for family in families})
+
+
+def _normalize_family_budgets(family_budgets: dict[str, int] | None) -> dict[str, int]:
+    if not family_budgets:
+        return {}
+    normalized: dict[str, int] = {}
+    for family, budget in family_budgets.items():
+        _validate_family(family)
+        if budget < 0:
+            raise ValueError(f"Preview budget for {family} must be >= 0")
+        normalized[family] = int(budget)
+    return normalized
+
+
+def _policy_entry(agent_id: int) -> dict[str, Any] | None:
+    with _policy_lock:
+        policy = _agent_policy_overrides.get(agent_id)
+        if policy is None:
+            return None
+        return {
+            "agent_id": policy["agent_id"],
+            "allowed_families": list(policy["allowed_families"])
+            if policy["allowed_families"] is not None
+            else None,
+            "family_budgets": dict(policy["family_budgets"]),
+            "updated_at": policy["updated_at"],
+        }
+
+
+def _record_admin_action(
+    action: str,
+    *,
+    actor: str,
+    target_agent_id: int | None = None,
+    payload: dict[str, Any] | None = None,
+) -> None:
+    entry = {
+        "event_id": next(_audit_counter),
+        "action": action,
+        "actor": actor,
+        "target_agent_id": target_agent_id,
+        "payload": payload or {},
+        "occurred_at": _utc_now(),
+    }
+    with _policy_lock:
+        _audit_log.appendleft(entry)
+
+
+def _require_agent_family_authorized(agent_id: int, family: str) -> None:
+    policy = _policy_entry(agent_id)
+    if policy is None or policy["allowed_families"] is None:
+        return
+    if family not in policy["allowed_families"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Preview {family} access is not allowed for agent {agent_id}.",
+        )
+
+
+def _consume_agent_budget(agent_id: int, family: str) -> None:
+    with _policy_lock:
+        policy = _agent_policy_overrides.get(agent_id)
+        if policy is None:
+            return
+        family_budgets = policy["family_budgets"]
+        if family not in family_budgets:
+            return
+        remaining = family_budgets[family]
+        if remaining <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Preview {family} budget exhausted for agent {agent_id}.",
+            )
+        family_budgets[family] = remaining - 1
+        policy["updated_at"] = _utc_now()
+
+
+def _require_agent_budget_available(agent_id: int, family: str) -> None:
+    policy = _policy_entry(agent_id)
+    if policy is None:
+        return
+    remaining = policy["family_budgets"].get(family)
+    if remaining is None:
+        return
+    if remaining <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Preview {family} budget exhausted for agent {agent_id}.",
+        )
 
 
 def _require_preview_surface_enabled() -> None:
@@ -185,7 +296,10 @@ def make_agent_preview_write_guard(
             family,
             allow_in_degraded_mode=allow_in_degraded_mode,
         )
+        _require_agent_family_authorized(agent.id, family)
+        _require_agent_budget_available(agent.id, family)
         _record_agent_mutation(agent.id, family)
+        _consume_agent_budget(agent.id, family)
 
     return dependency
 
@@ -208,12 +322,15 @@ async def require_warfare_preview_write(agent: Any = Depends(get_current_agent))
     _require_preview_writes_enabled()
     _require_warfare_mutations_enabled()
     _require_family_degraded_policy("warfare", allow_in_degraded_mode=False)
+    _require_agent_family_authorized(agent.id, "warfare")
+    _require_agent_budget_available(agent.id, "warfare")
     _record_agent_mutation(agent.id, "warfare")
+    _consume_agent_budget(agent.id, "warfare")
 
 
 async def require_control_plane_admin(
     admin_token: str | None = Security(admin_token_header),
-) -> None:
+) -> str:
     """Protect mutable control-plane actions behind a static admin token."""
     expected = settings.CONTROL_PLANE_ADMIN_TOKEN
     if not expected:
@@ -226,10 +343,15 @@ async def require_control_plane_admin(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid control-plane admin token.",
         )
+    token_fingerprint = hashlib.sha256(admin_token.encode()).hexdigest()[:8]
+    return f"control-plane-admin:{token_fingerprint}"
 
 
 def get_preview_guard_state() -> dict[str, Any]:
     """Return the currently effective preview control-plane state."""
+    with _policy_lock:
+        agent_policy_count = len(_agent_policy_overrides)
+        audit_log_size = len(_audit_log)
     return {
         "surface_enabled": _preview_surface_enabled(),
         "writes_enabled": _preview_writes_enabled(),
@@ -242,6 +364,8 @@ def get_preview_guard_state() -> dict[str, Any]:
             family: _family_limit(family)
             for family in sorted(_FAMILY_LIMIT_ATTRS)
         },
+        "agent_policy_count": agent_policy_count,
+        "audit_log_size": audit_log_size,
         "rate_limit_store": "process_local_best_effort",
         "admin_api": {
             "path": "/meta/control-plane",
@@ -251,12 +375,37 @@ def get_preview_guard_state() -> dict[str, Any]:
     }
 
 
+def get_control_plane_admin_snapshot(*, audit_limit: int = 20) -> dict[str, Any]:
+    """Return the admin-facing snapshot including actor policy and audit detail."""
+    state = get_preview_guard_state()
+    with _policy_lock:
+        policies = [
+            {
+                "agent_id": policy["agent_id"],
+                "allowed_families": list(policy["allowed_families"])
+                if policy["allowed_families"] is not None
+                else None,
+                "family_budgets": dict(policy["family_budgets"]),
+                "updated_at": policy["updated_at"],
+            }
+            for policy in sorted(
+                _agent_policy_overrides.values(),
+                key=lambda item: item["agent_id"],
+            )
+        ]
+        recent_audit_entries = list(_audit_log)[: max(audit_limit, 0)]
+    state["agent_policies"] = policies
+    state["recent_audit_entries"] = recent_audit_entries
+    return state
+
+
 def update_preview_guard_state(
     *,
     surface_enabled: bool | None = None,
     writes_enabled: bool | None = None,
     warfare_mutations_enabled: bool | None = None,
     degraded_mode: bool | None = None,
+    audit_actor: str | None = None,
 ) -> dict[str, Any]:
     """Apply runtime overrides to the process-local preview policy."""
     updates = {
@@ -269,7 +418,82 @@ def update_preview_guard_state(
         for key, value in updates.items():
             if value is not None:
                 _policy_overrides[key] = value
+    if audit_actor and any(value is not None for value in updates.values()):
+        _record_admin_action(
+            "update_preview_runtime_policy",
+            actor=audit_actor,
+            payload={key: value for key, value in updates.items() if value is not None},
+        )
     return get_preview_guard_state()
+
+
+def upsert_agent_preview_policy(
+    agent_id: int,
+    *,
+    allowed_families: list[str] | None = None,
+    family_budgets: dict[str, int] | None = None,
+    audit_actor: str | None = None,
+) -> dict[str, Any]:
+    """Upsert a process-local per-agent preview policy."""
+    normalized_families = _normalize_allowed_families(allowed_families)
+    normalized_budgets = _normalize_family_budgets(family_budgets)
+    policy = {
+        "agent_id": agent_id,
+        "allowed_families": normalized_families,
+        "family_budgets": normalized_budgets,
+        "updated_at": _utc_now(),
+    }
+    with _policy_lock:
+        _agent_policy_overrides[agent_id] = policy
+    if audit_actor:
+        _record_admin_action(
+            "upsert_agent_preview_policy",
+            actor=audit_actor,
+            target_agent_id=agent_id,
+            payload={
+                "allowed_families": normalized_families,
+                "family_budgets": normalized_budgets,
+            },
+        )
+    return _policy_entry(agent_id) or policy
+
+
+def clear_agent_preview_policy(
+    agent_id: int,
+    *,
+    audit_actor: str | None = None,
+) -> bool:
+    """Delete a process-local per-agent preview policy."""
+    with _policy_lock:
+        existed = _agent_policy_overrides.pop(agent_id, None) is not None
+    if existed and audit_actor:
+        _record_admin_action(
+            "clear_agent_preview_policy",
+            actor=audit_actor,
+            target_agent_id=agent_id,
+        )
+    return existed
+
+
+def reset_preview_guard_runtime(*, audit_actor: str | None = None) -> None:
+    """Clear process-local runtime counters and overrides while preserving code defaults."""
+    with _mutation_lock:
+        _mutation_windows.clear()
+    with _policy_lock:
+        for key in _policy_overrides:
+            _policy_overrides[key] = None
+        _agent_policy_overrides.clear()
+    if audit_actor:
+        _record_admin_action(
+            "reset_preview_guard_runtime",
+            actor=audit_actor,
+        )
+
+
+def list_control_plane_audit(*, limit: int = 20) -> list[dict[str, Any]]:
+    """Return recent admin actions for the process-local preview policy."""
+    with _policy_lock:
+        return list(_audit_log)[: max(limit, 0)]
 
 
 def build_preview_guard_metadata() -> dict[str, Any]:
@@ -284,3 +508,5 @@ def reset_preview_guard_state() -> None:
     with _policy_lock:
         for key in _policy_overrides:
             _policy_overrides[key] = None
+        _agent_policy_overrides.clear()
+        _audit_log.clear()

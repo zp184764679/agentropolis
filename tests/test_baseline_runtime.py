@@ -18,6 +18,8 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["preview_guard"]["surface_enabled"] is True
     assert meta["preview_guard"]["writes_enabled"] is True
     assert meta["preview_guard"]["degraded_mode"] is False
+    assert meta["preview_guard"]["agent_policy_count"] == 0
+    assert meta["preview_guard"]["audit_log_size"] == 0
     assert meta["preview_guard"]["rate_limit_store"] == "process_local_best_effort"
     assert meta["preview_guard"]["admin_api"]["path"] == "/meta/control-plane"
     assert meta["orm_surface"]["target_models_registered"] is True
