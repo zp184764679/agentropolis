@@ -142,6 +142,8 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 - Preview authz is now process-local and per-agent by route family; preview budgets are decremented per allowed family mutation
 - Authenticated preview reads now follow family-scoped policy as well; public intel / public world reads still stay behind only the preview surface gate
 - `/meta/control-plane/audit` exposes the in-memory admin action trail for preview policy changes
+- Admin mutations now support structured `reason_code` / `note`; audit queries can filter by action, target agent, and reason code
+- `/meta/control-plane/agents/{agent_id}/refill-budget` provides process-local family budget refill semantics for preview testing and staged rollout
 - Preview mutation throttling is currently process-local and best-effort; it is a migration safety valve, not the final distributed quota model
 
 ### Route Mount Policy

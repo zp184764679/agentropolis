@@ -247,11 +247,26 @@ class PreviewControlPlaneUpdateRequest(BaseModel):
     writes_enabled: bool | None = None
     warfare_mutations_enabled: bool | None = None
     degraded_mode: bool | None = None
+    reason_code: str | None = Field(default=None, min_length=2, max_length=64)
+    note: str | None = Field(default=None, min_length=2, max_length=280)
 
 
 class PreviewAgentPolicyRequest(BaseModel):
     allowed_families: list[str] | None = None
     family_budgets: dict[str, int] | None = None
+    reason_code: str | None = Field(default=None, min_length=2, max_length=64)
+    note: str | None = Field(default=None, min_length=2, max_length=280)
+
+
+class PreviewAgentBudgetRefillRequest(BaseModel):
+    increments: dict[str, int]
+    reason_code: str | None = Field(default=None, min_length=2, max_length=64)
+    note: str | None = Field(default=None, min_length=2, max_length=280)
+
+
+class ControlPlaneActionRequest(BaseModel):
+    reason_code: str | None = Field(default=None, min_length=2, max_length=64)
+    note: str | None = Field(default=None, min_length=2, max_length=280)
 
 
 class PreviewAgentPolicyResponse(BaseModel):
@@ -270,6 +285,8 @@ class ControlPlaneAuditEntry(BaseModel):
     action: str
     actor: str
     target_agent_id: int | None = None
+    reason_code: str | None = None
+    note: str | None = None
     payload: dict = Field(default_factory=dict)
     occurred_at: str
 

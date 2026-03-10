@@ -204,6 +204,7 @@ def test_control_plane_admin_reset_clears_overrides(
             reset_response = await client.post(
                 "/meta/control-plane/reset-rate-limits",
                 headers=_admin_headers(),
+                json={"reason_code": "cleanup", "note": "reset after manual override"},
             )
             assert reset_response.status_code == 200
 
@@ -323,6 +324,52 @@ def test_control_plane_agent_policy_consumes_family_budget(
         reset_preview_guard_state()
 
 
+def test_control_plane_budget_refill_restores_family_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "CONTROL_PLANE_ADMIN_TOKEN", "root-token")
+    reset_preview_guard_state()
+
+    async def scenario() -> None:
+        async with _preview_client(agent_id=7) as client:
+            policy = await client.put(
+                "/meta/control-plane/agents/7/policy",
+                headers=_admin_headers(),
+                json={"family_budgets": {"transport": 1}},
+            )
+            assert policy.status_code == 200
+
+            transport_guard = make_agent_preview_write_guard("transport")
+            actor = SimpleNamespace(id=7)
+            await transport_guard(actor)
+
+            refill = await client.post(
+                "/meta/control-plane/agents/7/refill-budget",
+                headers=_admin_headers(),
+                json={
+                    "increments": {"transport": 2},
+                    "reason_code": "quota_refill",
+                    "note": "manual preview refill",
+                },
+            )
+            assert refill.status_code == 200
+            assert refill.json()["family_budgets"]["transport"] == 2
+
+            await transport_guard(actor)
+            await transport_guard(actor)
+
+            with pytest.raises(HTTPException) as excinfo:
+                await transport_guard(actor)
+
+            assert excinfo.value.status_code == 403
+            assert excinfo.value.detail == "Preview transport budget exhausted for agent 7."
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        reset_preview_guard_state()
+
+
 def test_control_plane_audit_log_records_admin_actions(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -341,9 +388,25 @@ def test_control_plane_audit_log_records_admin_actions(
             policy = await client.put(
                 "/meta/control-plane/agents/9/policy",
                 headers=_admin_headers(),
-                json={"allowed_families": ["strategy"], "family_budgets": {"strategy": 2}},
+                json={
+                    "allowed_families": ["strategy"],
+                    "family_budgets": {"strategy": 2},
+                    "reason_code": "seed_policy",
+                    "note": "preview-only policy",
+                },
             )
             assert policy.status_code == 200
+
+            refill = await client.post(
+                "/meta/control-plane/agents/9/refill-budget",
+                headers=_admin_headers(),
+                json={
+                    "increments": {"strategy": 1},
+                    "reason_code": "quota_refill",
+                    "note": "top up strategy budget",
+                },
+            )
+            assert refill.status_code == 200
 
             audit = await client.get(
                 "/meta/control-plane/audit",
@@ -357,7 +420,55 @@ def test_control_plane_audit_log_records_admin_actions(
 
             assert "update_preview_runtime_policy" in actions
             assert "upsert_agent_preview_policy" in actions
+            assert "refill_agent_preview_budget" in actions
             assert all(entry["actor"].startswith("control-plane-admin:") for entry in entries)
+            refill_entry = next(
+                entry for entry in entries if entry["action"] == "refill_agent_preview_budget"
+            )
+            assert refill_entry["reason_code"] == "quota_refill"
+            assert refill_entry["note"] == "top up strategy budget"
+
+    asyncio.run(scenario())
+
+
+def test_control_plane_audit_filtering_by_reason_and_agent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "CONTROL_PLANE_ADMIN_TOKEN", "root-token")
+    reset_preview_guard_state()
+
+    async def scenario() -> None:
+        async with _preview_client() as client:
+            await client.put(
+                "/meta/control-plane/agents/5/policy",
+                headers=_admin_headers(),
+                json={
+                    "allowed_families": ["social"],
+                    "reason_code": "social_gate",
+                    "note": "grant social only",
+                },
+            )
+            await client.put(
+                "/meta/control-plane/agents/8/policy",
+                headers=_admin_headers(),
+                json={
+                    "allowed_families": ["strategy"],
+                    "reason_code": "strategy_gate",
+                    "note": "grant strategy only",
+                },
+            )
+
+            audit = await client.get(
+                "/meta/control-plane/audit",
+                headers=_admin_headers(),
+                params={"target_agent_id": 8, "reason_code": "strategy_gate"},
+            )
+
+            assert audit.status_code == 200
+            entries = audit.json()["entries"]
+            assert len(entries) == 1
+            assert entries[0]["target_agent_id"] == 8
+            assert entries[0]["reason_code"] == "strategy_gate"
 
     asyncio.run(scenario())
 

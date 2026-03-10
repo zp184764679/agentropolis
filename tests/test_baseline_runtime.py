@@ -21,8 +21,11 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["preview_guard"]["agent_policy_count"] == 0
     assert meta["preview_guard"]["audit_log_size"] == 0
     assert meta["preview_guard"]["policy_features"]["authenticated_read_policy"] == "family_scoped"
+    assert meta["preview_guard"]["policy_features"]["budget_refill_support"] is True
     assert meta["preview_guard"]["rate_limit_store"] == "process_local_best_effort"
     assert meta["preview_guard"]["admin_api"]["path"] == "/meta/control-plane"
+    assert meta["control_plane_surface"]["scope"] == "process_local_preview_policy"
+    assert "budget_refill" in meta["control_plane_surface"]["features"]
     assert meta["orm_surface"]["target_models_registered"] is True
     assert meta["orm_surface"]["metadata_table_count"] >= 39
     assert meta["migration_surface"]["alembic_baseline_present"] is True

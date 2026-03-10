@@ -107,6 +107,18 @@ def build_runtime_metadata() -> dict:
         "stage": "migration_scaffold",
         "reliable_endpoints": ["/health", "/meta/runtime"],
         "public_contract_frozen": False,
+        "control_plane_surface": {
+            "admin_endpoint": "/meta/control-plane",
+            "scope": "process_local_preview_policy",
+            "persistent": False,
+            "features": [
+                "runtime_policy_toggles",
+                "per_agent_family_authz",
+                "per_family_budgets",
+                "budget_refill",
+                "audit_log_filtering",
+            ],
+        },
         "auth_surface": {
             "company_auth": {
                 "status": "active_legacy",

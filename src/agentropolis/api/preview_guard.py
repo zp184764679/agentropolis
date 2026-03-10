@@ -163,6 +163,8 @@ def _record_admin_action(
     *,
     actor: str,
     target_agent_id: int | None = None,
+    reason_code: str | None = None,
+    note: str | None = None,
     payload: dict[str, Any] | None = None,
 ) -> None:
     entry = {
@@ -170,6 +172,8 @@ def _record_admin_action(
         "action": action,
         "actor": actor,
         "target_agent_id": target_agent_id,
+        "reason_code": reason_code,
+        "note": note,
         "payload": payload or {},
         "occurred_at": _utc_now(),
     }
@@ -380,6 +384,9 @@ def get_preview_guard_state() -> dict[str, Any]:
             "authenticated_read_policy": "family_scoped",
             "authenticated_write_policy": "family_scoped_with_budget",
             "public_preview_read_policy": "surface_only",
+            "admin_action_context": "structured_reason_note",
+            "budget_refill_support": True,
+            "audit_filter_support": True,
         },
         "rate_limit_store": "process_local_best_effort",
         "admin_api": {
@@ -421,6 +428,8 @@ def update_preview_guard_state(
     warfare_mutations_enabled: bool | None = None,
     degraded_mode: bool | None = None,
     audit_actor: str | None = None,
+    reason_code: str | None = None,
+    note: str | None = None,
 ) -> dict[str, Any]:
     """Apply runtime overrides to the process-local preview policy."""
     updates = {
@@ -437,6 +446,8 @@ def update_preview_guard_state(
         _record_admin_action(
             "update_preview_runtime_policy",
             actor=audit_actor,
+            reason_code=reason_code,
+            note=note,
             payload={key: value for key, value in updates.items() if value is not None},
         )
     return get_preview_guard_state()
@@ -448,6 +459,8 @@ def upsert_agent_preview_policy(
     allowed_families: list[str] | None = None,
     family_budgets: dict[str, int] | None = None,
     audit_actor: str | None = None,
+    reason_code: str | None = None,
+    note: str | None = None,
 ) -> dict[str, Any]:
     """Upsert a process-local per-agent preview policy."""
     normalized_families = _normalize_allowed_families(allowed_families)
@@ -465,6 +478,8 @@ def upsert_agent_preview_policy(
             "upsert_agent_preview_policy",
             actor=audit_actor,
             target_agent_id=agent_id,
+            reason_code=reason_code,
+            note=note,
             payload={
                 "allowed_families": normalized_families,
                 "family_budgets": normalized_budgets,
@@ -477,6 +492,8 @@ def clear_agent_preview_policy(
     agent_id: int,
     *,
     audit_actor: str | None = None,
+    reason_code: str | None = None,
+    note: str | None = None,
 ) -> bool:
     """Delete a process-local per-agent preview policy."""
     with _policy_lock:
@@ -486,11 +503,61 @@ def clear_agent_preview_policy(
             "clear_agent_preview_policy",
             actor=audit_actor,
             target_agent_id=agent_id,
+            reason_code=reason_code,
+            note=note,
         )
     return existed
 
 
-def reset_preview_guard_runtime(*, audit_actor: str | None = None) -> None:
+def refill_agent_preview_budget(
+    agent_id: int,
+    *,
+    increments: dict[str, int],
+    audit_actor: str | None = None,
+    reason_code: str | None = None,
+    note: str | None = None,
+) -> dict[str, Any]:
+    """Increment process-local per-agent family budgets."""
+    normalized = _normalize_family_budgets(increments)
+    if not normalized:
+        raise ValueError("At least one preview family budget increment is required.")
+    for family, amount in normalized.items():
+        if amount <= 0:
+            raise ValueError(f"Preview budget refill for {family} must be > 0")
+
+    with _policy_lock:
+        policy = _agent_policy_overrides.get(agent_id)
+        if policy is None:
+            policy = {
+                "agent_id": agent_id,
+                "allowed_families": None,
+                "family_budgets": {},
+                "updated_at": _utc_now(),
+            }
+            _agent_policy_overrides[agent_id] = policy
+
+        for family, amount in normalized.items():
+            policy["family_budgets"][family] = policy["family_budgets"].get(family, 0) + amount
+        policy["updated_at"] = _utc_now()
+
+    if audit_actor:
+        _record_admin_action(
+            "refill_agent_preview_budget",
+            actor=audit_actor,
+            target_agent_id=agent_id,
+            reason_code=reason_code,
+            note=note,
+            payload={"increments": normalized},
+        )
+    return _policy_entry(agent_id) or policy
+
+
+def reset_preview_guard_runtime(
+    *,
+    audit_actor: str | None = None,
+    reason_code: str | None = None,
+    note: str | None = None,
+) -> None:
     """Clear process-local runtime counters and overrides while preserving code defaults."""
     with _mutation_lock:
         _mutation_windows.clear()
@@ -502,13 +569,29 @@ def reset_preview_guard_runtime(*, audit_actor: str | None = None) -> None:
         _record_admin_action(
             "reset_preview_guard_runtime",
             actor=audit_actor,
+            reason_code=reason_code,
+            note=note,
         )
 
 
-def list_control_plane_audit(*, limit: int = 20) -> list[dict[str, Any]]:
+def list_control_plane_audit(
+    *,
+    limit: int = 20,
+    action: str | None = None,
+    target_agent_id: int | None = None,
+    reason_code: str | None = None,
+) -> list[dict[str, Any]]:
     """Return recent admin actions for the process-local preview policy."""
     with _policy_lock:
-        return list(_audit_log)[: max(limit, 0)]
+        entries = list(_audit_log)
+
+    if action is not None:
+        entries = [entry for entry in entries if entry["action"] == action]
+    if target_agent_id is not None:
+        entries = [entry for entry in entries if entry["target_agent_id"] == target_agent_id]
+    if reason_code is not None:
+        entries = [entry for entry in entries if entry["reason_code"] == reason_code]
+    return entries[: max(limit, 0)]
 
 
 def build_preview_guard_metadata() -> dict[str, Any]:
