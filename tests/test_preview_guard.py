@@ -143,6 +143,36 @@ def test_control_plane_admin_endpoint_requires_token(
     asyncio.run(scenario())
 
 
+def test_request_context_header_is_generated_for_runtime_surface() -> None:
+    reset_preview_guard_state()
+
+    async def scenario() -> None:
+        async with _preview_client() as client:
+            response = await client.get("/health")
+
+        assert response.status_code == 200
+        assert "X-Agentropolis-Request-ID" in response.headers
+        assert response.headers["X-Agentropolis-Request-ID"]
+
+    asyncio.run(scenario())
+
+
+def test_request_context_header_preserves_incoming_value() -> None:
+    reset_preview_guard_state()
+
+    async def scenario() -> None:
+        async with _preview_client() as client:
+            response = await client.get(
+                "/meta/runtime",
+                headers={"X-Agentropolis-Request-ID": "req-explicit-001"},
+            )
+
+        assert response.status_code == 200
+        assert response.headers["X-Agentropolis-Request-ID"] == "req-explicit-001"
+
+    asyncio.run(scenario())
+
+
 def test_control_plane_admin_endpoint_updates_runtime_policy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -427,6 +457,8 @@ def test_control_plane_audit_log_records_admin_actions(
             )
             assert refill_entry["reason_code"] == "quota_refill"
             assert refill_entry["note"] == "top up strategy budget"
+            assert refill_entry["request_id"]
+            assert refill_entry["client_fingerprint"]
 
     asyncio.run(scenario())
 

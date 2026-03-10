@@ -8,6 +8,7 @@ file presence alone.
 from __future__ import annotations
 
 from agentropolis.api.preview_guard import build_preview_guard_metadata
+from agentropolis.middleware import REQUEST_ID_HEADER
 from agentropolis.models import Base
 
 
@@ -106,17 +107,23 @@ def build_runtime_metadata() -> dict:
     return {
         "stage": "migration_scaffold",
         "reliable_endpoints": ["/health", "/meta/runtime"],
+        "request_context": {
+            "request_id_header": REQUEST_ID_HEADER,
+            "client_fingerprint_source": "best_effort_request_client",
+        },
         "public_contract_frozen": False,
         "control_plane_surface": {
             "admin_endpoint": "/meta/control-plane",
             "scope": "process_local_preview_policy",
             "persistent": False,
+            "request_id_header": REQUEST_ID_HEADER,
             "features": [
                 "runtime_policy_toggles",
                 "per_agent_family_authz",
                 "per_family_budgets",
                 "budget_refill",
                 "audit_log_filtering",
+                "audit_request_context",
             ],
         },
         "auth_surface": {

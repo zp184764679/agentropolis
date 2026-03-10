@@ -25,6 +25,7 @@ from fastapi.security import APIKeyHeader
 
 from agentropolis.api.auth import get_current_agent
 from agentropolis.config import settings
+from agentropolis.middleware import REQUEST_ID_HEADER
 
 _mutation_windows: dict[str, deque[float]] = defaultdict(deque)
 _mutation_lock = Lock()
@@ -163,6 +164,8 @@ def _record_admin_action(
     *,
     actor: str,
     target_agent_id: int | None = None,
+    request_id: str | None = None,
+    client_fingerprint: str | None = None,
     reason_code: str | None = None,
     note: str | None = None,
     payload: dict[str, Any] | None = None,
@@ -172,6 +175,8 @@ def _record_admin_action(
         "action": action,
         "actor": actor,
         "target_agent_id": target_agent_id,
+        "request_id": request_id,
+        "client_fingerprint": client_fingerprint,
         "reason_code": reason_code,
         "note": note,
         "payload": payload or {},
@@ -393,6 +398,7 @@ def get_preview_guard_state() -> dict[str, Any]:
             "path": "/meta/control-plane",
             "configured": bool(settings.CONTROL_PLANE_ADMIN_TOKEN),
             "token_header": "X-Control-Plane-Token",
+            "request_id_header": REQUEST_ID_HEADER,
         },
     }
 
@@ -428,6 +434,8 @@ def update_preview_guard_state(
     warfare_mutations_enabled: bool | None = None,
     degraded_mode: bool | None = None,
     audit_actor: str | None = None,
+    request_id: str | None = None,
+    client_fingerprint: str | None = None,
     reason_code: str | None = None,
     note: str | None = None,
 ) -> dict[str, Any]:
@@ -446,6 +454,8 @@ def update_preview_guard_state(
         _record_admin_action(
             "update_preview_runtime_policy",
             actor=audit_actor,
+            request_id=request_id,
+            client_fingerprint=client_fingerprint,
             reason_code=reason_code,
             note=note,
             payload={key: value for key, value in updates.items() if value is not None},
@@ -459,6 +469,8 @@ def upsert_agent_preview_policy(
     allowed_families: list[str] | None = None,
     family_budgets: dict[str, int] | None = None,
     audit_actor: str | None = None,
+    request_id: str | None = None,
+    client_fingerprint: str | None = None,
     reason_code: str | None = None,
     note: str | None = None,
 ) -> dict[str, Any]:
@@ -478,6 +490,8 @@ def upsert_agent_preview_policy(
             "upsert_agent_preview_policy",
             actor=audit_actor,
             target_agent_id=agent_id,
+            request_id=request_id,
+            client_fingerprint=client_fingerprint,
             reason_code=reason_code,
             note=note,
             payload={
@@ -492,6 +506,8 @@ def clear_agent_preview_policy(
     agent_id: int,
     *,
     audit_actor: str | None = None,
+    request_id: str | None = None,
+    client_fingerprint: str | None = None,
     reason_code: str | None = None,
     note: str | None = None,
 ) -> bool:
@@ -503,6 +519,8 @@ def clear_agent_preview_policy(
             "clear_agent_preview_policy",
             actor=audit_actor,
             target_agent_id=agent_id,
+            request_id=request_id,
+            client_fingerprint=client_fingerprint,
             reason_code=reason_code,
             note=note,
         )
@@ -514,6 +532,8 @@ def refill_agent_preview_budget(
     *,
     increments: dict[str, int],
     audit_actor: str | None = None,
+    request_id: str | None = None,
+    client_fingerprint: str | None = None,
     reason_code: str | None = None,
     note: str | None = None,
 ) -> dict[str, Any]:
@@ -545,6 +565,8 @@ def refill_agent_preview_budget(
             "refill_agent_preview_budget",
             actor=audit_actor,
             target_agent_id=agent_id,
+            request_id=request_id,
+            client_fingerprint=client_fingerprint,
             reason_code=reason_code,
             note=note,
             payload={"increments": normalized},
@@ -555,6 +577,8 @@ def refill_agent_preview_budget(
 def reset_preview_guard_runtime(
     *,
     audit_actor: str | None = None,
+    request_id: str | None = None,
+    client_fingerprint: str | None = None,
     reason_code: str | None = None,
     note: str | None = None,
 ) -> None:
@@ -569,6 +593,8 @@ def reset_preview_guard_runtime(
         _record_admin_action(
             "reset_preview_guard_runtime",
             actor=audit_actor,
+            request_id=request_id,
+            client_fingerprint=client_fingerprint,
             reason_code=reason_code,
             note=note,
         )

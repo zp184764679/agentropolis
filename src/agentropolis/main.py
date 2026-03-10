@@ -34,6 +34,7 @@ from agentropolis.api.warfare import router as warfare_router
 from agentropolis.api.world import router as world_router
 from agentropolis.config import settings
 from agentropolis.database import async_session, engine
+from agentropolis.middleware import RequestContextMiddleware
 from agentropolis.runtime_meta import build_runtime_metadata
 from agentropolis.services.seed import seed_game_data
 from agentropolis.services.seed_world import seed_world
@@ -76,6 +77,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestContextMiddleware)
 
 # Mount the current scaffold surface plus the target agent-auth preview surface.
 # These target routers are service-backed now, but they are still preview APIs:
