@@ -50,7 +50,7 @@ curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:800
 ## Current Runtime Status
 
 - `/health` and `/meta/runtime` are the two endpoints that should be treated as reliably available in the current scaffold
-- REST route modules for market/production/inventory/company/game are mounted, but many handlers are still placeholders during the migration and currently surface as `501 Not Implemented`
+- REST route modules for market/production/inventory/company/game are mounted; `market`, `inventory`, and `game` now have real read paths, while many legacy write paths still surface as `501 Not Implemented`
 - Agent/world/skills/transport/guild/diplomacy/strategy/decisions/warfare are now mounted as a preview target surface backed by real services, but the public contract is still not frozen
 - Preview routes are now behind a minimal control-plane guard: global preview kill switch, preview write gate, warfare mutation gate, and best-effort process-local mutation throttling
 - An admin-only process-local preview policy surface exists at `/meta/control-plane` when `CONTROL_PLANE_ADMIN_TOKEN` is configured
@@ -119,11 +119,11 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 | `/health` | Yes | Usable | Best current smoke-test target |
 | `/meta/runtime` | Yes | Usable | Machine-readable scaffold/runtime snapshot |
 | `/meta/control-plane` | Yes | Admin-only | Process-local preview policy surface; requires `X-Control-Plane-Token` and is not the final distributed control plane |
-| `/api/market` | Yes | Placeholder-heavy | Legacy company-auth scaffold, target replacement is regional agent-auth market API |
+| `/api/market` | Yes | Mixed scaffold reads | Public read APIs for prices/orderbook/history/analysis are live; legacy buy/sell/cancel write paths remain scaffold |
 | `/api/production` | Yes | Placeholder-heavy | Legacy company-oriented production surface |
-| `/api/inventory` | Yes | Placeholder-heavy | Legacy inventory scaffold |
+| `/api/inventory` | Yes | Mixed scaffold reads | Company inventory reads and public resource info are live; legacy write semantics still route through scaffold gaps |
 | `/api/company` | Yes | Placeholder-heavy | Legacy company registration/status surface |
-| `/api/game` | Yes | Placeholder-heavy | Legacy tick/game-state terminology still present |
+| `/api/game` | Yes | Mixed scaffold reads | Game status and leaderboard reads are live; broader legacy game/tick surface is still transitional |
 | `/api/agent` | Yes | Preview, service-backed | Agent registration, status, vitals actions, and public profile are live on the preview surface |
 | `/api/world` | Yes | Preview, service-backed | Region queries and travel lifecycle are mounted, but broader world/event surface is still incomplete |
 | `/api/skills` | Yes | Preview, service-backed | Skill definitions and personal skill read APIs are mounted |

@@ -52,6 +52,27 @@ async def get_current_company(
     return company
 
 
+async def get_optional_current_company(
+    api_key: str | None = Security(api_key_header),
+    session: AsyncSession = Depends(get_session),
+) -> Company | None:
+    """Resolve API key to a Company when present, otherwise allow anonymous access."""
+    if not api_key:
+        return None
+
+    key_hash = hash_api_key(api_key)
+    result = await session.execute(
+        select(Company).where(Company.api_key_hash == key_hash, Company.is_active.is_(True))
+    )
+    company = result.scalar_one_or_none()
+    if not company:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or inactive API key",
+        )
+    return company
+
+
 async def get_current_agent(
     api_key: str | None = Security(api_key_header),
     session: AsyncSession = Depends(get_session),

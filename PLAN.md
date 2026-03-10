@@ -128,6 +128,7 @@
 - **P1** 是接下来最高优先级。现在最缺的不是更多 route，而是能支撑 route 的真 service 逻辑。
 - **P2** 只允许挂载 preview-ready route。存在 `response_model`、schema、service、最小测试后，才允许进入 `main.py`。
 - **P3** 是最大风险段，因为这里要决定 `Agent -> Company` 的真实从属关系、区域库存的 owner 语义、以及 housekeeping 如何兼容 legacy tick 资产。
+- 在 `P3` 期间，允许先把 legacy scaffold 的只读面逐步从 `501` 拉到真查询，但这不等于写路径或撮合语义已经收口。
 - **P4** 完成前，所有外部 AI 接入都只能算“封闭环境原型”，不能把临时 transport 或权限假设对外承诺。
 - **P5/P6** 必须建立在前四阶段稳定之上；否则 autonomy 和外部接入只会把底层不一致放大。
 

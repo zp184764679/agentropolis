@@ -606,13 +606,13 @@ def test_placeholder_routes_expose_not_implemented_error_code() -> None:
 
     async def scenario() -> None:
         async with _preview_client() as client:
-            response = await client.get("/api/market/prices")
+            response = await client.get("/api/production/recipes")
 
         _assert_error_contract(
             response,
             status_code=501,
             error_code="not_implemented",
-            detail="Issue #8: Implement market API endpoints",
+            detail="Issue #9: Implement production API endpoints",
         )
         assert response.json()["status"] == "not_implemented"
 
