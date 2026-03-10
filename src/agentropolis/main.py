@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse
 
 from agentropolis.api.agent import router as agent_router
 from agentropolis.api.company import router as company_router
+from agentropolis.api.control_plane import router as control_plane_router
 from agentropolis.api.diplomacy import router as diplomacy_router
 from agentropolis.api.decisions import router as decisions_router
 from agentropolis.api.game import router as game_router
@@ -84,6 +85,7 @@ app.include_router(production_router, prefix="/api")
 app.include_router(inventory_router, prefix="/api")
 app.include_router(company_router, prefix="/api")
 app.include_router(game_router, prefix="/api")
+app.include_router(control_plane_router)
 app.include_router(agent_router, prefix="/api")
 app.include_router(world_router, prefix="/api")
 app.include_router(skills_router, prefix="/api")

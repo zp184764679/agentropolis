@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
 from agentropolis.api.preview_guard import (
-    require_agent_preview_write,
+    make_agent_preview_write_guard,
     require_preview_surface,
 )
 from agentropolis.api.schemas import (
@@ -33,6 +33,7 @@ router = APIRouter(
     tags=["strategy"],
     dependencies=[Depends(require_preview_surface)],
 )
+strategy_write_guard = make_agent_preview_write_guard("strategy")
 
 
 @router.get("/profile", response_model=StrategyProfileResponse)
@@ -62,7 +63,7 @@ async def get_my_profile(
 @router.put(
     "/profile",
     response_model=StrategyProfileResponse,
-    dependencies=[Depends(require_agent_preview_write)],
+    dependencies=[Depends(strategy_write_guard)],
 )
 async def update_profile(
     req: StrategyProfileUpdateRequest,

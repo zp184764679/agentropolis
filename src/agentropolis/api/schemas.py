@@ -225,6 +225,26 @@ class SuccessResponse(BaseModel):
     message: str
 
 
+class PreviewControlPlaneResponse(BaseModel):
+    surface_enabled: bool
+    writes_enabled: bool
+    warfare_mutations_enabled: bool
+    degraded_mode: bool
+    mutation_window_seconds: int
+    agent_mutations_per_window: int
+    registrations_per_window_per_host: int
+    family_limits: dict[str, int] = Field(default_factory=dict)
+    rate_limit_store: str
+    admin_api: dict = Field(default_factory=dict)
+
+
+class PreviewControlPlaneUpdateRequest(BaseModel):
+    surface_enabled: bool | None = None
+    writes_enabled: bool | None = None
+    warfare_mutations_enabled: bool | None = None
+    degraded_mode: bool | None = None
+
+
 # ─── Target World / Agent Surface ───────────────────────────────────────────
 
 

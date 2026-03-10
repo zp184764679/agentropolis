@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
 from agentropolis.api.preview_guard import (
-    require_agent_preview_write,
+    make_agent_preview_write_guard,
     require_preview_surface,
 )
 from agentropolis.api.schemas import (
@@ -33,12 +33,13 @@ router = APIRouter(
     tags=["guild"],
     dependencies=[Depends(require_preview_surface)],
 )
+social_write_guard = make_agent_preview_write_guard("social")
 
 
 @router.post(
     "/create",
     response_model=GuildInfo,
-    dependencies=[Depends(require_agent_preview_write)],
+    dependencies=[Depends(social_write_guard)],
 )
 async def create_guild(
     req: GuildCreateRequest,
@@ -79,7 +80,7 @@ async def list_all_guilds(
 @router.post(
     "/{guild_id}/join",
     response_model=SuccessResponse,
-    dependencies=[Depends(require_agent_preview_write)],
+    dependencies=[Depends(social_write_guard)],
 )
 async def join_guild(
     guild_id: int,
@@ -99,7 +100,7 @@ async def join_guild(
 @router.post(
     "/{guild_id}/leave",
     response_model=SuccessResponse,
-    dependencies=[Depends(require_agent_preview_write)],
+    dependencies=[Depends(social_write_guard)],
 )
 async def leave_guild(
     guild_id: int,
@@ -119,7 +120,7 @@ async def leave_guild(
 @router.post(
     "/{guild_id}/promote",
     response_model=SuccessResponse,
-    dependencies=[Depends(require_agent_preview_write)],
+    dependencies=[Depends(social_write_guard)],
 )
 async def promote_guild_member(
     guild_id: int,
@@ -148,7 +149,7 @@ async def promote_guild_member(
 @router.post(
     "/{guild_id}/deposit",
     response_model=SuccessResponse,
-    dependencies=[Depends(require_agent_preview_write)],
+    dependencies=[Depends(social_write_guard)],
 )
 async def deposit_guild_treasury(
     guild_id: int,
@@ -169,7 +170,7 @@ async def deposit_guild_treasury(
 @router.post(
     "/{guild_id}/disband",
     response_model=SuccessResponse,
-    dependencies=[Depends(require_agent_preview_write)],
+    dependencies=[Depends(social_write_guard)],
 )
 async def disband(
     guild_id: int,

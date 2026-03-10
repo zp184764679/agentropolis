@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
 from agentropolis.api.preview_guard import (
-    require_agent_preview_write,
+    make_agent_preview_write_guard,
     require_preview_surface,
 )
 from agentropolis.api.schemas import (
@@ -28,6 +28,7 @@ router = APIRouter(
     tags=["world"],
     dependencies=[Depends(require_preview_surface)],
 )
+world_write_guard = make_agent_preview_write_guard("world")
 
 
 @router.get("/map", response_model=WorldMapResponse)
@@ -48,7 +49,7 @@ async def get_region(region_id: int, session: AsyncSession = Depends(get_session
 @router.post(
     "/travel",
     response_model=TravelStatus,
-    dependencies=[Depends(require_agent_preview_write)],
+    dependencies=[Depends(world_write_guard)],
 )
 async def start_travel(
     req: TravelRequest,

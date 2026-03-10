@@ -12,6 +12,8 @@ from sqlalchemy.pool import StaticPool
 
 from agentropolis.api.auth import get_current_agent
 from agentropolis.api.preview_guard import (
+    get_preview_guard_state,
+    make_agent_preview_write_guard,
     require_agent_preview_write,
     reset_preview_guard_state,
 )
@@ -19,6 +21,10 @@ from agentropolis.config import settings
 from agentropolis.database import get_session
 from agentropolis.main import app
 from agentropolis.models import Base
+
+
+def _admin_headers(token: str = "root-token") -> dict[str, str]:
+    return {"X-Control-Plane-Token": token}
 
 
 @asynccontextmanager
@@ -80,6 +86,31 @@ def test_preview_guard_rate_limits_agent_mutations(monkeypatch: pytest.MonkeyPat
         reset_preview_guard_state()
 
 
+def test_preview_guard_enforces_family_specific_limits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "PREVIEW_TRANSPORT_MUTATIONS_PER_WINDOW", 1)
+    monkeypatch.setattr(settings, "PREVIEW_MUTATION_WINDOW_SECONDS", 60)
+    reset_preview_guard_state()
+
+    async def scenario() -> None:
+        actor = SimpleNamespace(id=99)
+        transport_guard = make_agent_preview_write_guard("transport")
+
+        await transport_guard(actor)
+
+        with pytest.raises(HTTPException) as excinfo:
+            await transport_guard(actor)
+
+        assert excinfo.value.status_code == 429
+        assert excinfo.value.detail == "Preview transport mutation rate limit exceeded."
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        reset_preview_guard_state()
+
+
 def test_preview_surface_kill_switch_blocks_reads(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -92,6 +123,93 @@ def test_preview_surface_kill_switch_blocks_reads(
 
         assert response.status_code == 503
         assert response.json()["detail"] == "Preview surface is disabled by runtime policy."
+
+    asyncio.run(scenario())
+
+
+def test_control_plane_admin_endpoint_requires_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "CONTROL_PLANE_ADMIN_TOKEN", "root-token")
+    reset_preview_guard_state()
+
+    async def scenario() -> None:
+        async with _preview_client() as client:
+            response = await client.get("/meta/control-plane")
+
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Invalid control-plane admin token."
+
+    asyncio.run(scenario())
+
+
+def test_control_plane_admin_endpoint_updates_runtime_policy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "CONTROL_PLANE_ADMIN_TOKEN", "root-token")
+    reset_preview_guard_state()
+
+    async def scenario() -> None:
+        async with _preview_client(agent_id=7) as client:
+            before = await client.get("/meta/control-plane", headers=_admin_headers())
+            assert before.status_code == 200
+            assert before.json()["degraded_mode"] is False
+
+            updated = await client.put(
+                "/meta/control-plane",
+                headers=_admin_headers(),
+                json={"degraded_mode": True, "writes_enabled": True},
+            )
+            assert updated.status_code == 200
+            assert updated.json()["degraded_mode"] is True
+            world_guard = make_agent_preview_write_guard("world")
+            agent_guard = make_agent_preview_write_guard(
+                "agent_self",
+                allow_in_degraded_mode=True,
+            )
+            actor = SimpleNamespace(id=7)
+
+            with pytest.raises(HTTPException) as excinfo:
+                await world_guard(actor)
+
+            assert excinfo.value.status_code == 503
+            assert excinfo.value.detail == "Preview world mutations are disabled in degraded mode."
+
+            await agent_guard(actor)
+            assert get_preview_guard_state()["degraded_mode"] is True
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        reset_preview_guard_state()
+
+
+def test_control_plane_admin_reset_clears_overrides(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "CONTROL_PLANE_ADMIN_TOKEN", "root-token")
+    monkeypatch.setattr(settings, "PREVIEW_SURFACE_ENABLED", True)
+    reset_preview_guard_state()
+
+    async def scenario() -> None:
+        async with _preview_client() as client:
+            updated = await client.put(
+                "/meta/control-plane",
+                headers=_admin_headers(),
+                json={"surface_enabled": False},
+            )
+            assert updated.status_code == 200
+            assert updated.json()["surface_enabled"] is False
+
+            reset_response = await client.post(
+                "/meta/control-plane/reset-rate-limits",
+                headers=_admin_headers(),
+            )
+            assert reset_response.status_code == 200
+
+            current = await client.get("/meta/control-plane", headers=_admin_headers())
+            assert current.status_code == 200
+            assert current.json()["surface_enabled"] is True
 
     asyncio.run(scenario())
 
