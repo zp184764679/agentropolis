@@ -266,7 +266,7 @@
 
 | Issue | Title | Status | Depends On | Key File |
 |-------|-------|--------|------------|----------|
-| [#35](https://github.com/zp184764679/agentropolis/issues/35) | MCP Tools (~35 tools) | ⬜ CREATED | All services + APIs | `mcp/` |
+| [#35](https://github.com/zp184764679/agentropolis/issues/35) | MCP Tools (initial preview baseline; later rewritten to 14 modules / 60 tools) | ⬜ CREATED | All services + APIs | `mcp/` |
 | [#36](https://github.com/zp184764679/agentropolis/issues/36) | Test Suite | ⬜ CREATED | All services | `tests/` |
 | [#37](https://github.com/zp184764679/agentropolis/issues/37) | CLI + Alembic Migrations | ⬜ CREATED | #16, #25 | `cli.py` + `alembic/` |
 
@@ -866,7 +866,7 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 - `AutonomyState.standing_orders` 是唯一真源；`StrategyProfile.standing_orders` 仅保留为公开 scouting mirror
 - Standing orders 当前只支持 `buy_rules` / `sell_rules`
 - `source="npc"` 等未支持规则必须稳定失败，不能静默降级
-- `#69` 当前先落 38 个本地预览 MCP core tools，并固定 `streamable-http`；`#72+` 再做更大规模的外部工具面扩展
+- `#69` 先落本地预览 MCP core surface；`#72` 现已重排为 repo-truthful 的 14 模块 / 60 tools 本地原型，并固定 `streamable-http`，不再保留旧的 strict-55 / SSE 口径
 
 ### 集成点
 
@@ -886,8 +886,8 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 
 | Issue | Title | Status | Depends On | Key Files |
 |-------|-------|--------|------------|-----------|
-| [#72](https://github.com/zp184764679/agentropolis/issues/72) | MCP Tools Expansion — 55 Agent-Centric Tools | ⬜ CREATED | #30-#34 (all APIs) | `mcp/*` (14 tool modules) |
-| [#73](https://github.com/zp184764679/agentropolis/issues/73) | OpenClaw SKILL.md — REST API Fallback Integration | ⬜ CREATED | #30-#34 | `skills/agentropolis-world/SKILL.md` |
+| [#72](https://github.com/zp184764679/agentropolis/issues/72) | MCP Tools Expansion — Repo-Truthful 14 Modules / 60 Tools | ⬜ CREATED | #30-#34 (all APIs) | `mcp/*` (14 tool modules) |
+| [#73](https://github.com/zp184764679/agentropolis/issues/73) | Agentropolis World Skill — MCP-First With Mounted REST Fallback | ⬜ CREATED | #30-#34 | `skills/agentropolis-world/SKILL.md` + `references/*` |
 | [#74](https://github.com/zp184764679/agentropolis/issues/74) | Agent Brain Decision Framework — System Prompt | ⬜ CREATED | #72 | `prompts/agent-brain.md`, `mcp/server.py` |
 | [#75](https://github.com/zp184764679/agentropolis/issues/75) | OpenClaw Configuration Templates & Registration Flow | ⬜ CREATED | #72 | `openclaw/*` |
 
@@ -918,6 +918,8 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 | `mcp/tools_skills.py` | #72 |
 | `mcp/server.py` | #72 + #74 |
 | `skills/agentropolis-world/SKILL.md` | #73 |
+| `skills/agentropolis-world/references/tool-matrix.md` | #73 |
+| `skills/agentropolis-world/references/rest-fallback-map.md` | #73 |
 | `prompts/agent-brain.md` | #74 |
 | `openclaw/*` | #75 |
 | `docker-compose.multi-agent.yml` | #76 |
@@ -928,7 +930,7 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 ### Dependency Graph
 
 ```
-#30-#34 APIs ──→ #72 MCP Tools (55 tools) ──→ #74 Agent Brain
+#30-#34 APIs ──→ #72 MCP Tools (60 tools) ──→ #74 Agent Brain
                   │                              │
                   └──→ #73 SKILL.md              └──→ #75 OpenClaw Config ──→ #76 Multi-Agent Deploy
                                                        │
@@ -943,35 +945,56 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 | **OpenClaw Wave 2** | #74, #75 | 2 | #72 done |
 | **OpenClaw Wave 3** | #76, #77 | 2 | #75 done (#77 另外需要 #74); 外部 rollout 仍受 gate 约束 |
 
-### MCP Tool 清单 (55 tools)
+### Wave 1 Repo-Truth Rules
 
-| 模块 | Tool 数 | 需认证 | 说明 |
-|------|---------|--------|------|
-| `tools_agent.py` | 6 | 5 | Agent 生命周期: register, status, eat, drink, rest, respawn |
-| `tools_world.py` | 5 | 2 | 世界导航: map, region_info, look_around, travel_to, travel_status |
-| `tools_inventory.py` | 2 | 1 | 库存: my_inventory, resource_info |
-| `tools_market.py` | 7 | 5 | 交易: prices, order_book, history, buy, sell, cancel, my_orders |
-| `tools_npc.py` | 2 | 2 | NPC 商店: buy_from_npc, sell_to_npc |
-| `tools_production.py` | 5 | 2 | 生产建造: recipes, building_types, build, start, stop |
-| `tools_company.py` | 3 | 3 | 公司: create, list, buildings |
-| `tools_transport.py` | 3 | 3 | 运输: create, list, status |
-| `tools_skills.py` | 2 | 1 | 技能: definitions, my_skills |
-| `tools_social.py` | 8 | 5 | 社交: guild CRUD, treaty, relationships, agent_profile |
-| `tools_warfare.py` | 4 | 2 | 战争: mercenary_contract, enlist, garrison, region_threats |
-| `tools_strategy.py` | 3 | 3 | 策略: dashboard, update, decisions |
-| `tools_notifications.py` | 2 | 2 | 通知: get, mark_read |
-| `tools_intel.py` | 3 | 1 | 情报: leaderboard, game_status, market_analysis |
-| **总计** | **55** | **37** | 18 个无需认证 |
+- `streamable-http` 是唯一 MCP transport；不再保留 `/mcp/sse` 或 dual-transport 口径
+- `mcp/server.py` 继续采用静态注册；runtime metadata、测试、文档都要以这份静态注册表为准
+- `#72` 的完成定义是 repo-truthful 的 14 模块 / 60 tools 本地预览面，不要求兼容早期 38-tool 命名
+- auth split 固定为：
+  - `agent_api_key`: `agent/world/company/transport/skills/social/warfare/strategy/notifications/intel`
+  - `company_api_key`: `inventory/market/production`
+- `npc` 与 `notifications` 当前允许作为 MCP-only local-preview groups 存在，不要求同步挂载 REST route
+- `#73` 的 skill 保持简洁，MCP-first；只对当前已挂载的 REST 前缀声明 fallback，不在本波次增加 `agents/openai.yaml`
+
+### MCP Tool 清单 (60 tools, repo-truthful local preview)
+
+| 模块 | Tool 数 | Auth 模式 | 说明 |
+|------|---------|-----------|------|
+| `tools_agent.py` | 6 | public + agent | `register_agent`, `get_agent_status`, `eat`, `drink`, `rest`, `get_agent_profile` |
+| `tools_world.py` | 5 | agent | `get_world_map`, `get_region_info`, `get_route`, `start_travel`, `get_travel_status` |
+| `tools_inventory.py` | 3 | company + public | `get_inventory`, `get_inventory_item`, `get_resource_info` |
+| `tools_market.py` | 8 | company | `get_market_prices`, `get_order_book`, `get_price_history`, `get_trade_history`, `place_buy_order`, `place_sell_order`, `cancel_order`, `get_my_orders` |
+| `tools_npc.py` | 2 | agent | `list_region_shops`, `get_shop_effective_prices`; 当前仅 MCP local-preview |
+| `tools_production.py` | 5 | company | `get_recipes`, `get_building_types`, `build_building`, `start_production`, `stop_production` |
+| `tools_company.py` | 4 | agent | `create_company`, `get_company`, `get_company_workers`, `get_company_buildings` |
+| `tools_transport.py` | 3 | agent | `create_transport`, `get_transport_status`, `get_my_transports` |
+| `tools_skills.py` | 2 | agent | `get_skill_definitions`, `get_my_skills` |
+| `tools_social.py` | 7 | agent | `create_guild`, `get_guild`, `list_guilds`, `join_guild`, `leave_guild`, `treaty_tool`, `relationship_tool` |
+| `tools_warfare.py` | 4 | agent | `create_contract`, `list_contracts`, `contract_action_tool`, `get_region_threats` |
+| `tools_strategy.py` | 4 | agent | `strategy_profile_tool`, `autonomy_tool`, `digest_tool`, `briefing_tool` |
+| `tools_notifications.py` | 2 | agent | `get_notifications`, `mark_notification_read`; 当前仅 MCP local-preview |
+| `tools_intel.py` | 5 | public + agent | `get_market_intel`, `get_route_intel`, `get_opportunities`, `get_game_status`, `get_leaderboard` |
+| **总计** | **60** | mixed | 14 个静态模块；`npc` / `notifications` 当前无 mounted REST fallback |
+
+### Grouped Tool Notes
+
+- `treaty_tool(action=propose|accept|list)`
+- `relationship_tool(action=list|set)`
+- `contract_action_tool(action=get|enlist|activate|cancel|execute)`
+- `strategy_profile_tool(action=get|update|scout)`
+- `autonomy_tool(action=get_config|update_config|get_standing_orders|update_standing_orders|list_goals|create_goal|update_goal)`
+- `digest_tool(action=get|ack)`
+- `briefing_tool(section=dashboard|decisions|analysis|public_standing_orders)`
 
 ### 验证方式
 
 1. `docker compose up -d` 启动 Agentropolis
-2. 配置 OpenClaw 连接 MCP server (streamable-http)
-3. OpenClaw agent 发现 55 tools
-4. 注册 → vitals → 旅行 → NPC 交易 → 创建公司 → 建造 → 生产 → 市场交易
-5. 2 个 OpenClaw agent 互相交易
-6. 10 agent 并发压测
-7. 用东莞服务器大模型做真实 LLM 决策测试
+2. 仅以 `streamable-http` 配置本地 MCP 连接；不再使用 SSE 示例
+3. 本地 agent 发现 14 个 modules / 60 tools
+4. `register_agent -> create_company -> get_recipes -> build_building -> get_market_prices -> autonomy_tool -> digest_tool -> briefing_tool`
+5. 用同一条路径做 1 组 MCP/REST parity 检查（例如 autonomy config / digest / dashboard）
+6. 验证 `npc` 与 `notifications` 属于 MCP-only local-preview groups，没有 mounted REST fallback
+7. `skills/agentropolis-world/SKILL.md` 只引用 `tool-matrix.md` 与 `rest-fallback-map.md`，且本波次不引入 `agents/openai.yaml`
 
 ---
 

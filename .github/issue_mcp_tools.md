@@ -1,111 +1,97 @@
 ## Overview
 
-Implement MCP (Model Context Protocol) tools — expose all game actions as MCP tools for AI Agents.
+Rewrite the local-preview MCP surface to match repo truth:
 
-MCP tools call the same service functions as REST routes. No logic duplication.
+- `streamable-http` is the only supported transport
+- MCP registration stays static in `src/agentropolis/mcp/server.py`
+- the Wave 1 preview surface exposes **14 tool modules / 60 tools**
+- MCP tools call the same services as REST routes; do not add MCP-only business logic
+
+This issue is a **local-preview integration slice**, not a public OpenClaw rollout.
 
 ## Files
 
 - **Modify**: `src/agentropolis/mcp/server.py`
+- **Modify**: `src/agentropolis/runtime_meta.py`
 - **Create/Modify**: `src/agentropolis/mcp/tools_agent.py`
-- **Create/Modify**: `src/agentropolis/mcp/tools_market.py`
-- **Create/Modify**: `src/agentropolis/mcp/tools_production.py`
 - **Create/Modify**: `src/agentropolis/mcp/tools_world.py`
+- **Create/Modify**: `src/agentropolis/mcp/tools_inventory.py`
+- **Create/Modify**: `src/agentropolis/mcp/tools_market.py`
+- **Create/Modify**: `src/agentropolis/mcp/tools_npc.py`
+- **Create/Modify**: `src/agentropolis/mcp/tools_production.py`
+- **Create/Modify**: `src/agentropolis/mcp/tools_company.py`
+- **Create/Modify**: `src/agentropolis/mcp/tools_transport.py`
+- **Create/Modify**: `src/agentropolis/mcp/tools_skills.py`
 - **Create/Modify**: `src/agentropolis/mcp/tools_social.py`
-- **Modify**: `src/agentropolis/main.py` (mount MCP server)
+- **Create/Modify**: `src/agentropolis/mcp/tools_warfare.py`
+- **Create/Modify**: `src/agentropolis/mcp/tools_strategy.py`
+- **Create/Modify**: `src/agentropolis/mcp/tools_notifications.py`
+- **Create/Modify**: `src/agentropolis/mcp/tools_intel.py`
+- **Modify**: `src/agentropolis/main.py` (conditional mount only)
+- **Modify**: `tests/test_mcp_core.py`
 
-## MCP Tools List
+## Repo-Truth Surface
 
-### Agent Tools
-- `register_agent(name)` → agent_id + api_key
-- `get_status()` → vitals, skills, location
-- `eat(resource_id, quantity)` → hunger update
-- `drink(resource_id, quantity)` → thirst update
-- `rest(duration_seconds)` → energy update
-- `travel(to_region_id)` → travel status
-- `respawn()` → after death
+### Module Catalog
 
-### Company Tools
-- `create_company(name)` → company_id
-- `company_status()` → balance, workers, buildings
-- `hire_agent(agent_id, role, salary)` → employment
-- `fire_agent(agent_id)` → removed
+- `tools_agent.py` — 6 tools
+- `tools_world.py` — 5 tools
+- `tools_inventory.py` — 3 tools
+- `tools_market.py` — 8 tools
+- `tools_npc.py` — 2 tools
+- `tools_production.py` — 5 tools
+- `tools_company.py` — 4 tools
+- `tools_transport.py` — 3 tools
+- `tools_skills.py` — 2 tools
+- `tools_social.py` — 7 tools
+- `tools_warfare.py` — 4 tools
+- `tools_strategy.py` — 4 grouped tools
+- `tools_notifications.py` — 2 tools
+- `tools_intel.py` — 5 tools
 
-### Market Tools
-- `buy(resource_id, quantity, price, tif?)` → order + fills
-- `sell(resource_id, quantity, price, tif?)` → order + fills
-- `cancel_order(order_id)` → cancelled
-- `order_book(resource_id, region_id?)` → bids/asks
-- `my_orders(status?)` → orders list
-- `market_prices(region_id?)` → price summary
-- `trade_history(resource_id?, minutes?)` → trades
+Total: **60 tools**
 
-### Production Tools
-- `build(building_type)` → building_id
-- `start_production(building_id, recipe_id)` → eta
-- `stop_production(building_id)` → stopped
-- `my_buildings()` → buildings list
-- `recipes(building_type?)` → recipes list
+### Grouped Tools
 
-### World Tools
-- `regions()` → all regions
-- `region_info(region_id)` → details
-- `find_route(from, to)` → path + time + cost
-- `world_map()` → full graph
-- `active_events(region_id?)` → events
+- `treaty_tool(action=propose|accept|list)`
+- `relationship_tool(action=list|set)`
+- `contract_action_tool(action=get|enlist|activate|cancel|execute)`
+- `strategy_profile_tool(action=get|update|scout)`
+- `autonomy_tool(action=get_config|update_config|get_standing_orders|update_standing_orders|list_goals|create_goal|update_goal)`
+- `digest_tool(action=get|ack)`
+- `briefing_tool(section=dashboard|decisions|analysis|public_standing_orders)`
 
-### Social Tools
-- `create_guild(name)` → guild_id
-- `join_guild(guild_id)` → joined
-- `propose_treaty(target, type, terms)` → treaty_id
-- `accept_treaty(treaty_id)` → active
-- `my_relationships()` → relations list
+## Auth Split
 
-### Inventory/Transport
-- `inventory(region_id?, owner?)` → items
-- `ship(items, to_region, transport_type?)` → shipment
-- `shipments(status?)` → list
-- `buy_from_npc(resource_id, quantity)` → purchase
-- `sell_to_npc(resource_id, quantity)` → sale
+- `agent_api_key` for `agent/world/company/transport/skills/social/warfare/strategy/notifications/intel`
+- `company_api_key` for `inventory/market/production`
+- `register_agent`, `get_game_status`, `get_leaderboard`, and public resource/profile reads may remain public where the backing service already allows it
 
-## Implementation Pattern
+## Runtime Rules
 
-```python
-from fastmcp import FastMCP
-mcp = FastMCP("Agentropolis")
-
-@mcp.tool()
-async def buy(resource_id: int, quantity: int, price: int, time_in_force: str = "GTC") -> dict:
-    """Place a buy order on the regional market."""
-    async with async_session() as session:
-        # Resolve agent from MCP context (api_key)
-        agent = await resolve_agent_from_context(session)
-        company = await resolve_company(session, agent)
-        result = await market_engine.place_order(
-            session, agent.id, company.id, agent.current_region_id,
-            resource_id, "BUY", quantity, price, time_in_force
-        )
-        await session.commit()
-        return result
-```
-
-## main.py Integration
-
-```python
-from agentropolis.mcp.server import mcp
-app.mount("/mcp", mcp.sse_app())
-```
+- Mount MCP only at `/mcp`
+- Use `mcp.streamable_http_app()`
+- Do not keep `/mcp/sse` examples or dual-transport docs
+- Keep static registration in `mcp/server.py` so runtime metadata and tests can count the exact surface
+- Report repo truth through `/meta/runtime`:
+  - `transport=streamable-http`
+  - `tool_count=60`
+  - real 14-module group map
+  - `local_preview_only=true`
+  - `public_rollout_ready=false`
+- `npc` and `notifications` are allowed to remain MCP-only local-preview groups in this wave
 
 ## Acceptance Criteria
 
-- [ ] All ~35 MCP tools implemented
-- [ ] Each tool calls corresponding service function
-- [ ] Agent authentication from MCP context
-- [ ] Error handling (ValueError → tool error)
-- [ ] MCP server mounted at /mcp
-- [ ] No logic duplication with REST routes
+- [ ] Exactly 14 tool modules are registered in `mcp/server.py`
+- [ ] Exactly 60 tools are exposed
+- [ ] `main.py` mounts `/mcp` with `streamable_http_app()` only when `MCP_SURFACE_ENABLED=true`
+- [ ] `runtime_meta.py` reports the same 14-module / 60-tool surface as the real registry
+- [ ] At least one MCP/REST parity path passes using the same backing services
+- [ ] `npc` and `notifications` are documented as MCP-only local-preview groups
+- [ ] No MCP tool duplicates business logic that already exists in services or mounted REST routes
 
 ## Dependencies
 
-- **Depends on**: ALL services and API routes
-- **Blocks**: None (final feature)
+- **Depends on**: mounted preview REST/API families plus the current service layer
+- **Blocks**: MCP-first skill/docs sync and later OpenClaw rollout work

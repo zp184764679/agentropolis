@@ -62,8 +62,14 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["mcp_surface"]["transport_frozen"] is True
     assert meta["mcp_surface"]["local_preview_only"] is True
     assert meta["mcp_surface"]["public_rollout_ready"] is False
-    assert meta["mcp_surface"]["tool_count"] == 38
-    assert meta["mcp_surface"]["tool_groups"]["agent_autonomy"] == 13
+    assert meta["mcp_surface"]["tool_count"] == 60
+    assert meta["mcp_surface"]["tool_groups"]["agent"] == 6
+    assert meta["mcp_surface"]["tool_groups"]["company"] == 4
+    assert meta["mcp_surface"]["tool_groups"]["market"] == 8
+    assert meta["mcp_surface"]["tool_groups"]["strategy"] == 4
+    assert meta["mcp_surface"]["tool_groups"]["social"] == 7
+    assert meta["mcp_surface"]["tool_groups"]["warfare"] == 4
+    assert meta["mcp_surface"]["mcp_only_local_preview_groups"] == ["notifications", "npc"]
 
 
 def test_sqlalchemy_mappers_and_metadata_create_on_sqlite() -> None:

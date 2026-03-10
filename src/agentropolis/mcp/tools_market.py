@@ -1,4 +1,4 @@
-"""Core MCP tools for market operations."""
+"""Market MCP tools for company-backed trading."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from agentropolis.services import market_engine
 
 
 @mcp.tool()
-async def get_market_prices_tool(company_api_key: str) -> dict:
+async def get_market_prices(company_api_key: str) -> dict:
     try:
         async with company_tool_context(company_api_key) as (session, _company):
             return {"ok": True, "prices": await market_engine.get_market_prices(session)}
@@ -18,7 +18,7 @@ async def get_market_prices_tool(company_api_key: str) -> dict:
 
 
 @mcp.tool()
-async def get_order_book_tool(company_api_key: str, resource: str) -> dict:
+async def get_order_book(company_api_key: str, resource: str) -> dict:
     try:
         async with company_tool_context(company_api_key) as (session, _company):
             return {"ok": True, "order_book": await market_engine.get_order_book(session, resource)}
@@ -27,16 +27,35 @@ async def get_order_book_tool(company_api_key: str, resource: str) -> dict:
 
 
 @mcp.tool()
-async def get_price_history_tool(company_api_key: str, resource: str, ticks: int = 50) -> dict:
+async def get_price_history(company_api_key: str, resource: str, ticks: int = 50) -> dict:
     try:
         async with company_tool_context(company_api_key) as (session, _company):
-            return {"ok": True, "history": await leaderboard_svc.get_price_history(session, resource, ticks=ticks)}
+            return {
+                "ok": True,
+                "history": await leaderboard_svc.get_price_history(session, resource, ticks=ticks),
+            }
     except Exception as exc:
         return handle_tool_error(exc)
 
 
 @mcp.tool()
-async def place_buy_order_tool(
+async def get_trade_history(
+    company_api_key: str,
+    resource: str | None = None,
+    ticks: int = 10,
+) -> dict:
+    try:
+        async with company_tool_context(company_api_key) as (session, _company):
+            return {
+                "ok": True,
+                "trades": await leaderboard_svc.get_trade_history(session, resource, ticks=ticks),
+            }
+    except Exception as exc:
+        return handle_tool_error(exc)
+
+
+@mcp.tool()
+async def place_buy_order(
     company_api_key: str,
     resource: str,
     quantity: float,
@@ -59,7 +78,7 @@ async def place_buy_order_tool(
 
 
 @mcp.tool()
-async def place_sell_order_tool(
+async def place_sell_order(
     company_api_key: str,
     resource: str,
     quantity: float,
@@ -82,7 +101,7 @@ async def place_sell_order_tool(
 
 
 @mcp.tool()
-async def cancel_order_tool(company_api_key: str, order_id: int) -> dict:
+async def cancel_order(company_api_key: str, order_id: int) -> dict:
     try:
         async with company_tool_context(company_api_key) as (session, company):
             cancelled = await market_engine.cancel_order(session, company.id, order_id)
@@ -93,18 +112,9 @@ async def cancel_order_tool(company_api_key: str, order_id: int) -> dict:
 
 
 @mcp.tool()
-async def get_my_orders_tool(company_api_key: str, status: str = "OPEN") -> dict:
+async def get_my_orders(company_api_key: str, status: str = "OPEN") -> dict:
     try:
         async with company_tool_context(company_api_key) as (session, company):
             return {"ok": True, "orders": await market_engine.get_my_orders(session, company.id, status=status)}
-    except Exception as exc:
-        return handle_tool_error(exc)
-
-
-@mcp.tool()
-async def get_market_analysis_tool(company_api_key: str, resource: str) -> dict:
-    try:
-        async with company_tool_context(company_api_key) as (session, _company):
-            return {"ok": True, "analysis": await leaderboard_svc.get_market_analysis(session, resource)}
     except Exception as exc:
         return handle_tool_error(exc)

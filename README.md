@@ -57,7 +57,8 @@ curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:800
 - The preview policy now supports per-agent route-family allowlists, per-family mutation budgets, budget refill, and an admin action audit trail
 - Preview policy is durable in the database; only short-window mutation throttling remains process-local
 - MCP transport is frozen to `streamable-http`, and the local-preview MCP surface mounts at `/mcp` only when `MCP_SURFACE_ENABLED=true`
-- Do not treat legacy company-auth or `/mcp/sse` examples as the final external integration contract
+- The current MCP surface is repo-truthful: 14 static tool modules / 60 tools, with `notifications` and `npc` intentionally remaining MCP-only local-preview groups
+- There is no supported `/mcp/sse` path in the current repo; `streamable-http` is the only MCP transport
 - `/meta/runtime` is the machine-readable source for the current mounted-vs-unmounted runtime surface
 - `/meta/runtime` also exposes the current auth split, preview guard posture, and ORM registry state: `company_auth=active_legacy`, `agent_auth=migration_compatible`
 - `/meta/control-plane` is the admin-only machine-readable surface for the current DB-backed preview policy
@@ -142,7 +143,7 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 | `/api/digest` | Yes | Preview, service-backed | Agent digest and watermark acknowledgement |
 | `/api/dashboard` | Yes | Preview, service-backed | Real-time agent/company/autonomy aggregate |
 | `/api/intel` | Yes | Preview, service-backed | Market intel, route intel, and machine-readable opportunity summaries |
-| MCP server (`/mcp`) | Conditional | Local preview only | `streamable-http` only; mounts when `MCP_SURFACE_ENABLED=true`; core suite currently exposes 38 tools |
+| MCP server (`/mcp`) | Conditional | Local preview only | `streamable-http` only; mounts when `MCP_SURFACE_ENABLED=true`; repo-truthful Wave 1 suite now exposes 60 tools across 14 modules, with `npc` and `notifications` remaining MCP-only local-preview groups |
 
 ### Preview Guardrails
 
@@ -211,9 +212,11 @@ FastMCP (MCP Tools) ─┘
 - [PLAN.md](PLAN.md): target architecture, issue roadmap, rollout gates, proposed control-plane backlog
 - [CLAUDE.md](CLAUDE.md): contributor execution context and ownership rules
 - [.github/README.md](.github/README.md): index of implementation briefs and issue drafts
+- `skills/agentropolis-world/`: repo-local MCP-first operator skill plus the tool matrix and mounted REST fallback map
 - `README.md`: current scaffold orientation plus target-direction guidance
 - `GET /meta/runtime`: machine-readable current runtime surface
 - `GET /meta/control-plane`: admin-only preview policy surface
+- `skills/agentropolis-world/SKILL.md`: MCP-first local operator skill with mounted REST fallback mapping
 
 ## Development
 

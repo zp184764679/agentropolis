@@ -1,25 +1,55 @@
-"""Core MCP tools for inventory reads."""
+"""Inventory MCP tools for company-owned resources."""
 
 from __future__ import annotations
 
-from agentropolis.mcp._shared import company_tool_context, handle_tool_error
+from sqlalchemy import select
+
+from agentropolis.mcp._shared import company_tool_context, handle_tool_error, public_tool_context
 from agentropolis.mcp.server import mcp
-from agentropolis.services.inventory_svc import get_inventory, get_resource_quantity
+from agentropolis.models import Resource
+from agentropolis.services.inventory_svc import (
+    get_inventory as get_inventory_svc,
+    get_resource_quantity,
+)
 
 
 @mcp.tool()
-async def get_inventory_tool(company_api_key: str) -> dict:
+async def get_inventory(company_api_key: str) -> dict:
     try:
         async with company_tool_context(company_api_key) as (session, company):
-            return {"ok": True, "items": await get_inventory(session, company.id)}
+            return {"ok": True, "items": await get_inventory_svc(session, company.id)}
     except Exception as exc:
         return handle_tool_error(exc)
 
 
 @mcp.tool()
-async def get_inventory_item_tool(company_api_key: str, resource: str) -> dict:
+async def get_inventory_item(company_api_key: str, resource: str) -> dict:
     try:
         async with company_tool_context(company_api_key) as (session, company):
             return {"ok": True, "item": await get_resource_quantity(session, company.id, resource)}
+    except Exception as exc:
+        return handle_tool_error(exc)
+
+
+@mcp.tool()
+async def get_resource_info(resource: str) -> dict:
+    try:
+        async with public_tool_context() as session:
+            result = await session.execute(
+                select(Resource).where(Resource.ticker == resource.upper())
+            )
+            item = result.scalar_one_or_none()
+            if item is None:
+                raise ValueError(f"Unknown resource ticker: {resource}")
+            return {
+                "ok": True,
+                "resource": {
+                    "ticker": item.ticker,
+                    "name": item.name,
+                    "category": item.category.value,
+                    "base_price": float(item.base_price),
+                    "description": item.description or "",
+                },
+            }
     except Exception as exc:
         return handle_tool_error(exc)

@@ -15,16 +15,28 @@ from agentropolis.database import async_session
 
 
 @asynccontextmanager
+async def public_tool_context():
+    async with async_session() as session:
+        yield session
+
+
+@asynccontextmanager
 async def agent_tool_context(
     agent_api_key: str,
     *,
     family: str,
     mutate: bool = False,
+    allow_in_degraded_mode: bool = False,
 ):
     async with async_session() as session:
         agent = await resolve_agent_from_api_key(session, agent_api_key)
         if mutate:
-            await allow_internal_preview_family_mutation(session, agent.id, family)
+            await allow_internal_preview_family_mutation(
+                session,
+                agent.id,
+                family,
+                allow_in_degraded_mode=allow_in_degraded_mode,
+            )
         else:
             await allow_internal_preview_family_access(session, agent.id, family)
         yield session, agent
