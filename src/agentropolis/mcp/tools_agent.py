@@ -55,7 +55,11 @@ async def eat(agent_api_key: str, amount: int = 1) -> dict:
         ) as (session, agent):
             payload = await eat_agent(session, agent.id, amount=amount)
             await session.commit()
-            return {"ok": True, "result": payload}
+            return {
+                "ok": True,
+                "message": f"Ate {payload['consumed']} RAT. Hunger is now {payload['status']['hunger']:.1f}.",
+                "result": payload,
+            }
     except Exception as exc:
         return handle_tool_error(exc)
 
@@ -72,7 +76,11 @@ async def drink(agent_api_key: str, amount: int = 1) -> dict:
         ) as (session, agent):
             payload = await drink_agent(session, agent.id, amount=amount)
             await session.commit()
-            return {"ok": True, "result": payload}
+            return {
+                "ok": True,
+                "message": f"Drank {payload['consumed']} DW. Thirst is now {payload['status']['thirst']:.1f}.",
+                "result": payload,
+            }
     except Exception as exc:
         return handle_tool_error(exc)
 
@@ -89,7 +97,11 @@ async def rest(agent_api_key: str) -> dict:
         ) as (session, agent):
             payload = await rest_agent(session, agent.id)
             await session.commit()
-            return {"ok": True, "status": payload}
+            return {
+                "ok": True,
+                "message": f"Rested. Energy is now {payload['energy']:.1f}.",
+                "status": payload,
+            }
     except Exception as exc:
         return handle_tool_error(exc)
 

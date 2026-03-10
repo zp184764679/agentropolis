@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import re
 
 from agentropolis.mcp.tools_agent import (
+    drink,
+    eat,
     get_agent_profile,
     get_agent_status,
     register_agent,
+    rest,
 )
 from agentropolis.mcp.tools_company import (
     create_company,
@@ -36,6 +40,7 @@ from agentropolis.mcp.tools_market import (
     place_sell_order,
 )
 from agentropolis.mcp.tools_production import (
+    build_building,
     get_building_types,
     get_recipes,
     start_production,
@@ -46,6 +51,7 @@ from agentropolis.mcp.tools_social import (
     create_guild,
     get_guild,
     join_guild,
+    leave_guild,
     list_guilds,
     relationship_tool,
     treaty_tool,
@@ -129,6 +135,10 @@ def _normalized_digest(payload: dict) -> dict:
     normalized = dict(payload)
     normalized["generated_at"] = "<generated>"
     return normalized
+
+
+def _normalized_message(message: str) -> str:
+    return re.sub(r"\d+(?:\.\d+)?", "<n>", message)
 
 
 def _normalized_guild(payload: dict) -> dict:
@@ -688,6 +698,244 @@ def test_rest_and_mcp_cover_strategy_social_and_warfare_parity() -> None:
             assert mcp_contract["contract"] == rest_contract.json()
             assert mcp_contract_list["contracts"] == rest_contract_list.json()["contracts"]
             assert mcp_threats["threats"] == rest_threats.json()
+
+    asyncio.run(scenario())
+
+
+def test_rest_and_mcp_cover_mutation_message_parity_for_agent_and_company_flows() -> None:
+    async def scenario() -> None:
+        async with seeded_client() as (client, _session_factory):
+            rest_agent = await register_agent("Parity Rest Mutator")
+            mcp_agent = await register_agent("Parity MCP Mutator")
+            assert rest_agent["ok"] is True
+            assert mcp_agent["ok"] is True
+
+            rest_agent_key = rest_agent["agent"]["api_key"]
+            mcp_agent_key = mcp_agent["agent"]["api_key"]
+
+            rest_eat = await client.post(
+                "/api/agent/eat",
+                headers=api_key_headers(rest_agent_key),
+                params={"amount": 1},
+            )
+            mcp_eat = await eat(mcp_agent_key, amount=1)
+            assert rest_eat.status_code == 200
+            assert mcp_eat["ok"] is True
+            assert _normalized_message(mcp_eat["message"]) == _normalized_message(rest_eat.json()["message"])
+
+            rest_drink = await client.post(
+                "/api/agent/drink",
+                headers=api_key_headers(rest_agent_key),
+                params={"amount": 1},
+            )
+            mcp_drink = await drink(mcp_agent_key, amount=1)
+            assert rest_drink.status_code == 200
+            assert mcp_drink["ok"] is True
+            assert _normalized_message(mcp_drink["message"]) == _normalized_message(rest_drink.json()["message"])
+
+            rest_rest = await client.post(
+                "/api/agent/rest",
+                headers=api_key_headers(rest_agent_key),
+            )
+            mcp_rest = await rest(mcp_agent_key)
+            assert rest_rest.status_code == 200
+            assert mcp_rest["ok"] is True
+            assert _normalized_message(mcp_rest["message"]) == _normalized_message(rest_rest.json()["message"])
+
+            rest_owner = await register_agent("Parity Rest Builder")
+            mcp_owner = await register_agent("Parity MCP Builder")
+            assert rest_owner["ok"] is True
+            assert mcp_owner["ok"] is True
+
+            rest_company = await create_company(rest_owner["agent"]["api_key"], "Parity Rest Builder Works")
+            mcp_company = await create_company(mcp_owner["agent"]["api_key"], "Parity MCP Builder Works")
+            assert rest_company["ok"] is True
+            assert mcp_company["ok"] is True
+
+            rest_company_key = rest_company["company"]["api_key"]
+            mcp_company_key = mcp_company["company"]["api_key"]
+
+            rest_build = await client.post(
+                "/api/production/build",
+                headers=api_key_headers(rest_company_key),
+                json={"building_type": "extractor"},
+            )
+            mcp_build = await build_building(mcp_company_key, "extractor")
+            assert rest_build.status_code == 200
+            assert mcp_build["ok"] is True
+            assert _normalized_message(mcp_build["message"]) == _normalized_message(rest_build.json()["message"])
+
+            rest_buildings = await client.get(
+                "/api/production/buildings",
+                headers=api_key_headers(rest_company_key),
+            )
+            mcp_buildings = await client.get(
+                "/api/production/buildings",
+                headers=api_key_headers(mcp_company_key),
+            )
+            rest_recipes = await client.get("/api/production/recipes")
+            assert rest_buildings.status_code == 200
+            assert mcp_buildings.status_code == 200
+            assert rest_recipes.status_code == 200
+
+            recipe = next(
+                item for item in rest_recipes.json() if item["building_type"] == "extractor"
+            )
+            rest_building_id = next(
+                building["building_id"]
+                for building in rest_buildings.json()
+                if building["building_type"] == "extractor" and building["active_recipe"] is None
+            )
+            mcp_building_id = next(
+                building["building_id"]
+                for building in mcp_buildings.json()
+                if building["building_type"] == "extractor" and building["active_recipe"] is None
+            )
+
+            rest_start = await client.post(
+                "/api/production/start",
+                headers=api_key_headers(rest_company_key),
+                json={"building_id": rest_building_id, "recipe_id": recipe["recipe_id"]},
+            )
+            mcp_start = await start_production(
+                mcp_company_key,
+                building_id=mcp_building_id,
+                recipe_id=recipe["recipe_id"],
+            )
+            assert rest_start.status_code == 200
+            assert mcp_start["ok"] is True
+            assert _normalized_message(mcp_start["message"]) == _normalized_message(rest_start.json()["message"])
+
+            rest_stop = await client.post(
+                "/api/production/stop",
+                headers=api_key_headers(rest_company_key),
+                params={"building_id": rest_building_id},
+            )
+            mcp_stop = await stop_production(mcp_company_key, building_id=mcp_building_id)
+            assert rest_stop.status_code == 200
+            assert mcp_stop["ok"] is True
+            assert _normalized_message(mcp_stop["message"]) == _normalized_message(rest_stop.json()["message"])
+
+    asyncio.run(scenario())
+
+
+def test_rest_and_mcp_cover_mutation_message_parity_for_social_and_warfare() -> None:
+    async def scenario() -> None:
+        async with seeded_client() as (client, _session_factory):
+            rest_leader = await register_agent("Parity Rest Leader")
+            rest_member = await register_agent("Parity Rest Member")
+            mcp_leader = await register_agent("Parity MCP Leader")
+            mcp_member = await register_agent("Parity MCP Member")
+            assert all(
+                created["ok"] is True
+                for created in (rest_leader, rest_member, mcp_leader, mcp_member)
+            )
+
+            rest_leader_key = rest_leader["agent"]["api_key"]
+            rest_member_key = rest_member["agent"]["api_key"]
+            mcp_leader_key = mcp_leader["agent"]["api_key"]
+            mcp_member_key = mcp_member["agent"]["api_key"]
+
+            rest_guild = await client.post(
+                "/api/guild/create",
+                headers=api_key_headers(rest_leader_key),
+                json={"name": "Parity Rest Guild", "home_region_id": 1},
+            )
+            mcp_guild = await create_guild(mcp_leader_key, "Parity MCP Guild", 1)
+            assert rest_guild.status_code == 200
+            assert mcp_guild["ok"] is True
+
+            rest_guild_id = rest_guild.json()["guild_id"]
+            mcp_guild_id = mcp_guild["guild"]["guild_id"]
+
+            rest_join = await client.post(
+                f"/api/guild/{rest_guild_id}/join",
+                headers=api_key_headers(rest_member_key),
+            )
+            mcp_join = await join_guild(mcp_member_key, mcp_guild_id)
+            assert rest_join.status_code == 200
+            assert mcp_join["ok"] is True
+            assert _normalized_message(mcp_join["message"]) == _normalized_message(rest_join.json()["message"])
+
+            rest_leave = await client.post(
+                f"/api/guild/{rest_guild_id}/leave",
+                headers=api_key_headers(rest_member_key),
+            )
+            mcp_leave = await leave_guild(mcp_member_key, mcp_guild_id)
+            assert rest_leave.status_code == 200
+            assert mcp_leave["ok"] is True
+            assert _normalized_message(mcp_leave["message"]) == _normalized_message(rest_leave.json()["message"])
+
+            rest_transport = await client.post(
+                "/api/transport/create",
+                headers=api_key_headers(rest_leader_key),
+                json={
+                    "from_region_id": 1,
+                    "to_region_id": 2,
+                    "items": {"RAT": 1},
+                    "transport_type": "backpack",
+                },
+            )
+            mcp_transport = await client.post(
+                "/api/transport/create",
+                headers=api_key_headers(mcp_leader_key),
+                json={
+                    "from_region_id": 1,
+                    "to_region_id": 2,
+                    "items": {"RAT": 1},
+                    "transport_type": "backpack",
+                },
+            )
+            assert rest_transport.status_code == 200
+            assert mcp_transport.status_code == 200
+
+            rest_contract = await client.post(
+                "/api/warfare/contracts",
+                headers=api_key_headers(rest_leader_key),
+                json={
+                    "mission_type": "raid_transport",
+                    "target_region_id": 2,
+                    "reward_per_agent": 100,
+                    "max_agents": 1,
+                    "target_transport_id": rest_transport.json()["transport_id"],
+                },
+            )
+            mcp_contract = await create_contract(
+                mcp_leader_key,
+                mission_type="raid_transport",
+                target_region_id=2,
+                reward_per_agent=100,
+                max_agents=1,
+                target_transport_id=mcp_transport.json()["transport_id"],
+            )
+            assert rest_contract.status_code == 200
+            assert mcp_contract["ok"] is True
+
+            rest_enlist = await client.post(
+                f"/api/warfare/contracts/{rest_contract.json()['contract_id']}/enlist",
+                headers=api_key_headers(rest_member_key),
+            )
+            mcp_enlist = await contract_action_tool(
+                mcp_member_key,
+                action="enlist",
+                contract_id=mcp_contract["contract"]["contract_id"],
+            )
+            assert rest_enlist.status_code == 200
+            assert mcp_enlist["ok"] is True
+            assert _normalized_message(mcp_enlist["message"]) == _normalized_message(rest_enlist.json()["message"])
+
+            rest_cancel = await client.post(
+                f"/api/warfare/contracts/{rest_contract.json()['contract_id']}/cancel",
+                headers=api_key_headers(rest_leader_key),
+            )
+            mcp_cancel = await contract_action_tool(
+                mcp_leader_key,
+                action="cancel",
+                contract_id=mcp_contract["contract"]["contract_id"],
+            )
+            assert rest_cancel.status_code == 200
+            assert mcp_cancel["ok"] is True
+            assert _normalized_message(mcp_cancel["message"]) == _normalized_message(rest_cancel.json()["message"])
 
     asyncio.run(scenario())
 

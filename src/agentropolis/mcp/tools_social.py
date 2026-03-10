@@ -77,7 +77,11 @@ async def join_guild(agent_api_key: str, guild_id: int) -> dict:
         ) as (session, agent):
             payload = await join_guild_svc(session, agent.id, guild_id)
             await session.commit()
-            return {"ok": True, "membership": payload}
+            return {
+                "ok": True,
+                "message": f"Joined guild {payload['guild_id']} as {payload['rank']}.",
+                "membership": payload,
+            }
     except Exception as exc:
         return handle_tool_error(exc)
 
@@ -93,7 +97,11 @@ async def leave_guild(agent_api_key: str, guild_id: int) -> dict:
         ) as (session, agent):
             await leave_guild_svc(session, agent.id, guild_id)
             await session.commit()
-            return {"ok": True, "guild_id": guild_id}
+            return {
+                "ok": True,
+                "message": f"Left guild {guild_id}.",
+                "guild_id": guild_id,
+            }
     except Exception as exc:
         return handle_tool_error(exc)
 

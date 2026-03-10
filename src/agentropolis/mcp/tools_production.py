@@ -59,7 +59,13 @@ async def build_building(company_api_key: str, building_type: str) -> dict:
         ) as (session, company):
             payload = await build_building_svc(session, company.id, building_type)
             await session.commit()
-            return {"ok": True, "building": payload}
+            return {
+                "ok": True,
+                "message": (
+                    f"Constructed {payload['building_type']} as building {payload['building_id']}."
+                ),
+                "building": payload,
+            }
     except ValueError as exc:
         return handle_tool_error(
             parity_http_error(
@@ -87,7 +93,14 @@ async def start_production(
         ) as (session, company):
             payload = await start_production_svc(session, company.id, building_id, recipe_id)
             await session.commit()
-            return {"ok": True, "production": payload}
+            return {
+                "ok": True,
+                "message": (
+                    f"Started {payload['recipe']} on building {payload['building_id']} "
+                    f"(eta {payload['eta_ticks']} ticks)."
+                ),
+                "production": payload,
+            }
     except ValueError as exc:
         return handle_tool_error(
             parity_http_error(
@@ -111,7 +124,16 @@ async def stop_production(company_api_key: str, building_id: int) -> dict:
         ) as (session, company):
             stopped = await stop_production_svc(session, company.id, building_id)
             await session.commit()
-            return {"ok": True, "stopped": bool(stopped), "building_id": building_id}
+            return {
+                "ok": True,
+                "message": (
+                    f"Stopped production on building {building_id}."
+                    if stopped
+                    else f"Building {building_id} was already idle."
+                ),
+                "stopped": bool(stopped),
+                "building_id": building_id,
+            }
     except ValueError as exc:
         return handle_tool_error(
             parity_http_error(

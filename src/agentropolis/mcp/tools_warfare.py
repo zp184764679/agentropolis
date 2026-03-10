@@ -97,7 +97,14 @@ async def contract_action_tool(
             if action == "enlist":
                 payload = await warfare_svc.enlist_in_contract(session, agent.id, contract_id)
                 await session.commit()
-                return {"ok": True, "result": payload}
+                return {
+                    "ok": True,
+                    "message": (
+                        f"Enlisted as {payload['role']} "
+                        f"({payload['enlisted_count']}/{payload['max_agents']})"
+                    ),
+                    "result": payload,
+                }
 
             if action == "activate":
                 contract = await warfare_svc.get_contract(session, contract_id)
@@ -107,11 +114,21 @@ async def contract_action_tool(
                     raise parity_http_error(403, "Only the employer can activate")
                 payload = await warfare_svc.activate_contract(session, contract_id)
                 await session.commit()
-                return {"ok": True, "result": payload}
+                return {
+                    "ok": True,
+                    "message": f"Contract activated with {payload['active_agents']} agents",
+                    "result": payload,
+                }
             if action == "cancel":
                 payload = await warfare_svc.cancel_contract(session, agent.id, contract_id)
                 await session.commit()
-                return {"ok": True, "result": payload}
+                return {
+                    "ok": True,
+                    "message": (
+                        f"Contract cancelled. Refund: {payload['refund']}, fee: {payload['fee']}"
+                    ),
+                    "result": payload,
+                }
             if action == "execute":
                 contract = await warfare_svc.get_contract(session, contract_id)
                 if contract is None:
