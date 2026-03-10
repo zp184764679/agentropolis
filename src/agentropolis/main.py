@@ -6,14 +6,15 @@ Current runtime role:
 - expose a minimal health endpoint
 
 Target runtime direction:
-- start housekeeping/background orchestration in lifespan
+- start housekeeping/background orchestration in lifespan when enabled
 - mount the stabilized MCP surface once the control contract is frozen
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -33,13 +34,18 @@ from agentropolis.api.strategy import router as strategy_router
 from agentropolis.api.transport import router as transport_router
 from agentropolis.api.warfare import router as warfare_router
 from agentropolis.api.world import router as world_router
-from agentropolis.api.preview_guard import ERROR_CODE_HEADER
+from agentropolis.api.preview_guard import (
+    ERROR_CODE_HEADER,
+    get_preview_guard_state,
+)
 from agentropolis.config import settings
-from agentropolis.database import async_session, engine
+from agentropolis.database import async_session, engine, get_session
 from agentropolis.middleware import REQUEST_ID_HEADER, RequestContextMiddleware
 from agentropolis.runtime_meta import build_runtime_metadata
+from agentropolis.services.game_engine import run_tick_loop
 from agentropolis.services.seed import seed_game_data
 from agentropolis.services.seed_world import seed_world
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -47,19 +53,30 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: seed initial data and manage long-lived runtime hooks."""
+    housekeeping_stop: asyncio.Event | None = None
+    housekeeping_task: asyncio.Task | None = None
+
     # Seed game data
     async with async_session() as session:
         resource_result = await seed_game_data(session)
         world_result = await seed_world(session)
         logger.info("Seed complete: resources=%s world=%s", resource_result, world_result)
 
-    # TODO: replace the legacy tick-loop stub with housekeeping/background orchestration.
-    # task = asyncio.create_task(run_housekeeping_loop())
+    if settings.HOUSEKEEPING_AUTOSTART:
+        housekeeping_stop = asyncio.Event()
+        housekeeping_task = asyncio.create_task(run_tick_loop(housekeeping_stop))
+        logger.info("Housekeeping loop started")
 
     yield
 
-    # TODO: cancel the housekeeping/background task on shutdown.
-    # task.cancel()
+    if housekeeping_stop is not None:
+        housekeeping_stop.set()
+    if housekeeping_task is not None:
+        housekeeping_task.cancel()
+        try:
+            await housekeeping_task
+        except asyncio.CancelledError:
+            pass
 
     await engine.dispose()
 
@@ -111,9 +128,11 @@ async def health():
 
 
 @app.get("/meta/runtime")
-async def runtime_metadata():
+async def runtime_metadata(session: AsyncSession = Depends(get_session)):
     """Machine-readable snapshot of the current scaffold/runtime surface."""
-    return build_runtime_metadata()
+    return build_runtime_metadata(
+        preview_guard_state=await get_preview_guard_state(session)
+    )
 
 
 @app.exception_handler(HTTPException)

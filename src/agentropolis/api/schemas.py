@@ -169,6 +169,8 @@ class InventoryResponse(BaseModel):
 class CompanyStatus(BaseModel):
     company_id: int
     name: str
+    founder_agent_id: int | None = None
+    region_id: int | None = None
     balance: float
     net_worth: float
     is_active: bool
@@ -179,6 +181,7 @@ class CompanyStatus(BaseModel):
 
 
 class WorkerInfo(BaseModel):
+    company_id: int | None = None
     count: int
     satisfaction: float
     rat_consumption_per_tick: float
@@ -236,7 +239,9 @@ class PreviewControlPlaneResponse(BaseModel):
     family_limits: dict[str, int] = Field(default_factory=dict)
     agent_policy_count: int = 0
     audit_log_size: int = 0
+    policy_features: dict = Field(default_factory=dict)
     rate_limit_store: str
+    persistent_policy_store: str | None = None
     error_codes: dict[str, str] = Field(default_factory=dict)
     admin_api: dict = Field(default_factory=dict)
     agent_policies: list["PreviewAgentPolicyResponse"] = Field(default_factory=list)
@@ -314,6 +319,20 @@ class AgentRegisterResponse(BaseModel):
     current_region_id: int
     balance: int
     message: str = "Agent registered. Save your API key - it cannot be retrieved later."
+
+
+class AgentCompanyCreateRequest(BaseModel):
+    company_name: str = Field(..., min_length=2, max_length=100)
+
+
+class AgentCompanyCreateResponse(BaseModel):
+    company_id: int
+    company_name: str
+    founder_agent_id: int
+    region_id: int | None = None
+    api_key: str = Field(..., description="Store this! It cannot be retrieved again.")
+    initial_balance: float
+    message: str = "Company registered. Save your API key - it cannot be retrieved later."
 
 
 class AgentStatus(BaseModel):

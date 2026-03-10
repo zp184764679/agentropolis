@@ -12,11 +12,16 @@ from agentropolis.api.preview_guard import (
     require_preview_surface,
 )
 from agentropolis.api.schemas import (
+    AgentCompanyCreateRequest,
+    AgentCompanyCreateResponse,
     AgentPublicProfile,
     AgentRegisterRequest,
     AgentRegisterResponse,
     AgentStatus,
+    BuildingInfo,
+    CompanyStatus,
     SuccessResponse,
+    WorkerInfo,
 )
 from agentropolis.database import get_session
 from agentropolis.models import Agent
@@ -27,6 +32,12 @@ from agentropolis.services.agent_svc import (
     register_agent as register_agent_svc,
     rest as rest_agent,
 )
+from agentropolis.services.company_svc import (
+    get_agent_company,
+    get_company_workers,
+    register_company as register_company_svc,
+)
+from agentropolis.services.production import get_agent_company_buildings
 from agentropolis.services.strategy_svc import get_public_profile
 from agentropolis.services.trait_svc import get_agent_traits
 
@@ -58,6 +69,78 @@ async def register_agent(
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from None
+
+
+@router.post(
+    "/company",
+    response_model=AgentCompanyCreateResponse,
+    dependencies=[Depends(agent_self_write_guard)],
+)
+async def register_company(
+    req: AgentCompanyCreateRequest,
+    agent: Agent = Depends(get_current_agent),
+    session: AsyncSession = Depends(get_session),
+):
+    """Create the current agent's company and receive its company API key."""
+    try:
+        result = await register_company_svc(
+            session,
+            req.company_name,
+            founder_agent_id=agent.id,
+        )
+        await session.commit()
+        return result
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+
+
+@router.get(
+    "/company",
+    response_model=CompanyStatus,
+    dependencies=[Depends(agent_self_access_guard)],
+)
+async def get_my_company(
+    agent: Agent = Depends(get_current_agent),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get the active company owned by the current agent."""
+    company = await get_agent_company(session, agent.id)
+    if company is None:
+        raise HTTPException(status_code=404, detail="Agent does not have an active company")
+    return company
+
+
+@router.get(
+    "/company/workers",
+    response_model=WorkerInfo,
+    dependencies=[Depends(agent_self_access_guard)],
+)
+async def get_my_company_workers(
+    agent: Agent = Depends(get_current_agent),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get workforce details for the current agent's company."""
+    company = await get_agent_company(session, agent.id)
+    if company is None:
+        raise HTTPException(status_code=404, detail="Agent does not have an active company")
+    return await get_company_workers(session, company["company_id"])
+
+
+@router.get(
+    "/company/buildings",
+    response_model=list[BuildingInfo],
+    dependencies=[Depends(agent_self_access_guard)],
+)
+async def get_my_company_buildings(
+    agent: Agent = Depends(get_current_agent),
+    session: AsyncSession = Depends(get_session),
+):
+    """List the current agent's company buildings."""
+    try:
+        return await get_agent_company_buildings(session, agent.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from None
 
 
 @router.get("/status", response_model=AgentStatus)

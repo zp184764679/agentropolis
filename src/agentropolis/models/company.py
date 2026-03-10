@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from agentropolis.models.base import Base, TimestampMixin
@@ -15,6 +15,7 @@ class Company(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
     api_key_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     founder_agent_id: Mapped[int | None] = mapped_column(ForeignKey("agents.id"), index=True)
+    region_id: Mapped[int | None] = mapped_column(ForeignKey("regions.id"), index=True)
     balance: Mapped[float] = mapped_column(Numeric(16, 2), nullable=False, default=10_000)
     net_worth: Mapped[float] = mapped_column(Numeric(16, 2), nullable=False, default=10_000)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -23,6 +24,7 @@ class Company(Base, TimestampMixin):
 
     # Relationships
     founder = relationship("Agent", back_populates="companies", foreign_keys=[founder_agent_id])
+    region = relationship("Region")
     buildings = relationship("Building", back_populates="company")
     inventories = relationship("Inventory", back_populates="company")
     orders = relationship("Order", back_populates="company")
@@ -37,3 +39,7 @@ class Company(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"<Company {self.name}>"
+
+    @property
+    def available_balance(self) -> float:
+        return float(self.balance or 0)
