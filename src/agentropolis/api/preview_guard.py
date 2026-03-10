@@ -27,6 +27,24 @@ from agentropolis.api.auth import get_current_agent
 from agentropolis.config import settings
 from agentropolis.middleware import REQUEST_ID_HEADER
 
+ERROR_CODE_HEADER = "X-Agentropolis-Error-Code"
+ERROR_CODE_CATALOG = {
+    "preview_surface_disabled": "Global preview surface kill switch is active.",
+    "preview_writes_disabled": "Preview writes are disabled by runtime policy.",
+    "preview_warfare_mutations_disabled": "Warfare preview mutations are disabled.",
+    "preview_{family}_degraded_mode_blocked": "Preview mutations for this route family are blocked in degraded mode.",
+    "preview_{family}_rate_limited": "Preview mutation quota exceeded for this route family.",
+    "preview_registration_rate_limited": "Preview registration quota exceeded for this client fingerprint.",
+    "preview_mutation_rate_limited": "Generic preview mutation quota exceeded.",
+    "preview_{family}_access_denied": "Authenticated preview access is not allowed for this route family.",
+    "preview_{family}_budget_exhausted": "Configured preview mutation budget for this route family is exhausted.",
+    "control_plane_admin_unconfigured": "Control-plane admin token is not configured.",
+    "control_plane_admin_invalid": "Control-plane admin token is invalid.",
+    "control_plane_policy_invalid": "Submitted control-plane agent policy payload is invalid.",
+    "control_plane_budget_refill_invalid": "Submitted budget refill payload is invalid.",
+    "control_plane_policy_not_found": "Requested preview agent policy does not exist.",
+    "not_implemented": "Legacy scaffold handler is mounted but not implemented yet.",
+}
 _mutation_windows: dict[str, deque[float]] = defaultdict(deque)
 _mutation_lock = Lock()
 _policy_lock = Lock()
@@ -61,6 +79,7 @@ def _record_window_event(
     limit: int,
     window_seconds: int,
     detail: str,
+    error_code: str,
 ) -> None:
     if limit <= 0:
         return
@@ -77,7 +96,10 @@ def _record_window_event(
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=detail,
-                headers={"Retry-After": str(window_seconds)},
+                headers={
+                    "Retry-After": str(window_seconds),
+                    ERROR_CODE_HEADER: error_code,
+                },
             )
 
         bucket.append(now)
@@ -94,6 +116,22 @@ def _policy_value(name: str, default: bool) -> bool:
     with _policy_lock:
         override = _policy_overrides[name]
     return default if override is None else override
+
+
+def _guard_exception(
+    *,
+    status_code: int,
+    detail: str,
+    error_code: str,
+    headers: dict[str, str] | None = None,
+) -> HTTPException:
+    merged_headers = dict(headers or {})
+    merged_headers[ERROR_CODE_HEADER] = error_code
+    return HTTPException(
+        status_code=status_code,
+        detail=detail,
+        headers=merged_headers,
+    )
 
 
 def _preview_surface_enabled() -> bool:
@@ -194,6 +232,9 @@ def _require_agent_family_authorized(agent_id: int, family: str) -> None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Preview {family} access is not allowed for agent {agent_id}.",
+            headers={
+                ERROR_CODE_HEADER: f"preview_{family}_access_denied",
+            },
         )
 
 
@@ -220,6 +261,9 @@ def _consume_agent_budget(agent_id: int, family: str) -> None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Preview {family} budget exhausted for agent {agent_id}.",
+                headers={
+                    ERROR_CODE_HEADER: f"preview_{family}_budget_exhausted",
+                },
             )
         family_budgets[family] = remaining - 1
         policy["updated_at"] = _utc_now()
@@ -236,30 +280,36 @@ def _require_agent_budget_available(agent_id: int, family: str) -> None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Preview {family} budget exhausted for agent {agent_id}.",
+            headers={
+                ERROR_CODE_HEADER: f"preview_{family}_budget_exhausted",
+            },
         )
 
 
 def _require_preview_surface_enabled() -> None:
     if not _preview_surface_enabled():
-        raise HTTPException(
+        raise _guard_exception(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Preview surface is disabled by runtime policy.",
+            error_code="preview_surface_disabled",
         )
 
 
 def _require_preview_writes_enabled() -> None:
     if not _preview_writes_enabled():
-        raise HTTPException(
+        raise _guard_exception(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Preview write operations are disabled by runtime policy.",
+            error_code="preview_writes_disabled",
         )
 
 
 def _require_warfare_mutations_enabled() -> None:
     if not _warfare_mutations_enabled():
-        raise HTTPException(
+        raise _guard_exception(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Warfare preview mutations are disabled by runtime policy.",
+            error_code="preview_warfare_mutations_disabled",
         )
 
 
@@ -269,9 +319,10 @@ def _require_family_degraded_policy(
     allow_in_degraded_mode: bool,
 ) -> None:
     if _preview_degraded_mode() and not allow_in_degraded_mode:
-        raise HTTPException(
+        raise _guard_exception(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Preview {family} mutations are disabled in degraded mode.",
+            error_code=f"preview_{family}_degraded_mode_blocked",
         )
 
 
@@ -281,6 +332,7 @@ def _record_agent_mutation(agent_id: Any, family: str) -> None:
         limit=_family_limit(family),
         window_seconds=settings.PREVIEW_MUTATION_WINDOW_SECONDS,
         detail=f"Preview {family} mutation rate limit exceeded.",
+        error_code=f"preview_{family}_rate_limited",
     )
 
 
@@ -298,6 +350,7 @@ async def require_preview_registration_write(request: Request) -> None:
         limit=settings.PREVIEW_REGISTRATIONS_PER_WINDOW_PER_HOST,
         window_seconds=settings.PREVIEW_MUTATION_WINDOW_SECONDS,
         detail="Preview registration rate limit exceeded.",
+        error_code="preview_registration_rate_limited",
     )
 
 
@@ -332,6 +385,7 @@ async def require_agent_preview_write(agent: Any = Depends(get_current_agent)) -
         limit=settings.PREVIEW_AGENT_MUTATIONS_PER_WINDOW,
         window_seconds=settings.PREVIEW_MUTATION_WINDOW_SECONDS,
         detail="Preview mutation rate limit exceeded.",
+        error_code="preview_mutation_rate_limited",
     )
 
 
@@ -353,14 +407,16 @@ async def require_control_plane_admin(
     """Protect mutable control-plane actions behind a static admin token."""
     expected = settings.CONTROL_PLANE_ADMIN_TOKEN
     if not expected:
-        raise HTTPException(
+        raise _guard_exception(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Control-plane admin token is not configured.",
+            error_code="control_plane_admin_unconfigured",
         )
     if admin_token != expected:
-        raise HTTPException(
+        raise _guard_exception(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid control-plane admin token.",
+            error_code="control_plane_admin_invalid",
         )
     token_fingerprint = hashlib.sha256(admin_token.encode()).hexdigest()[:8]
     return f"control-plane-admin:{token_fingerprint}"
@@ -392,13 +448,17 @@ def get_preview_guard_state() -> dict[str, Any]:
             "admin_action_context": "structured_reason_note",
             "budget_refill_support": True,
             "audit_filter_support": True,
+            "audit_request_id_filtering": True,
+            "stable_error_codes": True,
         },
         "rate_limit_store": "process_local_best_effort",
+        "error_codes": dict(ERROR_CODE_CATALOG),
         "admin_api": {
             "path": "/meta/control-plane",
             "configured": bool(settings.CONTROL_PLANE_ADMIN_TOKEN),
             "token_header": "X-Control-Plane-Token",
             "request_id_header": REQUEST_ID_HEADER,
+            "error_code_header": ERROR_CODE_HEADER,
         },
     }
 
@@ -606,6 +666,7 @@ def list_control_plane_audit(
     action: str | None = None,
     target_agent_id: int | None = None,
     reason_code: str | None = None,
+    request_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Return recent admin actions for the process-local preview policy."""
     with _policy_lock:
@@ -617,6 +678,8 @@ def list_control_plane_audit(
         entries = [entry for entry in entries if entry["target_agent_id"] == target_agent_id]
     if reason_code is not None:
         entries = [entry for entry in entries if entry["reason_code"] == reason_code]
+    if request_id is not None:
+        entries = [entry for entry in entries if entry["request_id"] == request_id]
     return entries[: max(limit, 0)]
 
 

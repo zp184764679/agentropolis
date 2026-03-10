@@ -13,7 +13,7 @@ Target runtime direction:
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -32,9 +32,10 @@ from agentropolis.api.strategy import router as strategy_router
 from agentropolis.api.transport import router as transport_router
 from agentropolis.api.warfare import router as warfare_router
 from agentropolis.api.world import router as world_router
+from agentropolis.api.preview_guard import ERROR_CODE_HEADER
 from agentropolis.config import settings
 from agentropolis.database import async_session, engine
-from agentropolis.middleware import RequestContextMiddleware
+from agentropolis.middleware import REQUEST_ID_HEADER, RequestContextMiddleware
 from agentropolis.runtime_meta import build_runtime_metadata
 from agentropolis.services.seed import seed_game_data
 from agentropolis.services.seed_world import seed_world
@@ -114,13 +115,44 @@ async def runtime_metadata():
     return build_runtime_metadata()
 
 
+@app.exception_handler(HTTPException)
+async def handle_http_exception(request: Request, exc: HTTPException):
+    """Expose stable error metadata for HTTP-layer failures."""
+    headers = dict(exc.headers or {})
+    request_id = getattr(request.state, "request_id", None)
+    if request_id and REQUEST_ID_HEADER not in headers:
+        headers[REQUEST_ID_HEADER] = request_id
+
+    content = {"detail": exc.detail}
+    if request_id:
+        content["request_id"] = request_id
+
+    error_code = headers.get(ERROR_CODE_HEADER)
+    if error_code:
+        content["error_code"] = error_code
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=content,
+        headers=headers,
+    )
+
+
 @app.exception_handler(NotImplementedError)
-async def handle_not_implemented(_: Request, exc: NotImplementedError):
+async def handle_not_implemented(request: Request, exc: NotImplementedError):
     """Expose scaffold placeholders as HTTP 501 instead of generic 500s."""
+    request_id = getattr(request.state, "request_id", None)
+    error_code = "not_implemented"
+    headers = {ERROR_CODE_HEADER: error_code}
+    if request_id:
+        headers[REQUEST_ID_HEADER] = request_id
     return JSONResponse(
         status_code=501,
         content={
             "detail": str(exc) or "This scaffold endpoint is not implemented yet.",
             "status": "not_implemented",
+            "error_code": error_code,
+            **({"request_id": request_id} if request_id else {}),
         },
+        headers=headers,
     )

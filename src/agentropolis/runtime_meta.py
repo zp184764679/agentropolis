@@ -7,7 +7,10 @@ file presence alone.
 
 from __future__ import annotations
 
-from agentropolis.api.preview_guard import build_preview_guard_metadata
+from agentropolis.api.preview_guard import (
+    ERROR_CODE_HEADER,
+    build_preview_guard_metadata,
+)
 from agentropolis.middleware import REQUEST_ID_HEADER
 from agentropolis.models import Base
 
@@ -117,13 +120,17 @@ def build_runtime_metadata() -> dict:
             "scope": "process_local_preview_policy",
             "persistent": False,
             "request_id_header": REQUEST_ID_HEADER,
+            "error_code_header": ERROR_CODE_HEADER,
+            "error_code_catalog": "preview_guard.error_codes",
             "features": [
                 "runtime_policy_toggles",
                 "per_agent_family_authz",
                 "per_family_budgets",
                 "budget_refill",
                 "audit_log_filtering",
+                "audit_request_id_filtering",
                 "audit_request_context",
+                "stable_error_codes",
             ],
         },
         "auth_surface": {
@@ -146,6 +153,7 @@ def build_runtime_metadata() -> dict:
             "mounted_route_groups": MOUNTED_ROUTE_GROUPS,
             "unmounted_route_groups": UNMOUNTED_ROUTE_GROUPS,
             "placeholder_error_status": 501,
+            "error_code_header": ERROR_CODE_HEADER,
         },
         "mcp_surface": {
             "mounted": False,

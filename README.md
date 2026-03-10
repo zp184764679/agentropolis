@@ -60,7 +60,9 @@ curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:800
 - `/meta/runtime` is the machine-readable source for the current mounted-vs-unmounted runtime surface
 - `/meta/runtime` also exposes the current auth split, preview guard posture, and ORM registry state: `company_auth=active_legacy`, `agent_auth=migration_compatible`
 - `/meta/control-plane` is the admin-only machine-readable surface for current process-local preview policy
-- Responses now carry `X-Agentropolis-Request-ID`; admin control-plane audit entries capture request id and best-effort client fingerprint
+- Error responses now carry both `X-Agentropolis-Request-ID` and `X-Agentropolis-Error-Code`; JSON error bodies mirror them as `request_id` and `error_code`
+- `/meta/runtime` and `/meta/control-plane` now expose the current migration-phase preview/control-plane error code catalog
+- Admin control-plane audit entries capture request id and best-effort client fingerprint
 - Fresh-database bootstrap now assumes `alembic upgrade head` followed by scaffold/world seed on startup
 
 ## Target Interface Direction
@@ -144,8 +146,10 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 - Authenticated preview reads now follow family-scoped policy as well; public intel / public world reads still stay behind only the preview surface gate
 - `/meta/control-plane/audit` exposes the in-memory admin action trail for preview policy changes
 - Admin mutations now support structured `reason_code` / `note`; audit queries can filter by action, target agent, and reason code
+- Audit queries can also filter by `request_id` for direct correlation with client-visible failures
 - `/meta/control-plane/agents/{agent_id}/refill-budget` provides process-local family budget refill semantics for preview testing and staged rollout
 - `X-Agentropolis-Request-ID` is propagated/generated per request and attached to admin audit entries for traceability
+- `X-Agentropolis-Error-Code` is the stable migration-phase header for preview/control-plane failures; clients should not parse human `detail` strings
 - Preview mutation throttling is currently process-local and best-effort; it is a migration safety valve, not the final distributed quota model
 
 ### Route Mount Policy
