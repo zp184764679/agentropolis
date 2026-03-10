@@ -75,6 +75,7 @@ Likewise, do not treat an `api/*.py` file existing on disk as evidence that it s
 - `/meta/control-plane` is the admin-only process-local preview policy surface when `CONTROL_PLANE_ADMIN_TOKEN` is configured
 - process-local preview policy now includes per-agent family authz, family budgets, and admin action audit entries
 - authenticated preview reads with `get_current_agent` are now family-scoped too; do not assume only mutations are policy-controlled
+- admin changes should carry structured reason/note context when possible, and audit review should prefer filtered queries over raw log dumps
 - 当前阶段：主线执行仍从 Wave 1 (#16 Foundation) 开始
 - OpenClaw / 外部玩家 rollout 不是“API 能跑”就开放，必须先满足 PLAN.md 中的 control-contract、concurrency、observability、recovery gate
 - **绝对不要重新创建 GitHub Issues** — 直接查看现有 issue 并实现
