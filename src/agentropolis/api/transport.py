@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
 from agentropolis.api.preview_guard import (
+    make_agent_preview_access_guard,
     make_agent_preview_write_guard,
     require_preview_surface,
 )
@@ -23,6 +24,7 @@ router = APIRouter(
     dependencies=[Depends(require_preview_surface)],
 )
 transport_write_guard = make_agent_preview_write_guard("transport")
+transport_access_guard = make_agent_preview_access_guard("transport")
 
 
 @router.post(
@@ -55,6 +57,7 @@ async def create_transport(
 @router.get("/status/{transport_id}", response_model=TransportStatusResponse)
 async def get_transport_status(
     transport_id: int,
+    _guard: None = Depends(transport_access_guard),
     agent: Agent = Depends(get_current_agent),
     session: AsyncSession = Depends(get_session),
 ):
@@ -71,6 +74,7 @@ async def get_transport_status(
 
 @router.get("/mine", response_model=list[TransportStatusResponse])
 async def get_my_transports(
+    _guard: None = Depends(transport_access_guard),
     agent: Agent = Depends(get_current_agent),
     session: AsyncSession = Depends(get_session),
 ):

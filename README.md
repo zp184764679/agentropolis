@@ -140,6 +140,7 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 - `/meta/control-plane`: admin-only process-local endpoint for inspecting and changing preview runtime policy during migration
 - Preview mutation quotas are split by route family: `agent_self`, `world`, `transport`, `social`, `strategy`, `warfare`
 - Preview authz is now process-local and per-agent by route family; preview budgets are decremented per allowed family mutation
+- Authenticated preview reads now follow family-scoped policy as well; public intel / public world reads still stay behind only the preview surface gate
 - `/meta/control-plane/audit` exposes the in-memory admin action trail for preview policy changes
 - Preview mutation throttling is currently process-local and best-effort; it is a migration safety valve, not the final distributed quota model
 

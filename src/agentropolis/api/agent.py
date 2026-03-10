@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
 from agentropolis.api.preview_guard import (
+    make_agent_preview_access_guard,
     make_agent_preview_write_guard,
     require_preview_registration_write,
     require_preview_surface,
@@ -38,6 +39,7 @@ agent_self_write_guard = make_agent_preview_write_guard(
     "agent_self",
     allow_in_degraded_mode=True,
 )
+agent_self_access_guard = make_agent_preview_access_guard("agent_self")
 
 
 @router.post(
@@ -60,6 +62,7 @@ async def register_agent(
 
 @router.get("/status", response_model=AgentStatus)
 async def get_status(
+    _guard: None = Depends(agent_self_access_guard),
     agent: Agent = Depends(get_current_agent),
     session: AsyncSession = Depends(get_session),
 ):
@@ -145,6 +148,7 @@ async def rest(
 @router.get("/profile/{agent_id}", response_model=AgentPublicProfile)
 async def get_public_agent_profile(
     agent_id: int,
+    _guard: None = Depends(agent_self_access_guard),
     _agent: Agent = Depends(get_current_agent),
     session: AsyncSession = Depends(get_session),
 ):

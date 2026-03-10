@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
 from agentropolis.api.preview_guard import (
+    make_agent_preview_access_guard,
     make_agent_preview_write_guard,
     require_preview_surface,
 )
@@ -34,10 +35,12 @@ router = APIRouter(
     dependencies=[Depends(require_preview_surface)],
 )
 strategy_write_guard = make_agent_preview_write_guard("strategy")
+strategy_access_guard = make_agent_preview_access_guard("strategy")
 
 
 @router.get("/profile", response_model=StrategyProfileResponse)
 async def get_my_profile(
+    _guard: None = Depends(strategy_access_guard),
     agent: Agent = Depends(get_current_agent),
     session: AsyncSession = Depends(get_session),
 ):
@@ -92,6 +95,7 @@ async def update_profile(
 @router.get("/scout/{agent_id}", response_model=StrategyPublicProfileResponse)
 async def scout_agent(
     agent_id: int,
+    _guard: None = Depends(strategy_access_guard),
     _agent: Agent = Depends(get_current_agent),
     session: AsyncSession = Depends(get_session),
 ):
@@ -107,6 +111,7 @@ async def scout_agent(
 
 @router.get("/dashboard", response_model=TrainingDashboardResponse)
 async def training_dashboard(
+    _guard: None = Depends(strategy_access_guard),
     agent: Agent = Depends(get_current_agent),
     session: AsyncSession = Depends(get_session),
 ):
@@ -181,6 +186,7 @@ async def training_dashboard(
 @router.get("/standing-orders", response_model=StandingOrdersResponse)
 async def list_standing_orders(
     region_id: int | None = Query(default=None, description="Filter by region"),
+    _guard: None = Depends(strategy_access_guard),
     agent: Agent = Depends(get_current_agent),
     session: AsyncSession = Depends(get_session),
 ):
