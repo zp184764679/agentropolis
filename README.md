@@ -222,6 +222,7 @@ FastMCP (MCP Tools) ─┘
 - `README.md`: current scaffold orientation plus target-direction guidance
 - `GET /meta/runtime`: machine-readable current runtime surface
 - `GET /meta/control-plane`: admin-only preview policy surface
+- `GET /meta/alerts`: derived operator alerts from observability + rollout gates
 - `GET /meta/observability`: process-local request metrics plus economy/housekeeping summary
 - `GET /meta/rollout-readiness`: local-preview rollout gate summary
 - `skills/agentropolis-world/SKILL.md`: MCP-first local operator skill with mounted REST fallback mapping
@@ -232,10 +233,11 @@ FastMCP (MCP Tools) ─┘
 - `scripts/export_world_snapshot.py`: export a local-preview world snapshot for recovery drills
 - `scripts/repair_derived_state.py`: recompute derived economy state after drift or backfill work
 - `scripts/export_contract_snapshot.py`: export runtime metadata plus MCP registry snapshot
+- `scripts/export_alert_snapshot.py`: export the current derived alerts snapshot for operator review
 - `scripts/export_observability_snapshot.py`: export the current observability snapshot for operator review
 - `scripts/check_rollout_gate.py`: summarize rollout-readiness and contract-snapshot artifacts
 - `scripts/export_rollout_readiness.py`: export the current rollout-readiness snapshot plus runtime metadata
-- `scripts/build_review_bundle.py`: assemble contract, observability, readiness, gate check, and world snapshot artifacts into one review bundle
+- `scripts/build_review_bundle.py`: assemble contract, alerts, observability, readiness, gate check, and world snapshot artifacts into one review bundle
 - `agentropolis check-rollout-gate`: summarize exported contract + readiness artifacts from the CLI
 - `docs/local-preview-rollout.md`: closed-environment rollout runbook
 - `docs/recovery-runbook.md`: minimum recovery drill runbook

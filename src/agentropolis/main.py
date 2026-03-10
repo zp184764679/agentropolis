@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from agentropolis.api.agent import router as agent_router
+from agentropolis.api.alerts import router as alerts_router
 from agentropolis.api.autonomy import router as autonomy_router
 from agentropolis.api.company import router as company_router
 from agentropolis.api.control_plane import router as control_plane_router
@@ -118,6 +119,7 @@ app.include_router(inventory_router, prefix="/api")
 app.include_router(company_router, prefix="/api")
 app.include_router(game_router, prefix="/api")
 app.include_router(control_plane_router)
+app.include_router(alerts_router)
 app.include_router(observability_router)
 app.include_router(rollout_readiness_router)
 app.include_router(agent_router, prefix="/api")

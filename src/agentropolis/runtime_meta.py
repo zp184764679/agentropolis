@@ -159,6 +159,14 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
                 "db_persisted_policy",
             ],
         },
+        "alerts_surface": {
+            "endpoint": "/meta/alerts",
+            "export_script": "scripts/export_alert_snapshot.py",
+            "sources": [
+                "/meta/observability",
+                "/meta/rollout-readiness",
+            ],
+        },
         "observability_surface": {
             "endpoint": "/meta/observability",
             "request_metrics": "process_local_best_effort",
@@ -328,6 +336,7 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
             ".github/README.md",
         ],
         "operator_bundle_surface": {
+            "alerts_script": "scripts/export_alert_snapshot.py",
             "observability_script": "scripts/export_observability_snapshot.py",
             "rollout_readiness_script": "scripts/export_rollout_readiness.py",
             "review_bundle_script": "scripts/build_review_bundle.py",
@@ -335,6 +344,7 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
             "cli_commands": [
                 "agentropolis contract-snapshot",
                 "agentropolis check-rollout-gate",
+                "agentropolis alerts-snapshot",
                 "agentropolis observability-snapshot",
                 "agentropolis rollout-readiness",
                 "agentropolis build-review-bundle",

@@ -15,6 +15,7 @@ from agentropolis.models import Base
 from agentropolis.services.seed import seed_game_data
 from agentropolis.services.seed_world import seed_world
 from scripts.build_review_bundle import build_review_bundle
+from scripts.export_alert_snapshot import build_alert_export
 from scripts.export_contract_snapshot import build_contract_snapshot
 from scripts.export_observability_snapshot import build_observability_export
 from scripts.export_rollout_readiness import build_rollout_readiness_export
@@ -22,6 +23,7 @@ from scripts.export_rollout_readiness import build_rollout_readiness_export
 
 def test_operator_bundle_surface_is_exposed_in_runtime_meta() -> None:
     meta = build_contract_snapshot()["runtime_meta"]
+    assert meta["operator_bundle_surface"]["alerts_script"] == "scripts/export_alert_snapshot.py"
     assert meta["operator_bundle_surface"]["observability_script"] == "scripts/export_observability_snapshot.py"
     assert meta["operator_bundle_surface"]["rollout_readiness_script"] == "scripts/export_rollout_readiness.py"
     assert meta["operator_bundle_surface"]["review_bundle_script"] == "scripts/build_review_bundle.py"
@@ -53,13 +55,16 @@ def test_rollout_export_and_review_bundle_build_files() -> None:
         bundle_root.parent.mkdir(parents=True, exist_ok=True)
         try:
             readiness = await build_rollout_readiness_export(session_factory=session_factory)
+            alerts = await build_alert_export(session_factory=session_factory)
             observability = await build_observability_export(session_factory=session_factory)
             assert "rollout_readiness" in readiness
+            assert "alerts" in alerts
             assert "observability" in observability
             bundle = await build_review_bundle(bundle_root, session_factory=session_factory)
             summary_path = Path(bundle["output_dir"]) / "bundle-summary.json"
             contract_path = Path(bundle["artifacts"]["contract_snapshot"])
             readiness_path = Path(bundle["artifacts"]["rollout_readiness"])
+            alerts_path = Path(bundle["artifacts"]["alerts"])
             observability_path = Path(bundle["artifacts"]["observability"])
             world_path = Path(bundle["artifacts"]["world_snapshot"])
             gate_check_path = Path(bundle["artifacts"]["gate_check"])
@@ -67,12 +72,14 @@ def test_rollout_export_and_review_bundle_build_files() -> None:
             assert summary_path.exists()
             assert contract_path.exists()
             assert readiness_path.exists()
+            assert alerts_path.exists()
             assert observability_path.exists()
             assert world_path.exists()
             assert gate_check_path.exists()
 
             summary = json.loads(summary_path.read_text(encoding="utf-8"))
             assert summary["artifacts"]["contract_snapshot"].endswith("contract-snapshot.json")
+            assert summary["artifacts"]["alerts"].endswith("alerts.json")
             assert summary["artifacts"]["observability"].endswith("observability.json")
             gate_check = json.loads(gate_check_path.read_text(encoding="utf-8"))
             assert gate_check["tool_count"] >= 60

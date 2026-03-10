@@ -177,6 +177,29 @@ def check_rollout_gate(readiness: str, contract_snapshot: str):
     console.print_json(json.dumps(payload))
 
 
+@cli.command("alerts-snapshot")
+@click.option(
+    "--output",
+    default="openclaw/runtime/alerts.json",
+    show_default=True,
+    help="Alerts snapshot output path.",
+)
+def alerts_snapshot(output: str):
+    """Export the current derived alerts snapshot."""
+    from scripts.export_alert_snapshot import build_alert_export
+
+    async def _snapshot():
+        payload = await build_alert_export()
+        from pathlib import Path
+
+        target = Path(output)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        console.print_json(json.dumps(payload))
+
+    asyncio.run(_snapshot())
+
+
 @cli.command("observability-snapshot")
 @click.option(
     "--output",

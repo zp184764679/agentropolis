@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Callable
 
 from scripts.check_rollout_gate import build_rollout_gate_summary
+from scripts.export_alert_snapshot import build_alert_export
 from scripts.export_contract_snapshot import build_contract_snapshot
 from scripts.export_observability_snapshot import build_observability_export
 from scripts.export_rollout_readiness import build_rollout_readiness_export
@@ -47,6 +48,13 @@ async def build_review_bundle(
         encoding="utf-8",
     )
 
+    alerts_payload = await build_alert_export(session_factory=session_factory)
+    alerts_path = target_dir / "alerts.json"
+    alerts_path.write_text(
+        json.dumps(alerts_payload, indent=2, ensure_ascii=True),
+        encoding="utf-8",
+    )
+
     world_snapshot_path = await export_world_snapshot_run(
         str(target_dir / "world-snapshot.json"),
         housekeeping_limit,
@@ -70,6 +78,7 @@ async def build_review_bundle(
             "contract_snapshot": contract_path.as_posix(),
             "rollout_readiness": readiness_path.as_posix(),
             "observability": observability_path.as_posix(),
+            "alerts": alerts_path.as_posix(),
             "world_snapshot": world_snapshot_path.as_posix(),
             "gate_check": gate_summary_path.as_posix(),
             "manifest_present": manifest_path.exists(),
