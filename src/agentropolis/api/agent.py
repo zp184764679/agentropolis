@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_current_agent
 from agentropolis.api.preview_guard import (
-    require_agent_preview_write,
+    make_agent_preview_write_guard,
     require_preview_registration_write,
     require_preview_surface,
 )
@@ -33,6 +33,10 @@ router = APIRouter(
     prefix="/agent",
     tags=["agent"],
     dependencies=[Depends(require_preview_surface)],
+)
+agent_self_write_guard = make_agent_preview_write_guard(
+    "agent_self",
+    allow_in_degraded_mode=True,
 )
 
 
@@ -72,7 +76,7 @@ async def get_status(
 @router.post(
     "/eat",
     response_model=SuccessResponse,
-    dependencies=[Depends(require_agent_preview_write)],
+    dependencies=[Depends(agent_self_write_guard)],
 )
 async def eat(
     amount: int = 1,
@@ -97,7 +101,7 @@ async def eat(
 @router.post(
     "/drink",
     response_model=SuccessResponse,
-    dependencies=[Depends(require_agent_preview_write)],
+    dependencies=[Depends(agent_self_write_guard)],
 )
 async def drink(
     amount: int = 1,
@@ -122,7 +126,7 @@ async def drink(
 @router.post(
     "/rest",
     response_model=SuccessResponse,
-    dependencies=[Depends(require_agent_preview_write)],
+    dependencies=[Depends(agent_self_write_guard)],
 )
 async def rest(
     agent: Agent = Depends(get_current_agent),

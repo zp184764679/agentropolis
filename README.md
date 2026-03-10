@@ -42,6 +42,9 @@ curl http://localhost:8000/health
 
 # Inspect the current runtime/scaffold surface
 curl http://localhost:8000/meta/runtime
+
+# Inspect the process-local preview policy (requires CONTROL_PLANE_ADMIN_TOKEN)
+curl -H "X-Control-Plane-Token: $CONTROL_PLANE_ADMIN_TOKEN" http://localhost:8000/meta/control-plane
 ```
 
 ## Current Runtime Status
@@ -50,10 +53,12 @@ curl http://localhost:8000/meta/runtime
 - REST route modules for market/production/inventory/company/game are mounted, but many handlers are still placeholders during the migration and currently surface as `501 Not Implemented`
 - Agent/world/skills/transport/guild/diplomacy/strategy/decisions/warfare are now mounted as a preview target surface backed by real services, but the public contract is still not frozen
 - Preview routes are now behind a minimal control-plane guard: global preview kill switch, preview write gate, warfare mutation gate, and best-effort process-local mutation throttling
+- An admin-only process-local preview policy surface exists at `/meta/control-plane` when `CONTROL_PLANE_ADMIN_TOKEN` is configured
 - MCP transport and public contract are still being frozen in the control-plane backlog
 - Do not treat legacy company-auth or `/mcp/sse` examples as the final external integration contract
 - `/meta/runtime` is the machine-readable source for the current mounted-vs-unmounted runtime surface
 - `/meta/runtime` also exposes the current auth split, preview guard posture, and ORM registry state: `company_auth=active_legacy`, `agent_auth=migration_compatible`
+- `/meta/control-plane` is the admin-only machine-readable surface for current process-local preview policy
 - Fresh-database bootstrap now assumes `alembic upgrade head` followed by scaffold/world seed on startup
 
 ## Target Interface Direction
@@ -108,6 +113,7 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 |---------|----------------------|---------------|-------|
 | `/health` | Yes | Usable | Best current smoke-test target |
 | `/meta/runtime` | Yes | Usable | Machine-readable scaffold/runtime snapshot |
+| `/meta/control-plane` | Yes | Admin-only | Process-local preview policy surface; requires `X-Control-Plane-Token` and is not the final distributed control plane |
 | `/api/market` | Yes | Placeholder-heavy | Legacy company-auth scaffold, target replacement is regional agent-auth market API |
 | `/api/production` | Yes | Placeholder-heavy | Legacy company-oriented production surface |
 | `/api/inventory` | Yes | Placeholder-heavy | Legacy inventory scaffold |
@@ -129,6 +135,9 @@ Most unimplemented handlers now fail as `501 Not Implemented` rather than opaque
 - `PREVIEW_SURFACE_ENABLED`: disables all mounted preview route groups without affecting legacy scaffold routes
 - `PREVIEW_WRITES_ENABLED`: puts preview mutations into read-only mode while keeping preview reads available
 - `WARFARE_MUTATIONS_ENABLED`: independently freezes warfare mutations without disabling preview read APIs
+- `PREVIEW_DEGRADED_MODE`: keeps preview reads available while blocking non-survival preview mutations
+- `/meta/control-plane`: admin-only process-local endpoint for inspecting and changing preview runtime policy during migration
+- Preview mutation quotas are split by route family: `agent_self`, `world`, `transport`, `social`, `strategy`, `warfare`
 - Preview mutation throttling is currently process-local and best-effort; it is a migration safety valve, not the final distributed quota model
 
 ### Route Mount Policy
@@ -182,6 +191,7 @@ FastMCP (MCP Tools) ─┘
 - [.github/README.md](.github/README.md): index of implementation briefs and issue drafts
 - `README.md`: current scaffold orientation plus target-direction guidance
 - `GET /meta/runtime`: machine-readable current runtime surface
+- `GET /meta/control-plane`: admin-only preview policy surface
 
 ## Development
 

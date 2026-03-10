@@ -62,6 +62,7 @@
 - issue ranges and roadmap phases
 - ownership rules for shared hotspot files
 - `/meta/runtime` 暴露的机器可读 runtime surface
+- `/meta/control-plane` 暴露的 admin-only process-local preview policy surface
 
 ### API Mount Rules
 
@@ -83,6 +84,7 @@
 - Abuse/Budget Guard ready: per-agent/per-tool 配额、spending caps、kill switch
 - Observability baseline ready: request/job metrics、经济健康指标、告警、结构化日志
 - Recovery baseline ready: snapshot/backup/restore 或最小可用修复工具
+- 迁移期允许存在 process-local preview policy admin surface 作为安全阀，但它不能替代最终的分布式 authz/quota/budget 控制面
 
 ---
 
