@@ -5,15 +5,24 @@ Dependencies: services/leaderboard.py, services/game_engine.py
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import get_optional_current_company
 from agentropolis.api.preview_guard import ERROR_CODE_HEADER
-from agentropolis.api.schemas import GameStatus, LeaderboardResponse
+from agentropolis.api.schemas import (
+    GameStatus,
+    HousekeepingHistoryResponse,
+    HousekeepingStatusResponse,
+    LeaderboardResponse,
+)
 from agentropolis.database import get_session
-from agentropolis.models import Company, GameState
+from agentropolis.models import Company, GameState, HousekeepingLog
+from agentropolis.services.game_engine import (
+    get_housekeeping_history as get_housekeeping_history_svc,
+    get_housekeeping_status as get_housekeeping_status_svc,
+)
 from agentropolis.services import leaderboard as leaderboard_svc
 
 router = APIRouter(prefix="/game", tags=["game"])
@@ -55,6 +64,28 @@ async def get_game_status(session: AsyncSession = Depends(get_session)):
         "next_tick_in_seconds": next_tick_in_seconds,
         "total_companies": total_companies,
         "active_companies": active_companies,
+    }
+
+
+@router.get("/housekeeping/status", response_model=HousekeepingStatusResponse)
+async def get_housekeeping_status(session: AsyncSession = Depends(get_session)):
+    """Return the latest housekeeping summary with GameState fallback."""
+    return await get_housekeeping_status_svc(session)
+
+
+@router.get("/housekeeping/history", response_model=HousekeepingHistoryResponse)
+async def get_housekeeping_history(
+    limit: int = Query(default=10, ge=1, le=100),
+    session: AsyncSession = Depends(get_session),
+):
+    """Return recent persisted housekeeping logs."""
+    entries = await get_housekeeping_history_svc(session, limit=limit)
+    total = int(
+        (await session.execute(select(func.count(HousekeepingLog.id)))).scalar_one() or 0
+    )
+    return {
+        "entries": entries,
+        "total": total,
     }
 
 

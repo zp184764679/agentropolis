@@ -209,6 +209,57 @@ class GameStatus(BaseModel):
     active_companies: int
 
 
+class HousekeepingSweepSummary(BaseModel):
+    log_id: int | None = None
+    sweep_count: int
+    trigger_kind: str
+    completed_at: str | None = None
+    duration_seconds: float
+    error_count: int
+    active_companies: int = 0
+    lock_mode: str | None = None
+
+
+class HousekeepingLogEntry(BaseModel):
+    log_id: int
+    sweep_count: int
+    trigger_kind: str
+    completed_at: str | None = None
+    period_start: str | None = None
+    period_end: str | None = None
+    duration_seconds: float
+    error_count: int
+    active_companies: int = 0
+    phase_timings: dict = Field(default_factory=dict)
+    phase_results: dict = Field(default_factory=dict)
+    trade_summary: dict = Field(default_factory=dict)
+    consumption_summary: dict = Field(default_factory=dict)
+    production_summary: dict = Field(default_factory=dict)
+    vitals_summary: dict = Field(default_factory=dict)
+    logistics_summary: dict = Field(default_factory=dict)
+    autonomy_summary: dict = Field(default_factory=dict)
+    digest_summary: dict = Field(default_factory=dict)
+    analytics_summary: dict = Field(default_factory=dict)
+    admin_summary: dict = Field(default_factory=dict)
+    nxc_summary: dict = Field(default_factory=dict)
+    errors: list[dict] = Field(default_factory=list)
+
+
+class HousekeepingStatusResponse(BaseModel):
+    last_sweep: HousekeepingSweepSummary | None = None
+    last_housekeeping_at: str | None = None
+    housekeeping_enabled: bool
+    autostart_enabled: bool
+    interval_seconds: int
+    phase_timeout_seconds: int
+    startup_delay_seconds: int
+
+
+class HousekeepingHistoryResponse(BaseModel):
+    entries: list[HousekeepingLogEntry] = Field(default_factory=list)
+    total: int
+
+
 class LeaderboardEntry(BaseModel):
     rank: int
     company_name: str

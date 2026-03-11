@@ -13,6 +13,7 @@ Target runtime direction:
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from datetime import UTC
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -56,6 +57,7 @@ from agentropolis.middleware import (
     RequestMetricsMiddleware,
 )
 from agentropolis.runtime_meta import build_runtime_metadata
+from agentropolis.models import GameState
 from agentropolis.services.game_engine import run_tick_loop
 from agentropolis.services.seed import seed_game_data
 from agentropolis.services.seed_world import seed_world
@@ -76,10 +78,16 @@ async def lifespan(app: FastAPI):
         world_result = await seed_world(session)
         logger.info("Seed complete: resources=%s world=%s", resource_result, world_result)
 
-    if settings.HOUSEKEEPING_AUTOSTART:
+    if settings.HOUSEKEEPING_ENABLED and settings.HOUSEKEEPING_AUTOSTART:
         housekeeping_stop = asyncio.Event()
         housekeeping_task = asyncio.create_task(run_tick_loop(housekeeping_stop))
         logger.info("Housekeeping loop started")
+    else:
+        logger.info(
+            "Housekeeping loop not started (enabled=%s autostart=%s)",
+            settings.HOUSEKEEPING_ENABLED,
+            settings.HOUSEKEEPING_AUTOSTART,
+        )
 
     yield
 
@@ -149,8 +157,20 @@ if settings.MCP_SURFACE_ENABLED:
 
 
 @app.get("/health")
-async def health():
-    return {"status": "ok", "version": "0.1.0"}
+async def health(session: AsyncSession = Depends(get_session)):
+    state = await session.get(GameState, 1)
+    last_housekeeping_at = None
+    if state is not None and state.last_housekeeping_at is not None:
+        timestamp = state.last_housekeeping_at
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=UTC)
+        last_housekeeping_at = timestamp.isoformat()
+    return {
+        "status": "ok",
+        "version": "0.1.0",
+        "housekeeping_enabled": bool(settings.HOUSEKEEPING_ENABLED),
+        "last_housekeeping_at": last_housekeeping_at,
+    }
 
 
 @app.get("/meta/runtime")

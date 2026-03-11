@@ -19,6 +19,7 @@ class GameState(Base):
     total_currency_supply: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_tick_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_housekeeping_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     def __repr__(self) -> str:
         return f"<GameState tick={self.current_tick} running={self.is_running}>"

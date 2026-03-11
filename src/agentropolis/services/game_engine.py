@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+from copy import deepcopy
 from datetime import UTC, datetime
 import logging
 from time import monotonic
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.config import settings
@@ -43,6 +44,7 @@ from agentropolis.services.agent_vitals import settle_all_agent_vitals
 from agentropolis.services.autopilot import run_all_reflexes, run_all_standing_orders
 
 logger = logging.getLogger(__name__)
+_last_sweep_summary: dict | None = None
 
 
 def _coerce_now(now: datetime | None = None) -> datetime:
@@ -61,6 +63,25 @@ def _normalize_timestamp(value: datetime | None, fallback: datetime) -> datetime
     return value
 
 
+def _isoformat(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.isoformat()
+
+
+def _set_last_sweep_summary(summary: dict | None) -> None:
+    global _last_sweep_summary
+    _last_sweep_summary = deepcopy(summary) if summary is not None else None
+
+
+def get_last_housekeeping_summary() -> dict | None:
+    if _last_sweep_summary is None:
+        return None
+    return deepcopy(_last_sweep_summary)
+
+
 async def _get_or_create_game_state(session: AsyncSession) -> GameState:
     state = await session.get(GameState, 1)
     if state is None:
@@ -73,6 +94,129 @@ async def _get_or_create_game_state(session: AsyncSession) -> GameState:
         session.add(state)
         await session.flush()
     return state
+
+
+def serialize_housekeeping_log(log: HousekeepingLog) -> dict:
+    return {
+        "log_id": int(log.id),
+        "sweep_count": int(log.sweep_count or 0),
+        "trigger_kind": log.trigger_kind,
+        "completed_at": _isoformat(log.completed_at),
+        "period_start": _isoformat(log.period_start),
+        "period_end": _isoformat(log.period_end),
+        "duration_seconds": float(log.duration_seconds or 0.0),
+        "error_count": int(log.error_count or 0),
+        "active_companies": int(log.active_companies or 0),
+        "phase_timings": dict(log.phase_timings or {}),
+        "phase_results": dict(log.phase_results or {}),
+        "trade_summary": dict(log.trade_summary or {}),
+        "consumption_summary": dict(log.consumption_summary or {}),
+        "production_summary": dict(log.production_summary or {}),
+        "vitals_summary": dict(log.vitals_summary or {}),
+        "logistics_summary": dict(log.logistics_summary or {}),
+        "autonomy_summary": dict(log.autonomy_summary or {}),
+        "digest_summary": dict(log.digest_summary or {}),
+        "analytics_summary": dict(log.analytics_summary or {}),
+        "admin_summary": dict(log.admin_summary or {}),
+        "nxc_summary": dict(log.nxc_summary or {}),
+        "errors": list(log.errors or []),
+    }
+
+
+def summarize_housekeeping_status(summary: dict | None) -> dict | None:
+    if summary is None:
+        return None
+    if "sweep_count" in summary:
+        return {
+            "log_id": summary.get("log_id"),
+            "sweep_count": int(summary.get("sweep_count") or 0),
+            "trigger_kind": summary.get("trigger_kind") or "scheduled",
+            "completed_at": summary.get("completed_at"),
+            "duration_seconds": float(summary.get("duration_seconds") or 0.0),
+            "error_count": int(summary.get("error_count") or 0),
+            "active_companies": int(summary.get("active_companies") or 0),
+            "lock_mode": summary.get("lock_mode"),
+        }
+    return {
+        "log_id": summary.get("log_id"),
+        "sweep_count": int(summary.get("current_tick") or 0),
+        "trigger_kind": summary.get("trigger_kind") or "scheduled",
+        "completed_at": summary.get("completed_at") or summary.get("period_end"),
+        "duration_seconds": float(summary.get("duration_seconds") or 0.0),
+        "error_count": int(summary.get("error_count") or 0),
+        "active_companies": int(summary.get("active_companies") or 0),
+        "lock_mode": summary.get("lock_mode"),
+    }
+
+
+async def get_housekeeping_history(
+    session: AsyncSession,
+    *,
+    limit: int = 10,
+) -> list[dict]:
+    result = await session.execute(
+        select(HousekeepingLog)
+        .order_by(HousekeepingLog.sweep_count.desc(), HousekeepingLog.id.desc())
+        .limit(max(limit, 1))
+    )
+    return [serialize_housekeeping_log(item) for item in result.scalars().all()]
+
+
+async def get_housekeeping_status(session: AsyncSession) -> dict:
+    state = await _get_or_create_game_state(session)
+    last_sweep = summarize_housekeeping_status(get_last_housekeeping_summary())
+    if last_sweep is None:
+        result = await session.execute(
+            select(HousekeepingLog)
+            .order_by(HousekeepingLog.sweep_count.desc(), HousekeepingLog.id.desc())
+            .limit(1)
+        )
+        latest_log = result.scalar_one_or_none()
+        last_sweep = (
+            summarize_housekeeping_status(serialize_housekeeping_log(latest_log))
+            if latest_log is not None
+            else None
+        )
+
+    return {
+        "last_sweep": last_sweep,
+        "last_housekeeping_at": _isoformat(state.last_housekeeping_at),
+        "housekeeping_enabled": bool(settings.HOUSEKEEPING_ENABLED),
+        "autostart_enabled": bool(settings.HOUSEKEEPING_AUTOSTART),
+        "interval_seconds": int(state.tick_interval_seconds or settings.TICK_INTERVAL_SECONDS),
+        "phase_timeout_seconds": int(settings.HOUSEKEEPING_PHASE_TIMEOUT),
+        "startup_delay_seconds": int(settings.HOUSEKEEPING_STARTUP_DELAY),
+    }
+
+
+async def _try_acquire_housekeeping_advisory_lock(session: AsyncSession) -> tuple[bool, str]:
+    bind = await session.connection()
+    if bind.dialect.name != "postgresql":
+        return True, "not_supported"
+
+    acquired = bool(
+        (
+            await session.execute(
+                text("SELECT pg_try_advisory_lock(:lock_key)"),
+                {"lock_key": 1},
+            )
+        ).scalar_one()
+    )
+    return acquired, "postgresql_advisory_lock"
+
+
+async def _release_housekeeping_advisory_lock(
+    session: AsyncSession,
+    *,
+    lock_mode: str,
+    acquired: bool,
+) -> None:
+    if not acquired or lock_mode != "postgresql_advisory_lock":
+        return
+    await session.execute(
+        text("SELECT pg_advisory_unlock(:lock_key)"),
+        {"lock_key": 1},
+    )
 
 
 async def _evaluate_traits(session: AsyncSession, now: datetime) -> dict:
@@ -132,10 +276,11 @@ async def _mark_runtime_stopped(session: AsyncSession) -> None:
 async def _run_phase(name: str, fn) -> tuple[dict, float, dict | None]:
     started = monotonic()
     max_attempts = max(1, int(settings.EXECUTION_PHASE_MAX_ATTEMPTS))
+    timeout_seconds = max(int(settings.HOUSEKEEPING_PHASE_TIMEOUT), 1)
     attempt_history: list[dict] = []
     for attempt in range(1, max_attempts + 1):
         try:
-            result = await fn()
+            result = await asyncio.wait_for(fn(), timeout=timeout_seconds)
             attempt_history.append({"attempt": attempt, "status": "completed"})
             return (
                 {
@@ -146,10 +291,47 @@ async def _run_phase(name: str, fn) -> tuple[dict, float, dict | None]:
                     "attempt_history": attempt_history,
                     "result": result,
                     "last_error": None,
+                    "timeout_seconds": timeout_seconds,
                 },
                 monotonic() - started,
                 None,
             )
+        except asyncio.TimeoutError:
+            detail = f"timed out after {timeout_seconds}s"
+            attempt_history.append(
+                {
+                    "attempt": attempt,
+                    "status": "failed",
+                    "detail": detail,
+                    "retryable": attempt < max_attempts,
+                    "timeout": True,
+                }
+            )
+            if attempt >= max_attempts:
+                return (
+                    {
+                        "status": "failed",
+                        "attempts": attempt,
+                        "max_attempts": max_attempts,
+                        "retry_used": attempt > 1,
+                        "attempt_history": attempt_history,
+                        "result": {},
+                        "last_error": {
+                            "phase": name,
+                            "detail": detail,
+                            "attempt": attempt,
+                            "timeout": True,
+                        },
+                        "timeout_seconds": timeout_seconds,
+                        "manual_repair_path": [
+                            "/meta/execution/jobs/housekeeping-backfill",
+                            "/meta/execution/jobs/{job_id}/retry",
+                            "agentropolis repair-derived-state",
+                        ],
+                    },
+                    monotonic() - started,
+                    {"phase": name, "detail": detail, "attempt": attempt, "timeout": True},
+                )
         except Exception as exc:
             logger.exception("Housekeeping phase %s failed on attempt %s", name, attempt)
             detail = str(exc)
@@ -175,6 +357,7 @@ async def _run_phase(name: str, fn) -> tuple[dict, float, dict | None]:
                             "detail": detail,
                             "attempt": attempt,
                         },
+                        "timeout_seconds": timeout_seconds,
                         "manual_repair_path": [
                             "/meta/execution/jobs/housekeeping-backfill",
                             "/meta/execution/jobs/{job_id}/retry",
@@ -193,6 +376,7 @@ async def _run_phase(name: str, fn) -> tuple[dict, float, dict | None]:
             "attempt_history": attempt_history,
             "result": {},
             "last_error": {"phase": name, "detail": "phase_failed"},
+            "timeout_seconds": timeout_seconds,
         },
         monotonic() - started,
         {"phase": name, "detail": "phase_failed"},
@@ -206,201 +390,232 @@ async def _execute_housekeeping_sweep(
     requested_tick: int | None = None,
     trigger_kind: str = "scheduled",
     execution_job_id: int | None = None,
+    record_runtime_summary: bool = True,
 ) -> dict:
     state = await _get_or_create_game_state(session)
     previous_tick = int(state.current_tick or 0)
     current_tick = int(requested_tick if requested_tick is not None else previous_tick + 1)
     period_start = _normalize_timestamp(state.last_tick_at, now)
+    lock_acquired, lock_mode = await _try_acquire_housekeeping_advisory_lock(session)
+    if not lock_acquired:
+        return {
+            "current_tick": previous_tick,
+            "period_start": period_start.isoformat(),
+            "period_end": now.isoformat(),
+            "trigger_kind": trigger_kind,
+            "execution_job_id": execution_job_id,
+            "skipped": True,
+            "skip_reason": "housekeeping_lock_unavailable",
+            "lock_mode": lock_mode,
+            "error_count": 0,
+        }
 
-    phase_timings: dict[str, float] = {}
-    phase_results: dict[str, dict] = {}
-    errors: list[dict] = []
+    try:
+        phase_timings: dict[str, float] = {}
+        phase_results: dict[str, dict] = {}
+        errors: list[dict] = []
 
-    consumption_phase, timing, error = await _run_phase(
-        "consumption",
-        lambda: tick_consumption(session),
-    )
-    consumption_summary = dict(consumption_phase["result"] or {})
-    phase_timings["consumption"] = round(timing, 6)
-    phase_results["consumption"] = consumption_phase
-    if error:
-        errors.append(error)
-
-    production_phase, timing, error = await _run_phase(
-        "production",
-        lambda: settle_all_buildings(session, now=now),
-    )
-    production_summary = dict(production_phase["result"] or {})
-    phase_timings["production"] = round(timing, 6)
-    phase_results["production"] = production_phase
-    if error:
-        errors.append(error)
-
-    trade_phase, timing, error = await _run_phase(
-        "market_matching",
-        lambda: match_all_resources(session, current_tick=current_tick),
-    )
-    trade_summary = dict(trade_phase["result"] or {})
-    phase_timings["market_matching"] = round(timing, 6)
-    phase_results["market_matching"] = trade_phase
-    if error:
-        errors.append(error)
-
-    wages_phase, timing, error = await _run_phase(
-        "wages",
-        lambda: settle_all_wages(session, now=now),
-    )
-    wages_summary = dict(wages_phase["result"] or {})
-    phase_timings["wages"] = round(timing, 6)
-    phase_results["wages"] = wages_phase
-    if error:
-        errors.append(error)
-
-    vitals_phase, timing, error = await _run_phase(
-        "agent_vitals",
-        lambda: settle_all_agent_vitals(session, now=now),
-    )
-    vitals_summary = dict(vitals_phase["result"] or {})
-    phase_timings["agent_vitals"] = round(timing, 6)
-    phase_results["agent_vitals"] = vitals_phase
-    if error:
-        errors.append(error)
-
-    autonomy_phase, timing, error = await _run_phase(
-        "autonomy",
-        _autonomy_phase(session, now, current_tick),
-    )
-    autonomy_summary = dict(autonomy_phase["result"] or {})
-    phase_timings["autonomy"] = round(timing, 6)
-    phase_results["autonomy"] = autonomy_phase
-    if error:
-        errors.append(error)
-
-    digest_phase, timing, error = await _run_phase(
-        "digest",
-        _digest_phase(session, now),
-    )
-    digest_summary = dict(digest_phase["result"] or {})
-    phase_timings["digest"] = round(timing, 6)
-    phase_results["digest"] = digest_phase
-    if error:
-        errors.append(error)
-
-    logistics_phase, timing, error = await _run_phase(
-        "logistics",
-        _logistics_phase(session, now),
-    )
-    logistics_summary = dict(logistics_phase["result"] or {})
-    phase_timings["logistics"] = round(timing, 6)
-    phase_results["logistics"] = logistics_phase
-    if error:
-        errors.append(error)
-
-    analytics_phase, timing, error = await _run_phase(
-        "analytics",
-        _analytics_phase(session, now),
-    )
-    analytics_summary = dict(analytics_phase["result"] or {})
-    phase_timings["analytics"] = round(timing, 6)
-    phase_results["analytics"] = analytics_phase
-    if error:
-        errors.append(error)
-
-    admin_phase, timing, error = await _run_phase(
-        "admin",
-        _admin_phase(session, now),
-    )
-    admin_summary = dict(admin_phase["result"] or {})
-    phase_timings["admin"] = round(timing, 6)
-    phase_results["admin"] = admin_phase
-    if error:
-        errors.append(error)
-
-    nxc_phase, timing, error = await _run_phase(
-        "nxc",
-        _nxc_phase(session, now),
-    )
-    nxc_summary = dict(nxc_phase["result"] or {})
-    phase_timings["nxc"] = round(timing, 6)
-    phase_results["nxc"] = nxc_phase
-    if error:
-        errors.append(error)
-
-    state.current_tick = current_tick
-    state.tick_interval_seconds = settings.TICK_INTERVAL_SECONDS
-    state.is_running = True
-    if state.started_at is None:
-        state.started_at = now
-    state.last_tick_at = now
-
-    sweep_duration = sum(phase_timings.values())
-    log = HousekeepingLog(
-        period_start=period_start,
-        period_end=now,
-        completed_at=now,
-        sweep_count=current_tick,
-        duration_seconds=sweep_duration,
-        trigger_kind=trigger_kind,
-        execution_job_id=execution_job_id,
-        consumption_summary=consumption_summary,
-        production_summary=production_summary,
-        trade_summary=trade_summary,
-        vitals_summary=vitals_summary,
-        logistics_summary=logistics_summary,
-        autonomy_summary=autonomy_summary,
-        digest_summary=digest_summary,
-        analytics_summary=analytics_summary,
-        admin_summary=admin_summary,
-        nxc_summary=nxc_summary,
-        phase_timings=phase_timings,
-        phase_results=phase_results,
-        active_companies=await _active_company_count(session),
-        error_count=len(errors),
-        errors=errors or None,
-    )
-    session.add(log)
-    await session.flush()
-    emit_structured_log(
-        logger,
-        "housekeeping_sweep_completed",
-        sweep_count=current_tick,
-        trigger_kind=trigger_kind,
-        execution_job_id=execution_job_id,
-        duration_seconds=round(sweep_duration, 6),
-        error_count=len(errors),
-        active_companies=log.active_companies,
-        phase_timings=phase_timings,
-        reflex_actions=int(
-            ((autonomy_summary.get("reflex") or {}).get("actions") or 0)
-        ),
-        standing_orders_created=int(
-            ((autonomy_summary.get("standing_orders") or {}).get("buy_orders_created") or 0)
+        consumption_phase, timing, error = await _run_phase(
+            "consumption",
+            lambda: tick_consumption(session),
         )
-        + int(((autonomy_summary.get("standing_orders") or {}).get("sell_orders_created") or 0)),
-        goals_completed=int(
-            ((autonomy_summary.get("goals") or {}).get("completed_now") or 0)
-        ),
-    )
+        consumption_summary = dict(consumption_phase["result"] or {})
+        phase_timings["consumption"] = round(timing, 6)
+        phase_results["consumption"] = consumption_phase
+        if error:
+            errors.append(error)
 
-    return {
-        "current_tick": current_tick,
-        "period_start": period_start.isoformat(),
-        "period_end": now.isoformat(),
-        "trigger_kind": trigger_kind,
-        "execution_job_id": execution_job_id,
-        "consumption": consumption_summary,
-        "production": production_summary,
-        "trade": trade_summary,
-        "vitals": vitals_summary,
-        "autonomy": autonomy_summary,
-        "digest": digest_summary,
-        "logistics": logistics_summary,
-        "analytics": analytics_summary,
-        "admin": admin_summary,
-        "nxc": nxc_summary,
-        "phase_results": phase_results,
-        "error_count": len(errors),
-    }
+        production_phase, timing, error = await _run_phase(
+            "production",
+            lambda: settle_all_buildings(session, now=now),
+        )
+        production_summary = dict(production_phase["result"] or {})
+        phase_timings["production"] = round(timing, 6)
+        phase_results["production"] = production_phase
+        if error:
+            errors.append(error)
+
+        trade_phase, timing, error = await _run_phase(
+            "market_matching",
+            lambda: match_all_resources(session, current_tick=current_tick),
+        )
+        trade_summary = dict(trade_phase["result"] or {})
+        phase_timings["market_matching"] = round(timing, 6)
+        phase_results["market_matching"] = trade_phase
+        if error:
+            errors.append(error)
+
+        wages_phase, timing, error = await _run_phase(
+            "wages",
+            lambda: settle_all_wages(session, now=now),
+        )
+        wages_summary = dict(wages_phase["result"] or {})
+        phase_timings["wages"] = round(timing, 6)
+        phase_results["wages"] = wages_phase
+        if error:
+            errors.append(error)
+
+        vitals_phase, timing, error = await _run_phase(
+            "agent_vitals",
+            lambda: settle_all_agent_vitals(session, now=now),
+        )
+        vitals_summary = dict(vitals_phase["result"] or {})
+        phase_timings["agent_vitals"] = round(timing, 6)
+        phase_results["agent_vitals"] = vitals_phase
+        if error:
+            errors.append(error)
+
+        autonomy_phase, timing, error = await _run_phase(
+            "autonomy",
+            _autonomy_phase(session, now, current_tick),
+        )
+        autonomy_summary = dict(autonomy_phase["result"] or {})
+        phase_timings["autonomy"] = round(timing, 6)
+        phase_results["autonomy"] = autonomy_phase
+        if error:
+            errors.append(error)
+
+        digest_phase, timing, error = await _run_phase(
+            "digest",
+            _digest_phase(session, now),
+        )
+        digest_summary = dict(digest_phase["result"] or {})
+        phase_timings["digest"] = round(timing, 6)
+        phase_results["digest"] = digest_phase
+        if error:
+            errors.append(error)
+
+        logistics_phase, timing, error = await _run_phase(
+            "logistics",
+            _logistics_phase(session, now),
+        )
+        logistics_summary = dict(logistics_phase["result"] or {})
+        phase_timings["logistics"] = round(timing, 6)
+        phase_results["logistics"] = logistics_phase
+        if error:
+            errors.append(error)
+
+        analytics_phase, timing, error = await _run_phase(
+            "analytics",
+            _analytics_phase(session, now),
+        )
+        analytics_summary = dict(analytics_phase["result"] or {})
+        phase_timings["analytics"] = round(timing, 6)
+        phase_results["analytics"] = analytics_phase
+        if error:
+            errors.append(error)
+
+        admin_phase, timing, error = await _run_phase(
+            "admin",
+            _admin_phase(session, now),
+        )
+        admin_summary = dict(admin_phase["result"] or {})
+        phase_timings["admin"] = round(timing, 6)
+        phase_results["admin"] = admin_phase
+        if error:
+            errors.append(error)
+
+        nxc_phase, timing, error = await _run_phase(
+            "nxc",
+            _nxc_phase(session, now),
+        )
+        nxc_summary = dict(nxc_phase["result"] or {})
+        phase_timings["nxc"] = round(timing, 6)
+        phase_results["nxc"] = nxc_phase
+        if error:
+            errors.append(error)
+
+        state.current_tick = current_tick
+        state.tick_interval_seconds = settings.TICK_INTERVAL_SECONDS
+        state.is_running = True
+        if state.started_at is None:
+            state.started_at = now
+        state.last_tick_at = now
+        state.last_housekeeping_at = now
+
+        sweep_duration = sum(phase_timings.values())
+        log = HousekeepingLog(
+            period_start=period_start,
+            period_end=now,
+            completed_at=now,
+            sweep_count=current_tick,
+            duration_seconds=sweep_duration,
+            trigger_kind=trigger_kind,
+            execution_job_id=execution_job_id,
+            consumption_summary=consumption_summary,
+            production_summary=production_summary,
+            trade_summary=trade_summary,
+            vitals_summary=vitals_summary,
+            logistics_summary=logistics_summary,
+            autonomy_summary=autonomy_summary,
+            digest_summary=digest_summary,
+            analytics_summary=analytics_summary,
+            admin_summary=admin_summary,
+            nxc_summary=nxc_summary,
+            phase_timings=phase_timings,
+            phase_results=phase_results,
+            active_companies=await _active_company_count(session),
+            error_count=len(errors),
+            errors=errors or None,
+        )
+        session.add(log)
+        await session.flush()
+        emit_structured_log(
+            logger,
+            "housekeeping_sweep_completed",
+            sweep_count=current_tick,
+            trigger_kind=trigger_kind,
+            execution_job_id=execution_job_id,
+            duration_seconds=round(sweep_duration, 6),
+            error_count=len(errors),
+            active_companies=log.active_companies,
+            phase_timings=phase_timings,
+            reflex_actions=int(
+                ((autonomy_summary.get("reflex") or {}).get("actions") or 0)
+            ),
+            standing_orders_created=int(
+                ((autonomy_summary.get("standing_orders") or {}).get("buy_orders_created") or 0)
+            )
+            + int(((autonomy_summary.get("standing_orders") or {}).get("sell_orders_created") or 0)),
+            goals_completed=int(
+                ((autonomy_summary.get("goals") or {}).get("completed_now") or 0)
+            ),
+        )
+
+        summary = {
+            "log_id": int(log.id),
+            "current_tick": current_tick,
+            "period_start": period_start.isoformat(),
+            "period_end": now.isoformat(),
+            "completed_at": now.isoformat(),
+            "trigger_kind": trigger_kind,
+            "execution_job_id": execution_job_id,
+            "consumption": consumption_summary,
+            "production": production_summary,
+            "trade": trade_summary,
+            "vitals": vitals_summary,
+            "autonomy": autonomy_summary,
+            "digest": digest_summary,
+            "logistics": logistics_summary,
+            "analytics": analytics_summary,
+            "admin": admin_summary,
+            "nxc": nxc_summary,
+            "phase_timings": phase_timings,
+            "phase_results": phase_results,
+            "active_companies": int(log.active_companies),
+            "duration_seconds": round(sweep_duration, 6),
+            "error_count": len(errors),
+            "lock_mode": lock_mode,
+        }
+        if record_runtime_summary:
+            _set_last_sweep_summary(summary)
+        return summary
+    finally:
+        await _release_housekeeping_advisory_lock(
+            session,
+            lock_mode=lock_mode,
+            acquired=lock_acquired,
+        )
 
 
 def _logistics_phase(session: AsyncSession, now: datetime):
@@ -522,6 +737,35 @@ async def execute_tick(tick_number: int | None = None) -> dict:
             return summary
 
 
+async def run_manual_housekeeping_sweep(
+    *,
+    dry_run: bool = False,
+    now: datetime | None = None,
+    session_factory=None,
+) -> dict:
+    """Run one housekeeping sweep through a fresh session for CLI/manual use."""
+    effective_now = _coerce_now(now)
+    if session_factory is None:
+        session_factory = async_session
+    async with acquire_housekeeping_slot():
+        async with session_factory() as session:
+            summary = await run_housekeeping_sweep(
+                session,
+                now=effective_now,
+                trigger_kind="manual",
+                record_runtime_summary=not dry_run,
+            )
+            if dry_run:
+                await session.rollback()
+                summary["dry_run"] = True
+                summary["committed"] = False
+            else:
+                await session.commit()
+                summary["dry_run"] = False
+                summary["committed"] = True
+            return summary
+
+
 async def run_housekeeping_sweep(
     session: AsyncSession,
     *,
@@ -529,6 +773,7 @@ async def run_housekeeping_sweep(
     tick_number: int | None = None,
     trigger_kind: str = "scheduled",
     execution_job_id: int | None = None,
+    record_runtime_summary: bool = True,
 ) -> dict:
     """Run one housekeeping sweep against a provided session."""
     return await _execute_housekeeping_sweep(
@@ -537,6 +782,7 @@ async def run_housekeeping_sweep(
         requested_tick=tick_number,
         trigger_kind=trigger_kind,
         execution_job_id=execution_job_id,
+        record_runtime_summary=record_runtime_summary,
     )
 
 
@@ -551,6 +797,14 @@ async def _scheduled_sweep_due(session: AsyncSession, *, now: datetime) -> bool:
 
 async def run_housekeeping_iteration(*, now: datetime | None = None, session_factory=async_session) -> dict:
     effective_now = _coerce_now(now)
+    if not settings.HOUSEKEEPING_ENABLED:
+        return {
+            "disabled": True,
+            "reason": "housekeeping_disabled",
+            "backfill": None,
+            "execution_jobs": None,
+            "scheduled_sweep": None,
+        }
     async with acquire_housekeeping_slot():
         async with session_factory() as session:
             backfill_summary = await schedule_missed_housekeeping_backfills(session, now=effective_now)
@@ -585,12 +839,21 @@ async def run_tick_loop(stop_event: asyncio.Event | None = None) -> None:
     """Compatibility loop entrypoint backed by housekeeping sweeps."""
     if stop_event is None:
         stop_event = asyncio.Event()
+    if not settings.HOUSEKEEPING_ENABLED:
+        logger.info("Housekeeping loop disabled by configuration")
+        return
 
     async with async_session() as session:
         await _mark_runtime_running(session, now=_coerce_now())
         await session.commit()
 
     try:
+        startup_delay = max(int(settings.HOUSEKEEPING_STARTUP_DELAY), 0)
+        if startup_delay > 0:
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=float(startup_delay))
+            except asyncio.TimeoutError:
+                pass
         while not stop_event.is_set():
             await run_housekeeping_iteration()
             try:

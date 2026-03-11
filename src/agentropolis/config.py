@@ -54,7 +54,10 @@ class Settings(BaseSettings):
     PREVIEW_COMPANY_PRODUCTION_MUTATIONS_PER_WINDOW: int = 20
     PREVIEW_REGISTRATIONS_PER_WINDOW_PER_HOST: int = 10
     CONTROL_PLANE_ADMIN_TOKEN: str | None = None
+    HOUSEKEEPING_ENABLED: bool = True
     HOUSEKEEPING_AUTOSTART: bool = True
+    HOUSEKEEPING_PHASE_TIMEOUT: int = 50
+    HOUSEKEEPING_STARTUP_DELAY: int = 2
     MCP_SURFACE_ENABLED: bool = False
 
     # App-level concurrency guard

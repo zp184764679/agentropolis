@@ -130,6 +130,11 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert meta["observability_surface"]["thresholds"]["request_error_warning_rate"] == 0.25
     assert meta["observability_surface"]["thresholds"]["mcp_failure_warning_rate"] == 0.25
     assert meta["observability_surface"]["export_script"] == "scripts/export_observability_snapshot.py"
+    assert meta["housekeeping_surface"]["status_endpoint"] == "/api/game/housekeeping/status"
+    assert meta["housekeeping_surface"]["history_endpoint"] == "/api/game/housekeeping/history"
+    assert meta["housekeeping_surface"]["manual_cli"] == "agentropolis sweep"
+    assert meta["housekeeping_surface"]["manual_dry_run_cli"] == "agentropolis sweep --dry-run"
+    assert meta["housekeeping_surface"]["last_housekeeping_at_source"] == "game_state.last_housekeeping_at"
     assert meta["execution_surface"]["endpoint"] == "/meta/execution"
     assert meta["execution_surface"]["job_states"] == [
         "accepted",

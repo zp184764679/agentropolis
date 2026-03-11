@@ -57,6 +57,19 @@ def run():
 
 
 @cli.command()
+@click.option("--dry-run", is_flag=True, help="Run one sweep and roll it back instead of committing.")
+def sweep(dry_run: bool):
+    """Run one housekeeping sweep manually."""
+    from agentropolis.services.game_engine import run_manual_housekeeping_sweep
+
+    async def _sweep():
+        payload = await run_manual_housekeeping_sweep(dry_run=dry_run)
+        console.print_json(json.dumps(payload))
+
+    asyncio.run(_sweep())
+
+
+@cli.command()
 def stats():
     """Show economy governance and tuning statistics."""
     from agentropolis.services.economy_governance import build_governance_snapshot

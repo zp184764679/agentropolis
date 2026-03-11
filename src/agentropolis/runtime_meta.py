@@ -289,6 +289,19 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
             },
             "export_script": "scripts/export_observability_snapshot.py",
         },
+        "housekeeping_surface": {
+            "status_endpoint": "/api/game/housekeeping/status",
+            "history_endpoint": "/api/game/housekeeping/history",
+            "manual_cli": "agentropolis sweep",
+            "manual_dry_run_cli": "agentropolis sweep --dry-run",
+            "enabled": bool(settings.HOUSEKEEPING_ENABLED),
+            "autostart": bool(settings.HOUSEKEEPING_AUTOSTART),
+            "startup_delay_seconds": int(settings.HOUSEKEEPING_STARTUP_DELAY),
+            "phase_timeout_seconds": int(settings.HOUSEKEEPING_PHASE_TIMEOUT),
+            "lock_strategy": "postgresql_advisory_lock_or_noop",
+            "last_housekeeping_at_source": "game_state.last_housekeeping_at",
+            "in_memory_summary": True,
+        },
         "execution_surface": {
             "endpoint": "/meta/execution",
             "admin_job_endpoints": [

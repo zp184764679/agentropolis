@@ -5,7 +5,7 @@
 ## Quick Stats
 
 - **Total Issues**: 60 (#16 - #80)
-- **Reserved / Intentionally Unused IDs**: #59-#63 (保留编号, 为保持历史链接稳定不复用)
+- **Reserved / Intentionally Unused IDs**: None
 - **Old Issues**: #1-#15 (CLOSED, superseded)
 - **Design Gap Issues**: #39-#55 (17 issues, identified from PrUn/EVE analysis)
 - **Training System**: #56-#58 (3 issues, ✅ CODE COMPLETE)
@@ -802,6 +802,29 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 - **api/schemas.py**: StrategyProfile*, DecisionLog*, AgentTrait*, AgentPublicProfile schemas
 - **config.py**: DECISION_RESOLVE_DELAY_SECONDS, DECISION_MAX_RESOLVE_BATCH, TRAIT_DECAY_DAYS
 - **main.py**: strategy_router, decisions_router
+
+---
+
+## Housekeeping Hardening (#59-#63)
+
+> 这 5 个 housekeeping issue 现在是实际存在的 GitHub issue，不再是保留编号。
+> 当前 repo 已把它们收口到现行的 housekeeping orchestrator 架构，而不是回退到旧的 `_phase_f_log` / `aggregate_candles()` 设计。
+
+| Issue | Title | Status | Depends | Main Files |
+|-------|-------|--------|---------|------------|
+| [#59](https://github.com/zp184764679/agentropolis/issues/59) | Housekeeping Bug Fixes + Code Cleanup | ✅ REPO COMPLETE | #23 | `services/game_engine.py`, `models/game_state.py` |
+| [#60](https://github.com/zp184764679/agentropolis/issues/60) | Candle Aggregation 性能优化 | ✅ REPO COMPLETE | #21,#23 | `services/market_engine.py`, `services/game_engine.py` |
+| [#61](https://github.com/zp184764679/agentropolis/issues/61) | Housekeeping API + CLI + 可观测性 | ✅ REPO COMPLETE | #59 | `api/game.py`, `api/schemas.py`, `cli.py`, `main.py` |
+| [#62](https://github.com/zp184764679/agentropolis/issues/62) | Housekeeping 配置 + 韧性增强 | ✅ REPO COMPLETE | #59 | `config.py`, `services/game_engine.py`, `main.py` |
+| [#63](https://github.com/zp184764679/agentropolis/issues/63) | Housekeeping 单元测试 + 集成测试 | ✅ REPO COMPLETE | #59,#61,#62 | `tests/test_game_engine.py` |
+
+### Repo-Truth Notes
+
+- `#59`: 现行架构通过 `GameState.last_housekeeping_at`、in-memory `last_sweep_summary`、以及统一 `trade_summary`/phase logging 收口。
+- `#60`: 当前 repo 不再保留独立 `aggregate_candles()`；trade candles 已在 `market_engine._record_price_point()` 内联写入，因此该 issue 按“架构替代后已收口”处理。
+- `#61`: 已提供 `/api/game/housekeeping/status`、`/api/game/housekeeping/history`、`agentropolis sweep`、`agentropolis sweep --dry-run`，`/health` 也会回传 `last_housekeeping_at`。
+- `#62`: 已提供 `HOUSEKEEPING_ENABLED`、`HOUSEKEEPING_PHASE_TIMEOUT`、`HOUSEKEEPING_STARTUP_DELAY`，以及 PostgreSQL advisory lock / phase timeout / loop gate。
+- `#63`: housekeeping status/history/timeout/dry-run/runtime-meta 回归已在 `tests/test_game_engine.py` 锁定。
 
 ---
 
