@@ -763,9 +763,9 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 
 | Issue | Title | Status | Depends On | Key Files |
 |-------|-------|--------|------------|-----------|
-| [#56](https://github.com/zp184764679/agentropolis/issues/56) | Strategy Profile — 教条配置与机械效果 | ✅ DONE | #16 | `models/strategy_profile.py`, `services/strategy_svc.py`, `api/strategy.py` |
-| [#57](https://github.com/zp184764679/agentropolis/issues/57) | Decision Journal — 决策日志与复盘分析 | ✅ DONE | #16, #56 | `models/decision_log.py`, `services/decision_log_svc.py`, `services/training_hooks.py`, `api/decisions.py` |
-| [#58](https://github.com/zp184764679/agentropolis/issues/58) | Agent Traits — 行为特质与荣誉系统 | ✅ DONE | #16, #57 | `models/agent_trait.py`, `services/trait_svc.py` |
+| [#56](https://github.com/zp184764679/agentropolis/issues/56) | Strategy Profile — 教条配置与机械效果 | ✅ REPO COMPLETE | #16 | `models/strategy_profile.py`, `services/strategy_svc.py`, `api/strategy.py` |
+| [#57](https://github.com/zp184764679/agentropolis/issues/57) | Decision Journal — 决策日志与复盘分析 | ✅ REPO COMPLETE | #16, #56 | `models/decision_log.py`, `services/decision_log_svc.py`, `services/training_hooks.py`, `api/decisions.py` |
+| [#58](https://github.com/zp184764679/agentropolis/issues/58) | Agent Traits — 行为特质与荣誉系统 | ✅ REPO COMPLETE | #16, #57 | `models/agent_trait.py`, `services/trait_svc.py` |
 
 ### 执行顺序
 

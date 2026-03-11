@@ -128,6 +128,27 @@ REPO_COMPLETE_ISSUES = [
         "evidence_commits": ["09f6990"],
     },
     {
+        "issue": 56,
+        "title": "Strategy Profile — 教条配置与机械效果",
+        "repo_status": "repo_complete",
+        "sync_action": "close_if_acceptance_matches",
+        "evidence_commits": ["d627c73"],
+    },
+    {
+        "issue": 57,
+        "title": "Decision Journal — 决策日志与复盘分析",
+        "repo_status": "repo_complete",
+        "sync_action": "close_if_acceptance_matches",
+        "evidence_commits": ["d627c73"],
+    },
+    {
+        "issue": 58,
+        "title": "Agent Traits — 行为特质与荣誉系统",
+        "repo_status": "repo_complete",
+        "sync_action": "close_if_acceptance_matches",
+        "evidence_commits": ["d627c73"],
+    },
+    {
         "issue": 64,
         "title": "Server Autopilot — Reflex + Standing Orders",
         "repo_status": "repo_complete",
