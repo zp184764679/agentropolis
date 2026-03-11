@@ -466,7 +466,7 @@ async def run_all_standing_orders(
                 max_affordable = math.floor(
                     min(
                         float(buy_rule["max_qty"]),
-                        float(company.balance) / float(buy_rule["below_price"]),
+                        int(company.balance) / float(buy_rule["below_price"]),
                         remaining_budget / float(buy_rule["below_price"]),
                     )
                 )

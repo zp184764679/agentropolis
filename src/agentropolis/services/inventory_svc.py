@@ -278,7 +278,7 @@ async def get_inventory(session: AsyncSession, company_id: int) -> list[dict]:
                 "quantity": quantity_value,
                 "reserved": reserved_value,
                 "available": quantity_value - reserved_value,
-                "base_price": float(base_price or 0),
+                "base_price": int(base_price or 0),
             }
         )
     return items
@@ -321,7 +321,7 @@ async def get_resource_quantity(
         "quantity": quantity_value,
         "reserved": reserved_value,
         "available": quantity_value - reserved_value,
-        "base_price": float(base_price or 0),
+        "base_price": int(base_price or 0),
     }
 
 
@@ -353,7 +353,7 @@ async def get_resource_quantity_in_region(
         "quantity": quantity_value,
         "reserved": reserved_value,
         "available": quantity_value - reserved_value,
-        "base_price": float(resource.base_price or 0),
+        "base_price": int(resource.base_price or 0),
         "region_id": resolved_region_id,
     }
 

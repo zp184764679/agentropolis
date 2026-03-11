@@ -64,7 +64,7 @@ async def get_resource_info(resource: str) -> dict:
                     "ticker": item.ticker,
                     "name": item.name,
                     "category": item.category.value,
-                    "base_price": float(item.base_price),
+                    "base_price": int(item.base_price),
                     "description": item.description or "",
                 },
             }

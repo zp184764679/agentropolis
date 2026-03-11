@@ -64,7 +64,7 @@ Likewise, do not treat an `api/*.py` file existing on disk as evidence that it s
 - #59-#63 为保留编号，用于保持历史链接与讨论上下文稳定
 - Issues #1-#15 已关闭（旧版计划，已废弃）
 - Issues #17-#38: shared world kernel / API / integration core 已达到 repo-complete，且对应 GitHub issue 状态已同步
-- Issue #16: foundation migration 仍未完全收口，当前 repo 还保留 Numeric money/quantity、以及 company-key 兼容字段，因此不能视为已完成
+- Issue #16: foundation migration 仍未完全收口；整数 credits 契约已覆盖 `Resource.base_price`、`BuildingType.cost_credits`、`Company.balance/net_worth`，但 repo 仍保留 fractional quantity / order-price 路径，以及 company-key 兼容字段，因此不能视为已完成
 - Issues #39-#55: Design Gap issues (PrUn/EVE 审查后的 17 个补全项); `#39-#55` 现已达到 repo-complete
 - Issues #56-#58: Training System (`#56-#58` 均已达到 repo-complete，且对应 GitHub issue 状态已同步)
 - Issues #64-#71: **Autonomy Engine** — repo 已有完整本地预览实现，对应 repo-complete issue 状态已同步

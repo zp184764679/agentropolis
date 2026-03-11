@@ -87,6 +87,7 @@ def test_start_and_settle_production_adds_outputs() -> None:
 def test_build_building_deducts_balance_and_materials() -> None:
     async def scenario(session: AsyncSession) -> None:
         created = await register_company(session, "Builder Forge")
+        assert isinstance(created["initial_balance"], int)
         await add_resource(session, created["company_id"], "BLD", 10.0, region_id=created["region_id"])
         before = await get_company_status(session, created["company_id"])
 
@@ -94,6 +95,9 @@ def test_build_building_deducts_balance_and_materials() -> None:
         after = await get_company_status(session, created["company_id"])
 
         assert result["building_type"] == "warehouse"
+        assert isinstance(result["cost_credits"], int)
+        assert isinstance(before["balance"], int)
+        assert isinstance(after["net_worth"], int)
         assert after["balance"] < before["balance"]
         warehouses = [
             item

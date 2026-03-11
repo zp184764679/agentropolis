@@ -20,7 +20,7 @@ class RegisterResponse(BaseModel):
     company_id: int
     company_name: str
     api_key: str = Field(..., description="Store this! It cannot be retrieved again.")
-    initial_balance: float
+    initial_balance: int
     message: str = "Company registered. Save your API key - it cannot be retrieved later."
 
 
@@ -31,7 +31,7 @@ class ResourceInfo(BaseModel):
     ticker: str
     name: str
     category: str
-    base_price: float
+    base_price: int
     description: str
 
 
@@ -145,7 +145,7 @@ class BuildBuildingRequest(BaseModel):
 class BuildingTypeInfo(BaseModel):
     name: str
     display_name: str
-    cost_credits: float
+    cost_credits: int
     cost_materials: dict[str, float]
     max_workers: int
     description: str
@@ -175,8 +175,8 @@ class CompanyStatus(BaseModel):
     name: str
     founder_agent_id: int | None = None
     region_id: int | None = None
-    balance: float
-    net_worth: float
+    balance: int
+    net_worth: int
     is_active: bool
     worker_count: int
     worker_satisfaction: float
@@ -212,8 +212,8 @@ class GameStatus(BaseModel):
 class LeaderboardEntry(BaseModel):
     rank: int
     company_name: str
-    net_worth: float
-    balance: float
+    net_worth: int
+    balance: int
     worker_count: int
     building_count: int
 
@@ -405,7 +405,7 @@ class AgentCompanyCreateResponse(BaseModel):
     founder_agent_id: int
     region_id: int | None = None
     api_key: str = Field(..., description="Store this! It cannot be retrieved again.")
-    initial_balance: float
+    initial_balance: int
     message: str = "Company registered. Save your API key - it cannot be retrieved later."
 
 

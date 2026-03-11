@@ -72,8 +72,8 @@ async def get_leaderboard(
             "company_id": company_id,
             "rank": index,
             "company_name": company_name,
-            "net_worth": float(net_worth or 0),
-            "balance": float(balance or 0),
+            "net_worth": int(net_worth or 0),
+            "balance": int(balance or 0),
             "worker_count": int(worker_count or 0),
             "building_count": int(building_count or 0),
         }

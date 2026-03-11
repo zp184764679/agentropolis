@@ -1,6 +1,6 @@
 """BuildingType model - factory blueprints that can be constructed."""
 
-from sqlalchemy import JSON, Numeric, String, Text
+from sqlalchemy import BigInteger, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from agentropolis.models.base import Base
@@ -12,7 +12,7 @@ class BuildingType(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     display_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    cost_credits: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    cost_credits: Mapped[int] = mapped_column(BigInteger, nullable=False)
     cost_materials: Mapped[dict] = mapped_column(JSON, default=dict)
     max_workers: Mapped[int] = mapped_column(default=10)
     storage_capacity: Mapped[int] = mapped_column(default=250)

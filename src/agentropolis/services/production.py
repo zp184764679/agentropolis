@@ -303,7 +303,7 @@ async def estimate_build_building_cost(
     ).scalar_one_or_none()
     if building_type is None:
         raise ValueError(f"Unknown building type: {building_type_name}")
-    return int(round(float(building_type.cost_credits)))
+    return int(building_type.cost_credits)
 
 
 async def build_building(
@@ -319,7 +319,7 @@ async def build_building(
     if building_type is None:
         raise ValueError(f"Unknown building type: {building_type_name}")
 
-    await debit_balance(session, company_id, float(building_type.cost_credits))
+    await debit_balance(session, company_id, int(building_type.cost_credits))
     for ticker, quantity in (building_type.cost_materials or {}).items():
         await remove_resource(
             session,
@@ -342,7 +342,7 @@ async def build_building(
     return {
         "building_id": building.id,
         "building_type": building_type.name,
-        "cost_credits": float(building_type.cost_credits),
+        "cost_credits": int(building_type.cost_credits),
         "cost_materials": building_type.cost_materials or {},
     }
 
@@ -436,7 +436,7 @@ async def get_building_types(session: AsyncSession) -> list[dict]:
         {
             "name": building_type.name,
             "display_name": building_type.display_name,
-            "cost_credits": float(building_type.cost_credits),
+            "cost_credits": int(building_type.cost_credits),
             "cost_materials": building_type.cost_materials or {},
             "max_workers": building_type.max_workers,
             "description": building_type.description or "",

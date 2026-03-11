@@ -13,6 +13,7 @@ import secrets
 from typing import Any
 
 from datetime import UTC, datetime
+from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +26,11 @@ from agentropolis.services.seed import STARTER_BUILDINGS, STARTER_INVENTORY
 
 def _worker_productivity_modifier(satisfaction: float) -> float:
     return 0.5 if satisfaction < settings.LOW_SATISFACTION_THRESHOLD else 1.0
+
+
+def normalize_credit_amount(amount: int | float | Decimal) -> int:
+    """Normalize preview credit amounts onto integer copper units."""
+    return int(Decimal(str(amount)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 async def _get_company_for_update(session: AsyncSession, company_id: int) -> Company:
@@ -126,8 +132,8 @@ async def register_company(
         api_key_hash=hash_api_key(api_key),
         founder_agent_id=founder_agent_id,
         region_id=region.id,
-        balance=float(settings.INITIAL_BALANCE),
-        net_worth=float(settings.INITIAL_BALANCE),
+        balance=int(settings.INITIAL_BALANCE),
+        net_worth=int(settings.INITIAL_BALANCE),
         npc_worker_count=int(settings.INITIAL_WORKERS),
         npc_satisfaction=100.0,
         last_consumption_at=datetime.now(UTC),
@@ -182,42 +188,43 @@ async def register_company(
         "founder_agent_id": company.founder_agent_id,
         "region_id": company.region_id,
         "api_key": api_key,
-        "initial_balance": float(company.balance),
+        "initial_balance": int(company.balance),
     }
 
 
-async def debit_balance(session: AsyncSession, company_id: int, amount: float) -> float:
+async def debit_balance(session: AsyncSession, company_id: int, amount: int | float | Decimal) -> int:
     """Debit company balance with FOR UPDATE lock."""
     if amount < 0:
         raise ValueError("Debit amount must be >= 0")
 
     company = await _get_company_for_update(session, company_id)
-    current_balance = float(company.balance)
-    if current_balance < amount:
+    requested_amount = normalize_credit_amount(amount)
+    current_balance = int(company.balance)
+    if current_balance < requested_amount:
         raise ValueError(
-            f"Insufficient balance: need {amount:.2f}, available {current_balance:.2f}"
+            f"Insufficient balance: need {requested_amount}, available {current_balance}"
         )
-    company.balance = current_balance - amount
+    company.balance = current_balance - requested_amount
     await session.flush()
-    return float(company.balance)
+    return int(company.balance)
 
 
-async def credit_balance(session: AsyncSession, company_id: int, amount: float) -> float:
+async def credit_balance(session: AsyncSession, company_id: int, amount: int | float | Decimal) -> int:
     """Credit company balance with FOR UPDATE lock."""
     if amount < 0:
         raise ValueError("Credit amount must be >= 0")
 
     company = await _get_company_for_update(session, company_id)
-    company.balance = float(company.balance) + amount
+    company.balance = int(company.balance) + normalize_credit_amount(amount)
     await session.flush()
-    return float(company.balance)
+    return int(company.balance)
 
 
-async def recalculate_net_worth(session: AsyncSession, company_id: int) -> float:
+async def recalculate_net_worth(session: AsyncSession, company_id: int) -> int:
     """Recalculate and update a company's net worth."""
     company = await _get_company_for_update(session, company_id)
 
-    inventory_value = float(
+    inventory_value = (
         (
             await session.execute(
                 select(
@@ -233,7 +240,7 @@ async def recalculate_net_worth(session: AsyncSession, company_id: int) -> float
         ).scalar_one()
         or 0
     )
-    building_value = float(
+    building_value = (
         (
             await session.execute(
                 select(
@@ -250,9 +257,11 @@ async def recalculate_net_worth(session: AsyncSession, company_id: int) -> float
         or 0
     )
 
-    company.net_worth = float(company.balance) + inventory_value + building_value
+    company.net_worth = normalize_credit_amount(
+        int(company.balance) + inventory_value + building_value
+    )
     await session.flush()
-    return float(company.net_worth)
+    return int(company.net_worth)
 
 
 async def recalculate_all_net_worths(session: AsyncSession) -> int:
@@ -288,7 +297,7 @@ async def get_company_status(session: AsyncSession, company_id: int) -> dict:
         "name": company.name,
         "founder_agent_id": company.founder_agent_id,
         "region_id": company.region_id,
-        "balance": float(company.balance),
+        "balance": int(company.balance),
         "net_worth": net_worth,
         "is_active": bool(company.is_active),
         "worker_count": int(company.npc_worker_count or 0),

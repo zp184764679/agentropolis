@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from agentropolis.models.base import Base, TimestampMixin
@@ -16,8 +16,8 @@ class Company(Base, TimestampMixin):
     api_key_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     founder_agent_id: Mapped[int | None] = mapped_column(ForeignKey("agents.id"), index=True)
     region_id: Mapped[int | None] = mapped_column(ForeignKey("regions.id"), index=True)
-    balance: Mapped[float] = mapped_column(Numeric(16, 2), nullable=False, default=10_000)
-    net_worth: Mapped[float] = mapped_column(Numeric(16, 2), nullable=False, default=10_000)
+    balance: Mapped[int] = mapped_column(BigInteger, nullable=False, default=10_000)
+    net_worth: Mapped[int] = mapped_column(BigInteger, nullable=False, default=10_000)
     npc_worker_count: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
     npc_satisfaction: Mapped[float] = mapped_column(Float, nullable=False, default=100.0)
     last_consumption_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -43,8 +43,8 @@ class Company(Base, TimestampMixin):
         return f"<Company {self.name}>"
 
     @property
-    def available_balance(self) -> float:
-        return float(self.balance or 0)
+    def available_balance(self) -> int:
+        return int(self.balance or 0)
 
     @property
     def workforce_tier_counts(self) -> dict[str, int]:

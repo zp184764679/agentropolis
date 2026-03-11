@@ -266,6 +266,7 @@ def test_inventory_read_endpoints_return_company_stockpile() -> None:
             resource_info = await client.get("/api/inventory/info/ORE")
             assert resource_info.status_code == 200
             assert resource_info.json()["name"] == "Iron Ore"
+            assert isinstance(resource_info.json()["base_price"], int)
 
             inventory_response = await client.get(
                 "/api/inventory",
@@ -286,5 +287,13 @@ def test_inventory_read_endpoints_return_company_stockpile() -> None:
             )
             assert detail_response.status_code == 200
             assert detail_response.json()["available"] == 40.0
+
+            company_status = await client.get(
+                "/api/company/status",
+                headers=_company_headers(auth["alpha_api_key"]),
+            )
+            assert company_status.status_code == 200
+            assert isinstance(company_status.json()["balance"], int)
+            assert isinstance(company_status.json()["net_worth"], int)
 
     asyncio.run(scenario())

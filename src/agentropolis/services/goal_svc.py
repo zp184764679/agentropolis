@@ -226,14 +226,14 @@ async def _wealth_progress(
         raise ValueError(f"Agent {agent_id} not found")
 
     company = await get_active_company_model(session, agent_id)
-    company_net_worth = float(company.net_worth) if company is not None else 0.0
-    current_total = float(agent.personal_balance) + company_net_worth
+    company_net_worth = int(company.net_worth) if company is not None else 0
+    current_total = int(agent.personal_balance) + company_net_worth
 
     progress = {
-        "current_total": round(current_total, 2),
+        "current_total": current_total,
         "target_amount": target_amount,
         "agent_balance": int(agent.personal_balance),
-        "company_net_worth": round(company_net_worth, 2),
+        "company_net_worth": company_net_worth,
         "ratio": round(current_total / target_amount, 4),
     }
     return progress, current_total >= target_amount

@@ -80,6 +80,6 @@ async def get_resource_info(ticker: str, session: AsyncSession = Depends(get_ses
         "ticker": resource.ticker,
         "name": resource.name,
         "category": resource.category.value,
-        "base_price": float(resource.base_price),
+        "base_price": int(resource.base_price),
         "description": resource.description or "",
     }

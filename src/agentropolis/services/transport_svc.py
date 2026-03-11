@@ -213,11 +213,11 @@ async def create_transport(
         owner.personal_balance = int(owner.personal_balance) - cost
         owner.last_active_at = _coerce_now()
     else:
-        if float(owner.balance) < cost:
+        if int(owner.balance) < cost:
             raise ValueError(
                 f"Company {owner.id} has insufficient balance for transport cost {cost}"
             )
-        owner.balance = float(owner.balance) - cost
+        owner.balance = int(owner.balance) - cost
 
     for inventory, ticker in zip(source_rows, normalized_items, strict=False):
         inventory.quantity = float(inventory.quantity) - normalized_items[ticker]
