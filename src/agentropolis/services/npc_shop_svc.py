@@ -53,7 +53,7 @@ async def get_effective_prices(
 
     Returns: {"buy_prices": {ticker: price}, "sell_prices": {ticker: price}}
     """
-    from agentropolis.services.reputation_svc import get_reputation_modifier
+    from agentropolis.services.reputation_svc import check_shop_access, get_reputation_modifier
 
     result = await session.execute(
         select(NpcShop).where(NpcShop.id == shop_id)
@@ -61,6 +61,8 @@ async def get_effective_prices(
     shop = result.scalar_one_or_none()
     if shop is None:
         raise ValueError(f"Shop {shop_id} not found")
+    if not check_shop_access(reputation):
+        raise ValueError("Agent reputation too low for NPC shop access")
 
     rep_modifier = get_reputation_modifier(reputation)
 

@@ -63,7 +63,7 @@ Likewise, do not treat an `api/*.py` file existing on disk as evidence that it s
 - GitHub Issues #16-#80 对应当前 PLAN.md 任务集
 - #59-#63 为保留编号，用于保持历史链接与讨论上下文稳定
 - Issues #1-#15 已关闭（旧版计划，已废弃）
-- Issues #39-#55: Design Gap issues (PrUn/EVE 审查后的 17 个补全项); `#39-#44` 现已达到 repo-complete，`#45-#55` 仍需继续顺序收口
+- Issues #39-#55: Design Gap issues (PrUn/EVE 审查后的 17 个补全项); `#39-#47` 现已达到 repo-complete，`#48-#55` 仍需继续顺序收口
 - Issues #56-#58: Training System (✅ prototype code complete)
 - Issues #64-#71: **Autonomy Engine** — repo 已有完整本地预览实现；若 GitHub 仍 open，优先视为 issue-state sync 待补
 - Issues #72-#77: OpenClaw Integration — repo 已达到本地/封闭环境原型完成态；这不等于 public rollout 已完成

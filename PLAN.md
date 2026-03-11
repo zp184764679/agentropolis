@@ -662,9 +662,9 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 |-------|-------|--------|------------|-----------|
 | [#43](https://github.com/zp184764679/agentropolis/issues/43) | Event Effects Application | ✅ REPO COMPLETE | #16,#29 | `services/event_svc.py` (extend) |
 | [#44](https://github.com/zp184764679/agentropolis/issues/44) | Building Natural Decay | ✅ REPO COMPLETE | #16,#20 | `services/maintenance_svc.py` |
-| [#45](https://github.com/zp184764679/agentropolis/issues/45) | Agent Direct Trade | ⬜ CREATED | #16,#17,#24 | `services/direct_trade_svc.py` |
-| [#46](https://github.com/zp184764679/agentropolis/issues/46) | Reputation Effects | ⬜ CREATED | #16,#24 | `services/reputation_svc.py` |
-| [#47](https://github.com/zp184764679/agentropolis/issues/47) | NPC Shop Dynamic Pricing | ⬜ CREATED | #16,#27,#46 | `services/npc_shop_svc.py` (extend) |
+| [#45](https://github.com/zp184764679/agentropolis/issues/45) | Agent Direct Trade | ✅ REPO COMPLETE | #16,#17,#24 | `services/direct_trade_svc.py` |
+| [#46](https://github.com/zp184764679/agentropolis/issues/46) | Reputation Effects | ✅ REPO COMPLETE | #16,#24 | `services/reputation_svc.py` |
+| [#47](https://github.com/zp184764679/agentropolis/issues/47) | NPC Shop Dynamic Pricing | ✅ REPO COMPLETE | #16,#27,#46 | `services/npc_shop_svc.py` (extend) |
 
 ### P2 — 丰富度
 
