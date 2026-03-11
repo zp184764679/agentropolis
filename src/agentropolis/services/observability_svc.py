@@ -21,7 +21,6 @@ from agentropolis.models import (
     TaxRecord,
     TransportOrder,
     TransportStatus,
-    Worker,
 )
 from agentropolis.services.concurrency import get_concurrency_snapshot
 from agentropolis.services.economy_governance import build_economy_health_thresholds
@@ -236,8 +235,9 @@ async def build_observability_snapshot(session: AsyncSession) -> dict:
     low_worker_satisfaction_companies = int(
         (
             await session.execute(
-                select(func.count(Worker.company_id)).where(
-                    Worker.satisfaction < float(thresholds["worker_satisfaction"]["warning_below"])
+                select(func.count(Company.id)).where(
+                    Company.npc_satisfaction
+                    < float(thresholds["worker_satisfaction"]["warning_below"])
                 )
             )
         ).scalar_one()
@@ -246,8 +246,9 @@ async def build_observability_snapshot(session: AsyncSession) -> dict:
     critical_worker_satisfaction_companies = int(
         (
             await session.execute(
-                select(func.count(Worker.company_id)).where(
-                    Worker.satisfaction < float(thresholds["worker_satisfaction"]["critical_below"])
+                select(func.count(Company.id)).where(
+                    Company.npc_satisfaction
+                    < float(thresholds["worker_satisfaction"]["critical_below"])
                 )
             )
         ).scalar_one()

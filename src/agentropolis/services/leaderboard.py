@@ -21,7 +21,6 @@ from agentropolis.models import (
     PriceHistory,
     Resource,
     Trade,
-    Worker,
 )
 
 
@@ -35,9 +34,6 @@ async def get_leaderboard(
     Metrics: "net_worth", "balance", "workers", "buildings"
     Returns: [{"rank", "company_name", "net_worth", "balance", "worker_count", "building_count"}]
     """
-    worker_counts = (
-        select(Worker.company_id, Worker.count.label("worker_count")).subquery()
-    )
     building_counts = (
         select(Building.company_id, func.count(Building.id).label("building_count"))
         .group_by(Building.company_id)
@@ -47,7 +43,7 @@ async def get_leaderboard(
     metric_columns = {
         "net_worth": Company.net_worth,
         "balance": Company.balance,
-        "workers": func.coalesce(worker_counts.c.worker_count, 0),
+        "workers": func.coalesce(Company.npc_worker_count, 0),
         "buildings": func.coalesce(building_counts.c.building_count, 0),
     }
     normalized_metric = metric.lower()
@@ -60,10 +56,9 @@ async def get_leaderboard(
             Company.name,
             Company.net_worth,
             Company.balance,
-            func.coalesce(worker_counts.c.worker_count, 0).label("worker_count"),
+            func.coalesce(Company.npc_worker_count, 0).label("worker_count"),
             func.coalesce(building_counts.c.building_count, 0).label("building_count"),
         )
-        .outerjoin(worker_counts, worker_counts.c.company_id == Company.id)
         .outerjoin(building_counts, building_counts.c.company_id == Company.id)
         .where(Company.is_active.is_(True))
         .order_by(metric_columns[normalized_metric].desc(), Company.name.asc())

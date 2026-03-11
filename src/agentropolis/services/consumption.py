@@ -1,12 +1,14 @@
-"""Worker upkeep settlement for the legacy company economy."""
+"""NPC workforce upkeep settlement for the legacy company economy."""
 
 from __future__ import annotations
+
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.config import settings
-from agentropolis.models import AgentEmployment, Company, Worker
+from agentropolis.models import AgentEmployment, Company
 from agentropolis.services.inventory_svc import remove_resource
 
 ROLE_CONSUMPTION_MULTIPLIER = {
@@ -113,9 +115,6 @@ async def get_company_workforce_profile(
     if company is None:
         raise ValueError(f"Company {company_id} not found")
 
-    worker = (
-        await session.execute(select(Worker).where(Worker.company_id == company_id))
-    ).scalar_one_or_none()
     employments = list(
         (
             await session.execute(
@@ -125,9 +124,9 @@ async def get_company_workforce_profile(
     )
 
     tier_counts = _employment_tier_counts(employments)
-    npc_workers = int(worker.count if worker else 0)
+    npc_workers = int(company.npc_worker_count or 0)
     tier_counts["npc_workers"] = npc_workers
-    satisfaction = float(worker.satisfaction if worker else 0.0)
+    satisfaction = float(company.npc_satisfaction or 0.0)
     employment_count = len(employments)
     management_bonus = _management_bonus(employments)
     equivalent_load = float(npc_workers) + _tier_consumption_load(employments)
@@ -151,12 +150,9 @@ async def get_company_workforce_profile(
 
 async def tick_consumption(session: AsyncSession) -> dict:
     """Settle one worker upkeep cycle for all active companies."""
-    result = await session.execute(
-        select(Company, Worker)
-        .join(Worker, Worker.company_id == Company.id)
-        .where(Company.is_active.is_(True))
-    )
-    rows = result.all()
+    rows = (
+        await session.execute(select(Company).where(Company.is_active.is_(True)))
+    ).scalars().all()
 
     total_rat = 0.0
     total_dw = 0.0
@@ -173,8 +169,10 @@ async def tick_consumption(session: AsyncSession) -> dict:
     for employment in employment_rows:
         employments_by_company.setdefault(employment.company_id, []).append(employment)
 
-    for company, worker in rows:
-        worker_count = int(worker.count or 0)
+    now = datetime.now(UTC)
+
+    for company in rows:
+        worker_count = int(company.npc_worker_count or 0)
         employments = employments_by_company.get(company.id, [])
         tier_counts = _employment_tier_counts(employments)
         tier_counts["npc_workers"] = worker_count
@@ -198,20 +196,21 @@ async def tick_consumption(session: AsyncSession) -> dict:
         total_rat += consumed_rat
         total_dw += consumed_dw
 
-        worker.satisfaction = _next_satisfaction(
-            current=float(worker.satisfaction or 0.0),
+        company.npc_satisfaction = _next_satisfaction(
+            current=float(company.npc_satisfaction or 0.0),
             supplied_rat=consumed_rat >= required_rat and required_rat > 0,
             supplied_dw=consumed_dw >= required_dw and required_dw > 0,
         )
 
-        if float(worker.satisfaction) <= 0 and worker_count > 0:
+        if float(company.npc_satisfaction) <= 0 and worker_count > 0:
             lost = max(1, int(round(worker_count * settings.WORKER_ATTRITION_RATE)))
-            worker.count = max(0, worker_count - lost)
+            company.npc_worker_count = max(0, worker_count - lost)
             workers_lost += lost
 
-        satisfaction_map[company.id] = float(worker.satisfaction)
+        company.last_consumption_at = now
+        satisfaction_map[company.id] = float(company.npc_satisfaction)
         productivity_map[company.id] = round(
-            _base_worker_productivity_modifier(float(worker.satisfaction))
+            _base_worker_productivity_modifier(float(company.npc_satisfaction))
             * (1.0 + _management_bonus(employments)),
             3,
         )

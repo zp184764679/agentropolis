@@ -23,7 +23,6 @@ from agentropolis.models import (
     PriceHistory,
     Resource,
     Trade,
-    Worker,
 )
 from agentropolis.services.seed import seed_game_data
 
@@ -71,6 +70,8 @@ async def _legacy_client():
             api_key_hash=hash_api_key(alpha_api_key),
             balance=2500,
             net_worth=8200,
+            npc_worker_count=14,
+            npc_satisfaction=92.0,
             is_active=True,
         )
         beta = Company(
@@ -78,6 +79,8 @@ async def _legacy_client():
             api_key_hash=hash_api_key(beta_api_key),
             balance=1700,
             net_worth=5100,
+            npc_worker_count=8,
+            npc_satisfaction=88.0,
             is_active=True,
         )
         seed_session.add_all([alpha, beta])
@@ -85,8 +88,6 @@ async def _legacy_client():
 
         seed_session.add_all(
             [
-                Worker(company_id=alpha.id, count=14, satisfaction=92.0),
-                Worker(company_id=beta.id, count=8, satisfaction=88.0),
                 Building(company_id=alpha.id, building_type_id=building_type.id),
                 Building(company_id=alpha.id, building_type_id=building_type.id),
                 Building(company_id=beta.id, building_type_id=building_type.id),

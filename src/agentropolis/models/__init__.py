@@ -63,7 +63,6 @@ from agentropolis.models.trade import Trade
 from agentropolis.models.transport_order import TransportOrder, TransportStatus
 from agentropolis.models.travel import TravelQueue
 from agentropolis.models.treaty import Treaty, TreatyType
-from agentropolis.models.worker import Worker
 from agentropolis.models.world_event import WorldEvent
 
 __all__ = [
@@ -144,6 +143,5 @@ __all__ = [
     "TravelQueue",
     "Treaty",
     "TreatyType",
-    "Worker",
     "WorldEvent",
 ]

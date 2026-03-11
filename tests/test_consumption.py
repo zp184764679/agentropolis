@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from agentropolis.models import Base, Inventory, Resource, Worker
+from agentropolis.models import Base, Company, Inventory, Resource
 from agentropolis.services.company_svc import register_company
 from agentropolis.services.consumption import tick_consumption
 from agentropolis.services.seed import seed_game_data
@@ -36,10 +36,9 @@ async def _run_seeded_session(callback):
 def test_tick_consumption_recovers_satisfaction_when_supplied() -> None:
     async def scenario(session: AsyncSession) -> None:
         created = await register_company(session, "Recovery Foods")
-        worker = (
-            await session.execute(select(Worker).where(Worker.company_id == created["company_id"]))
-        ).scalar_one()
-        worker.satisfaction = 60.0
+        company = await session.get(Company, created["company_id"])
+        assert company is not None
+        company.npc_satisfaction = 60.0
         await session.flush()
 
         summary = await tick_consumption(session)
@@ -48,10 +47,9 @@ def test_tick_consumption_recovers_satisfaction_when_supplied() -> None:
         assert summary["total_rat_consumed"] > 0
         assert summary["total_dw_consumed"] > 0
 
-        refreshed = (
-            await session.execute(select(Worker).where(Worker.company_id == created["company_id"]))
-        ).scalar_one()
-        assert float(refreshed.satisfaction) > 60.0
+        refreshed = await session.get(Company, created["company_id"])
+        assert refreshed is not None
+        assert float(refreshed.npc_satisfaction) > 60.0
 
     asyncio.run(_run_seeded_session(scenario))
 
@@ -59,11 +57,10 @@ def test_tick_consumption_recovers_satisfaction_when_supplied() -> None:
 def test_tick_consumption_decays_satisfaction_and_causes_attrition_when_unsupplied() -> None:
     async def scenario(session: AsyncSession) -> None:
         created = await register_company(session, "Attrition Works")
-        worker = (
-            await session.execute(select(Worker).where(Worker.company_id == created["company_id"]))
-        ).scalar_one()
-        worker.satisfaction = 0.0
-        worker.count = 100
+        company = await session.get(Company, created["company_id"])
+        assert company is not None
+        company.npc_satisfaction = 0.0
+        company.npc_worker_count = 100
 
         result = await session.execute(
             select(Inventory)
@@ -81,10 +78,9 @@ def test_tick_consumption_decays_satisfaction_and_causes_attrition_when_unsuppli
         summary = await tick_consumption(session)
 
         assert summary["workers_lost"] > 0
-        refreshed = (
-            await session.execute(select(Worker).where(Worker.company_id == created["company_id"]))
-        ).scalar_one()
-        assert int(refreshed.count) < 100
-        assert float(refreshed.satisfaction) == 0.0
+        refreshed = await session.get(Company, created["company_id"])
+        assert refreshed is not None
+        assert int(refreshed.npc_worker_count) < 100
+        assert float(refreshed.npc_satisfaction) == 0.0
 
     asyncio.run(_run_seeded_session(scenario))

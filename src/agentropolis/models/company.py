@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from agentropolis.models.base import Base, TimestampMixin
@@ -18,6 +18,9 @@ class Company(Base, TimestampMixin):
     region_id: Mapped[int | None] = mapped_column(ForeignKey("regions.id"), index=True)
     balance: Mapped[float] = mapped_column(Numeric(16, 2), nullable=False, default=10_000)
     net_worth: Mapped[float] = mapped_column(Numeric(16, 2), nullable=False, default=10_000)
+    npc_worker_count: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    npc_satisfaction: Mapped[float] = mapped_column(Float, nullable=False, default=100.0)
+    last_consumption_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     bankruptcy_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -28,7 +31,6 @@ class Company(Base, TimestampMixin):
     buildings = relationship("Building", back_populates="company")
     inventories = relationship("Inventory", back_populates="company")
     orders = relationship("Order", back_populates="company")
-    workers = relationship("Worker", back_populates="company", uselist=False)
     employments = relationship("AgentEmployment", back_populates="company")
     buy_trades = relationship(
         "Trade", back_populates="buyer", foreign_keys="Trade.buyer_id"
@@ -47,7 +49,7 @@ class Company(Base, TimestampMixin):
     @property
     def workforce_tier_counts(self) -> dict[str, int]:
         counts = {
-            "npc_workers": int(self.workers.count if self.workers else 0),
+            "npc_workers": int(self.npc_worker_count or 0),
             "worker": 0,
             "foreman": 0,
             "manager": 0,

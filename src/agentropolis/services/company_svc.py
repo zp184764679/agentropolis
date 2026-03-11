@@ -12,12 +12,14 @@ from __future__ import annotations
 import secrets
 from typing import Any
 
+from datetime import UTC, datetime
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.api.auth import hash_api_key
 from agentropolis.config import settings
-from agentropolis.models import Agent, Building, BuildingType, Company, Inventory, Region, Resource, Worker
+from agentropolis.models import Agent, Building, BuildingType, Company, Inventory, Region, Resource
 from agentropolis.services.seed import STARTER_BUILDINGS, STARTER_INVENTORY
 
 
@@ -98,7 +100,7 @@ async def register_company(
 ) -> dict:
     """Register a new company with starter kit.
 
-    Creates: Company, Worker, starter buildings, starter inventory.
+    Creates: Company, starter buildings, starter inventory.
     Returns: {"company_id", "api_key", "name", "balance", "founder_agent_id", "region_id"}
     Raises: ValueError if name already taken or founder already has an active company
     """
@@ -126,18 +128,13 @@ async def register_company(
         region_id=region.id,
         balance=float(settings.INITIAL_BALANCE),
         net_worth=float(settings.INITIAL_BALANCE),
+        npc_worker_count=int(settings.INITIAL_WORKERS),
+        npc_satisfaction=100.0,
+        last_consumption_at=datetime.now(UTC),
         is_active=True,
     )
     session.add(company)
     await session.flush()
-
-    session.add(
-        Worker(
-            company_id=company.id,
-            count=settings.INITIAL_WORKERS,
-            satisfaction=100.0,
-        )
-    )
 
     building_types_result = await session.execute(
         select(BuildingType).where(BuildingType.name.in_(tuple(STARTER_BUILDINGS)))
@@ -276,9 +273,6 @@ async def get_company_status(session: AsyncSession, company_id: int) -> dict:
     if company is None:
         raise ValueError(f"Company {company_id} not found")
 
-    worker = (
-        await session.execute(select(Worker).where(Worker.company_id == company_id))
-    ).scalar_one_or_none()
     building_count = int(
         (
             await session.execute(
@@ -297,8 +291,8 @@ async def get_company_status(session: AsyncSession, company_id: int) -> dict:
         "balance": float(company.balance),
         "net_worth": net_worth,
         "is_active": bool(company.is_active),
-        "worker_count": int(worker.count if worker else 0),
-        "worker_satisfaction": float(worker.satisfaction if worker else 0),
+        "worker_count": int(company.npc_worker_count or 0),
+        "worker_satisfaction": float(company.npc_satisfaction or 0),
         "building_count": building_count,
         "created_at": company.created_at.isoformat(),
     }

@@ -212,7 +212,7 @@
 > **必须先完成 #16，其余所有 issue 依赖它**
 >
 > 当前 repo 已在兼容层上把 #17-#38 路径跑通，但 #16 自身仍保留 foundation migration 尾项，
-> 尤其是 Worker legacy path、Numeric money/quantity、以及 company-key 兼容字段尚未完全移除；
+> 尤其是 Numeric money/quantity 契约、以及 company-key 兼容字段尚未完全移除；
 > 因此 #16 继续保持 open，不能和后续 service/api issue 一起视为已收口。
 
 ---
