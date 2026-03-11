@@ -72,6 +72,13 @@ REPO_COMPLETE_ISSUES = [
         "evidence_commits": ["2c2a843"],
     },
     {
+        "issue": 48,
+        "title": "Agent Carry Capacity",
+        "repo_status": "repo_complete",
+        "sync_action": "close_if_acceptance_matches",
+        "evidence_commits": ["39ac91d"],
+    },
+    {
         "issue": 64,
         "title": "Server Autopilot — Reflex + Standing Orders",
         "repo_status": "repo_complete",
