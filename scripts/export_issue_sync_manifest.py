@@ -51,6 +51,27 @@ REPO_COMPLETE_ISSUES = [
         "evidence_commits": ["4b86023"],
     },
     {
+        "issue": 45,
+        "title": "Agent Direct Trade",
+        "repo_status": "repo_complete",
+        "sync_action": "close_if_acceptance_matches",
+        "evidence_commits": ["2c2a843"],
+    },
+    {
+        "issue": 46,
+        "title": "Reputation Effects",
+        "repo_status": "repo_complete",
+        "sync_action": "close_if_acceptance_matches",
+        "evidence_commits": ["2c2a843"],
+    },
+    {
+        "issue": 47,
+        "title": "NPC Shop Dynamic Pricing",
+        "repo_status": "repo_complete",
+        "sync_action": "close_if_acceptance_matches",
+        "evidence_commits": ["2c2a843"],
+    },
+    {
         "issue": 64,
         "title": "Server Autopilot — Reflex + Standing Orders",
         "repo_status": "repo_complete",
