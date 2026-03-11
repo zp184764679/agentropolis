@@ -44,8 +44,8 @@ async def settle_building_decay(
             "status": building.status.value,
         }
 
-    # Use updated_at as reference for decay timing
-    last_check = building.updated_at if building.updated_at else now
+    # Use last_durability_at as the stable decay cursor, falling back once to updated_at.
+    last_check = building.last_durability_at or building.updated_at or now
     elapsed_hours = (now - last_check).total_seconds() / 3600.0
 
     if elapsed_hours <= 0:
@@ -65,6 +65,7 @@ async def settle_building_decay(
         building.durability = 0.0
         building.status = BuildingStatus.DISABLED
 
+    building.last_durability_at = now
     await session.flush()
 
     return {

@@ -1,6 +1,8 @@
 """Inventory model - regional stockpiles owned by companies or agents."""
 
-from sqlalchemy import ForeignKey, Integer, Numeric, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from agentropolis.models.base import Base
@@ -27,6 +29,7 @@ class Inventory(Base):
     )
     quantity: Mapped[float] = mapped_column(Numeric(16, 4), nullable=False, default=0)
     reserved: Mapped[float] = mapped_column(Numeric(16, 4), nullable=False, default=0)
+    last_decay_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Relationships
     company = relationship("Company", back_populates="inventories")

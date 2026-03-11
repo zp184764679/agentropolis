@@ -2,7 +2,7 @@
 
 import enum
 
-from sqlalchemy import Enum, Numeric, String, Text
+from sqlalchemy import Boolean, Enum, Float, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from agentropolis.models.base import Base
@@ -27,6 +27,8 @@ class Resource(Base):
     )
     base_price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="")
+    is_perishable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    decay_rate_per_hour: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
     # Relationships
     inventories = relationship("Inventory", back_populates="resource")

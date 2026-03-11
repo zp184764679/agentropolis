@@ -100,6 +100,13 @@ async def accept_contract(
     if contract.proposer_agent_id == acceptor_agent_id:
         raise ValueError("Cannot accept your own contract")
 
+    result = await session.execute(
+        select(Agent).where(Agent.id == acceptor_agent_id).with_for_update()
+    )
+    acceptor = result.scalar_one_or_none()
+    if acceptor is None:
+        raise ValueError(f"Agent {acceptor_agent_id} not found")
+
     contract.acceptor_agent_id = acceptor_agent_id
     contract.status = PlayerContractStatus.ACCEPTED
     contract.accepted_at = datetime.now(UTC)
@@ -191,7 +198,7 @@ async def cancel_contract(
     # Reputation penalty if already accepted
     if contract.status == PlayerContractStatus.ACCEPTED:
         proposer.reputation = max(
-            -100.0, proposer.reputation + settings.REPUTATION_CONTRACT_BREACH_PENALTY
+            -100.0, proposer.reputation - settings.REPUTATION_CONTRACT_BREACH_PENALTY
         )
 
     contract.status = PlayerContractStatus.CANCELLED

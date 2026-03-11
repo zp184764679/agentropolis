@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.models import Region, TaxRecord
+from agentropolis.services.event_svc import get_effective_region_coefficients
 
 
 async def calculate_tax(
@@ -17,7 +18,8 @@ async def calculate_tax(
     ).scalar_one_or_none()
     if region is None:
         raise ValueError(f"Region {region_id} not found")
-    return max(int(round(float(amount) * float(region.tax_rate))), 0)
+    coefficients = await get_effective_region_coefficients(session, region_id)
+    return max(int(round(float(amount) * float(coefficients["tax_rate"]))), 0)
 
 
 async def collect_tax(
@@ -38,7 +40,8 @@ async def collect_tax(
     if region is None:
         raise ValueError(f"Region {region_id} not found")
 
-    tax_amount = max(int(round(float(amount) * float(region.tax_rate))), 0)
+    coefficients = await get_effective_region_coefficients(session, region_id)
+    tax_amount = max(int(round(float(amount) * float(coefficients["tax_rate"]))), 0)
     region.treasury = int(region.treasury) + tax_amount
     record = TaxRecord(
         tax_type=tax_type,

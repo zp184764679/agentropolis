@@ -114,6 +114,47 @@ async def expire_events(session: AsyncSession) -> int:
     return len(list(events))
 
 
+async def apply_active_event_effects(
+    session: AsyncSession,
+    now: datetime | None = None,
+) -> dict:
+    """Summarize active event overlays for housekeeping and operator views."""
+    timestamp = _coerce_now(now)
+    result = await session.execute(
+        select(WorldEvent)
+        .where(
+            WorldEvent.is_active.is_(True),
+            WorldEvent.ends_at > timestamp,
+        )
+        .order_by(WorldEvent.region_id.asc(), WorldEvent.id.asc())
+    )
+    events = list(result.scalars().all())
+    if not events:
+        return {
+            "active_event_count": 0,
+            "affected_regions": 0,
+            "regions": [],
+        }
+
+    region_ids = sorted({int(event.region_id) for event in events if event.region_id is not None})
+    region_summaries: list[dict] = []
+    for region_id in region_ids:
+        coefficients = await get_effective_region_coefficients(session, region_id, now=timestamp)
+        region_summaries.append(
+            {
+                "region_id": region_id,
+                "active_events": sum(1 for event in events if event.region_id == region_id),
+                "effective_coefficients": coefficients,
+            }
+        )
+
+    return {
+        "active_event_count": len(events),
+        "affected_regions": len(region_summaries),
+        "regions": region_summaries,
+    }
+
+
 async def get_region_events(session: AsyncSession, region_id: int) -> list[dict]:
     """Get active events affecting a specific region."""
     now = _coerce_now()

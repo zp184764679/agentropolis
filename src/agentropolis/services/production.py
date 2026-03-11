@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 from agentropolis.config import settings
 from agentropolis.models import Building, BuildingStatus, BuildingType, Company, Recipe
 from agentropolis.services.company_svc import debit_balance, get_agent_company
+from agentropolis.services.event_svc import get_effective_region_coefficients
 from agentropolis.services.inventory_svc import (
     add_resource,
     get_resource_quantity_in_region,
@@ -122,6 +123,12 @@ async def _settle_building(
     outputs: dict[str, float] = {}
     completed = 0
     company = await _get_company_for_validation(session, building.company_id)
+    region_coefficients = await get_effective_region_coefficients(
+        session,
+        building.region_id or company.region_id,
+        now=now,
+    )
+    production_modifier = max(float(region_coefficients.get("production_modifier", 1.0)), 0.0)
 
     for _ in range(completed_cycles):
         try:
@@ -148,14 +155,15 @@ async def _settle_building(
             }
 
         for ticker, quantity in (recipe.outputs or {}).items():
+            adjusted_quantity = float(quantity) * production_modifier
             await add_resource(
                 session,
                 company.id,
                 ticker,
-                float(quantity),
+                adjusted_quantity,
                 region_id=building.region_id or company.region_id,
             )
-            outputs[ticker] = outputs.get(ticker, 0.0) + float(quantity)
+            outputs[ticker] = outputs.get(ticker, 0.0) + adjusted_quantity
         completed += 1
 
     building.last_production_at = last_production_at + timedelta(
@@ -169,6 +177,7 @@ async def _settle_building(
         "active_recipe": recipe.name,
         "progress_seconds": progress_seconds,
         "outputs": outputs,
+        "production_modifier": production_modifier,
     }
 
 

@@ -56,7 +56,7 @@ async def get_notifications(
     if unread_only:
         query = query.where(Notification.is_read == False)  # noqa: E712
 
-    query = query.order_by(Notification.created_at.desc()).offset(offset).limit(limit)
+    query = query.order_by(Notification.created_at.desc(), Notification.id.desc()).offset(offset).limit(limit)
     result = await session.execute(query)
     notifications = result.scalars().all()
 

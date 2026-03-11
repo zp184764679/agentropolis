@@ -22,16 +22,16 @@ from agentropolis.models import (
 # ─── Resource Definitions ────────────────────────────────────────────────────
 
 RESOURCES = [
-    {"ticker": "H2O", "name": "Water", "category": ResourceCategory.RAW, "base_price": 5.0, "description": "Extracted from underground aquifers. Essential for farming and purification."},
-    {"ticker": "ORE", "name": "Iron Ore", "category": ResourceCategory.RAW, "base_price": 8.0, "description": "Raw iron ore mined from deposits. Must be smelted before use."},
-    {"ticker": "C", "name": "Carbon", "category": ResourceCategory.RAW, "base_price": 6.0, "description": "Organic carbon compound. Used in smelting and construction."},
-    {"ticker": "CRP", "name": "Crops", "category": ResourceCategory.RAW, "base_price": 4.0, "description": "Agricultural produce grown in farms. Raw ingredient for rations."},
-    {"ticker": "RAT", "name": "Rations", "category": ResourceCategory.CONSUMABLE, "base_price": 12.0, "description": "Processed food rations. Workers consume these every tick."},
-    {"ticker": "DW", "name": "Drinking Water", "category": ResourceCategory.CONSUMABLE, "base_price": 10.0, "description": "Purified water safe for consumption. Workers need this every tick."},
-    {"ticker": "FE", "name": "Iron", "category": ResourceCategory.REFINED, "base_price": 25.0, "description": "Refined iron ingots. Base material for steel and machinery."},
-    {"ticker": "STL", "name": "Steel", "category": ResourceCategory.REFINED, "base_price": 50.0, "description": "High-grade steel alloy. Required for advanced manufacturing."},
-    {"ticker": "MCH", "name": "Machinery Parts", "category": ResourceCategory.COMPONENT, "base_price": 120.0, "description": "Precision mechanical components. High-value trade good."},
-    {"ticker": "BLD", "name": "Building Materials", "category": ResourceCategory.COMPONENT, "base_price": 80.0, "description": "Prefabricated construction materials. Used to build new facilities."},
+    {"ticker": "H2O", "name": "Water", "category": ResourceCategory.RAW, "base_price": 5.0, "description": "Extracted from underground aquifers. Essential for farming and purification.", "is_perishable": False, "decay_rate_per_hour": 0.0},
+    {"ticker": "ORE", "name": "Iron Ore", "category": ResourceCategory.RAW, "base_price": 8.0, "description": "Raw iron ore mined from deposits. Must be smelted before use.", "is_perishable": False, "decay_rate_per_hour": 0.0},
+    {"ticker": "C", "name": "Carbon", "category": ResourceCategory.RAW, "base_price": 6.0, "description": "Organic carbon compound. Used in smelting and construction.", "is_perishable": False, "decay_rate_per_hour": 0.0},
+    {"ticker": "CRP", "name": "Crops", "category": ResourceCategory.RAW, "base_price": 4.0, "description": "Agricultural produce grown in farms. Raw ingredient for rations.", "is_perishable": False, "decay_rate_per_hour": 0.0},
+    {"ticker": "RAT", "name": "Rations", "category": ResourceCategory.CONSUMABLE, "base_price": 12.0, "description": "Processed food rations. Workers consume these every tick.", "is_perishable": True, "decay_rate_per_hour": 0.05},
+    {"ticker": "DW", "name": "Drinking Water", "category": ResourceCategory.CONSUMABLE, "base_price": 10.0, "description": "Purified water safe for consumption. Workers need this every tick.", "is_perishable": True, "decay_rate_per_hour": 0.05},
+    {"ticker": "FE", "name": "Iron", "category": ResourceCategory.REFINED, "base_price": 25.0, "description": "Refined iron ingots. Base material for steel and machinery.", "is_perishable": False, "decay_rate_per_hour": 0.0},
+    {"ticker": "STL", "name": "Steel", "category": ResourceCategory.REFINED, "base_price": 50.0, "description": "High-grade steel alloy. Required for advanced manufacturing.", "is_perishable": False, "decay_rate_per_hour": 0.0},
+    {"ticker": "MCH", "name": "Machinery Parts", "category": ResourceCategory.COMPONENT, "base_price": 120.0, "description": "Precision mechanical components. High-value trade good.", "is_perishable": False, "decay_rate_per_hour": 0.0},
+    {"ticker": "BLD", "name": "Building Materials", "category": ResourceCategory.COMPONENT, "base_price": 80.0, "description": "Prefabricated construction materials. Used to build new facilities.", "is_perishable": False, "decay_rate_per_hour": 0.0},
 ]
 
 # ─── Building Type Definitions ───────────────────────────────────────────────

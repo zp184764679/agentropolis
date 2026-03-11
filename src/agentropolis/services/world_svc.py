@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.config import settings
 from agentropolis.models import Agent, AgentSkill, Inventory, Region, RegionConnection, TravelQueue
+from agentropolis.services.event_svc import get_effective_region_coefficients
 from agentropolis.services.training_hooks import get_travel_time_modifier, log_travel_decision
 
 
@@ -298,9 +299,20 @@ async def start_travel(
         )
 
     travel_time_modifier = await get_travel_time_modifier(session, agent_id)
+    region_coefficients = await get_effective_region_coefficients(
+        session,
+        agent.current_region_id,
+        now=now,
+    )
     adjusted_travel_seconds = max(
         1,
-        int(round(path_info["total_time_seconds"] * travel_time_modifier)),
+        int(
+            round(
+                path_info["total_time_seconds"]
+                * travel_time_modifier
+                * float(region_coefficients.get("travel_time_modifier", 1.0))
+            )
+        ),
     )
 
     travel = TravelQueue(

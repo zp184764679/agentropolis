@@ -16,17 +16,21 @@ from agentropolis.models import Agent, Company, GameState, HousekeepingLog
 from agentropolis.services.company_svc import check_bankruptcies, recalculate_all_net_worths
 from agentropolis.services.concurrency import acquire_housekeeping_slot
 from agentropolis.services.consumption import tick_consumption
+from agentropolis.services.contract_svc import expire_contracts
 from agentropolis.services.currency_svc import update_game_state_economics
+from agentropolis.services.decay_svc import settle_all_perishable_decay
 from agentropolis.services.digest_svc import build_digest_housekeeping_summary
 from agentropolis.services.employment_svc import settle_all_wages
 from agentropolis.services.execution_svc import (
     run_due_execution_jobs,
     schedule_missed_housekeeping_backfills,
 )
-from agentropolis.services.event_svc import expire_events
+from agentropolis.services.event_svc import apply_active_event_effects, expire_events
 from agentropolis.services.goal_svc import compute_all_goal_progress
 from agentropolis.services.market_engine import match_all_resources
+from agentropolis.services.maintenance_svc import settle_all_building_decay
 from agentropolis.services.nxc_mining_svc import adjust_difficulty, check_halving, update_active_refineries
+from agentropolis.services.notification_svc import prune_old_notifications
 from agentropolis.services.production import settle_all_buildings
 from agentropolis.services.structured_logging import emit_structured_log
 from agentropolis.services.tax_svc import get_region_tax_history
@@ -302,7 +306,7 @@ async def _execute_housekeeping_sweep(
 
     admin_phase, timing, error = await _run_phase(
         "admin",
-        _admin_phase(session),
+        _admin_phase(session, now),
     )
     admin_summary = dict(admin_phase["result"] or {})
     phase_timings["admin"] = round(timing, 6)
@@ -451,23 +455,33 @@ def _analytics_phase(session: AsyncSession, now: datetime):
     async def runner() -> dict:
         traits = await _evaluate_traits(session, now)
         events_expired = await expire_events(session)
+        event_effects = await apply_active_event_effects(session, now=now)
         economics = await update_game_state_economics(session)
         return {
             "traits": traits,
             "events_expired": events_expired,
+            "event_effects": event_effects,
             "economics": economics,
         }
 
     return runner
 
 
-def _admin_phase(session: AsyncSession):
+def _admin_phase(session: AsyncSession, now: datetime):
     async def runner() -> dict:
         bankruptcies = await check_bankruptcies(session)
         companies_revalued = await recalculate_all_net_worths(session)
+        contracts_expired = await expire_contracts(session, now=now)
+        notifications_pruned = await prune_old_notifications(session, now=now)
+        perishable_decay = await settle_all_perishable_decay(session, now=now)
+        building_decay = await settle_all_building_decay(session, now=now)
         return {
             "bankruptcies": bankruptcies,
             "companies_revalued": companies_revalued,
+            "contracts_expired": contracts_expired,
+            "notifications_pruned": notifications_pruned,
+            "perishable_decay": perishable_decay,
+            "building_decay": building_decay,
         }
 
     return runner
