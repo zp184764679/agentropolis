@@ -31,6 +31,7 @@ from agentropolis.services.guild_svc import (
     leave_guild as leave_guild_svc,
     list_guilds,
     promote_member,
+    upgrade_guild,
 )
 
 router = APIRouter(
@@ -46,6 +47,7 @@ guild_join_leave_guard = make_agent_preview_write_guard(
 )
 guild_promote_guard = make_agent_preview_write_guard("social", operation="guild_promote")
 guild_disband_guard = make_agent_preview_write_guard("social", operation="guild_disband")
+guild_upgrade_guard = make_agent_preview_write_guard("social", operation="guild_upgrade")
 
 
 @router.post(
@@ -206,6 +208,32 @@ async def disband(
             await disband_guild(session, agent.id, guild_id)
             await session.commit()
             return {"message": f"Guild {guild_id} disbanded."}
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+
+
+@router.post(
+    "/{guild_id}/upgrade",
+    response_model=SuccessResponse,
+    dependencies=[Depends(guild_upgrade_guard)],
+)
+async def upgrade(
+    guild_id: int,
+    agent: Agent = Depends(get_current_agent),
+    session: AsyncSession = Depends(get_session),
+):
+    """Upgrade a guild to the next level."""
+    try:
+        async with acquire_entity_locks([agent_lock_key(agent.id), guild_lock_key(guild_id)]):
+            result = await upgrade_guild(session, agent.id, guild_id)
+            await session.commit()
+            return {
+                "message": (
+                    f"Guild {result['guild_id']} upgraded "
+                    f"{result['old_level']} -> {result['new_level']}."
+                )
+            }
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from None

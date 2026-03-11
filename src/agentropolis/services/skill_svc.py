@@ -80,7 +80,7 @@ async def award_xp(
         session.add(agent_skill)
         await session.flush()
 
-    xp_multiplier = await get_xp_modifier(session, agent_id, definition.name)
+    xp_multiplier = await get_xp_modifier(session, agent_id, definition.category.value)
     adjusted_xp = max(1, int(round(xp_amount * xp_multiplier)))
     previous_level = agent_skill.level
 

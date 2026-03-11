@@ -88,7 +88,7 @@ def get_career_xp_multiplier(career_path: str | None, skill_category: str) -> fl
 
     if career_path == "miner" and skill_category == "gathering":
         return 1.0 + bonuses.get("gathering_xp_bonus", 0.0)
-    elif career_path == "artisan" and skill_category == "production":
+    elif career_path == "artisan" and skill_category == "crafting":
         return 1.0 + bonuses.get("crafting_xp_bonus", 0.0)
 
     return 1.0
@@ -99,3 +99,17 @@ def get_career_tax_reduction(career_path: str | None) -> float:
     if career_path == "merchant":
         return CAREER_BONUSES["merchant"].get("trade_tax_reduction", 0.0)
     return 0.0
+
+
+def get_career_combat_modifier(career_path: str | None) -> float:
+    """Get combat power multiplier from career path."""
+    if career_path == "soldier":
+        return 1.0 + CAREER_BONUSES["soldier"].get("combat_power_bonus", 0.0)
+    return 1.0
+
+
+def get_career_reputation_gain_multiplier(career_path: str | None) -> float:
+    """Get multiplier for positive reputation changes."""
+    if career_path == "diplomat":
+        return 1.0 + CAREER_BONUSES["diplomat"].get("reputation_gain_bonus", 0.0)
+    return 1.0

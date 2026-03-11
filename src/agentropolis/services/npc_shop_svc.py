@@ -68,12 +68,20 @@ async def get_effective_prices(
 
     # Strategy + trait modifier (discount for buy prices)
     strategy_modifier = 1.0
+    guild_discount = 0.0
     if agent_id is not None:
         try:
             from agentropolis.services.training_hooks import get_npc_price_modifier
             strategy_modifier = await get_npc_price_modifier(session, agent_id)
         except Exception:
             strategy_modifier = 1.0
+        try:
+            from agentropolis.services.guild_svc import get_agent_guild_effects
+
+            guild_effects = await get_agent_guild_effects(session, agent_id)
+            guild_discount = float(guild_effects["npc_discount"])
+        except Exception:
+            guild_discount = 0.0
 
     max_stock = shop.max_stock or {}
     current_stock = shop.stock or {}
@@ -85,7 +93,10 @@ async def get_effective_prices(
         cs = current_stock.get(ticker, 0)
         dynamic = calculate_dynamic_price(base_price, cs, ms, elasticity)
         # Buy from shop: lower price = better for agent
-        effective_buy[ticker] = max(1, int(dynamic * rep_modifier * strategy_modifier))
+        effective_buy[ticker] = max(
+            1,
+            int(dynamic * rep_modifier * strategy_modifier * (1.0 - guild_discount)),
+        )
 
     effective_sell: dict[str, int] = {}
     for ticker, base_price in (shop.sell_prices or {}).items():

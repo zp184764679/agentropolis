@@ -52,6 +52,11 @@ async def adjust_reputation(
     if agent is None:
         raise ValueError(f"Agent {agent_id} not found")
 
+    if delta > 0:
+        from agentropolis.services.career_svc import get_career_reputation_gain_multiplier
+
+        delta *= get_career_reputation_gain_multiplier(agent.career_path)
+
     agent.reputation = max(-100.0, min(100.0, agent.reputation + delta))
     await session.flush()
 

@@ -493,3 +493,59 @@ def get_guild_level_benefits(level: int) -> dict:
     if level >= 4:
         benefits[4] = {"description": "Guild shop discount (-10%)"}
     return benefits
+
+
+async def get_agent_guild_snapshot(
+    session: AsyncSession,
+    agent_id: int,
+) -> dict | None:
+    result = await session.execute(
+        select(Guild, GuildMember)
+        .join(GuildMember, GuildMember.guild_id == Guild.id)
+        .where(
+            GuildMember.agent_id == agent_id,
+            Guild.is_active.is_(True),
+        )
+    )
+    row = result.first()
+    if row is None:
+        return None
+    guild, membership = row
+    return {
+        "guild_id": guild.id,
+        "level": int(guild.level),
+        "rank": membership.rank.value,
+        "home_region_id": guild.home_region_id,
+        "benefits": get_guild_level_benefits(int(guild.level)),
+    }
+
+
+def get_guild_tax_reduction(level: int) -> float:
+    return 0.05 if int(level) >= 3 else 0.0
+
+
+def get_guild_shop_discount(level: int) -> float:
+    return 0.10 if int(level) >= 4 else 0.0
+
+
+async def get_agent_guild_effects(
+    session: AsyncSession,
+    agent_id: int,
+) -> dict[str, float | int | None]:
+    snapshot = await get_agent_guild_snapshot(session, agent_id)
+    if snapshot is None:
+        return {
+            "guild_id": None,
+            "level": 0,
+            "tax_reduction": 0.0,
+            "npc_discount": 0.0,
+        }
+    level = int(snapshot["level"])
+    return {
+        "guild_id": snapshot["guild_id"],
+        "level": level,
+        "home_region_id": snapshot["home_region_id"],
+        "tax_reduction": get_guild_tax_reduction(level),
+        "npc_discount": get_guild_shop_discount(level),
+        "warehouse_bonus": 500 if level >= 2 else 0,
+    }

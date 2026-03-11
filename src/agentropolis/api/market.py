@@ -103,6 +103,7 @@ async def place_buy_order(
                 req.resource,
                 req.quantity,
                 req.price,
+                req.time_in_force,
             )
             await session.commit()
             orders = await market_engine.get_my_orders(session, company.id, status="ALL")
@@ -135,6 +136,7 @@ async def place_sell_order(
                 req.resource,
                 req.quantity,
                 req.price,
+                req.time_in_force,
             )
             await session.commit()
             orders = await market_engine.get_my_orders(session, company.id, status="ALL")

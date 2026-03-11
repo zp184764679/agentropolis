@@ -284,6 +284,18 @@ async def settle_transport_arrivals(
     resources = await _get_resource_map(session, all_tickers)
 
     for transport in transports:
+        total_quantity = sum(int(quantity) for quantity in (transport.items or {}).values())
+        from agentropolis.services.storage_svc import check_storage_available
+
+        has_storage = await check_storage_available(
+            session,
+            total_quantity,
+            transport.to_region_id,
+            company_id=transport.owner_company_id,
+            agent_id=transport.owner_agent_id,
+        )
+        if not has_storage:
+            continue
         for ticker, quantity in (transport.items or {}).items():
             resource = resources[ticker]
             destination = await _get_or_create_inventory_row(

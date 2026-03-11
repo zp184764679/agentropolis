@@ -115,6 +115,18 @@ async def add_resource(
         company_id=company_id,
         region_id=region_id,
     )
+    from agentropolis.services.storage_svc import check_storage_available
+
+    has_capacity = await check_storage_available(
+        session,
+        amount,
+        resolved_region_id,
+        company_id=company_id,
+    )
+    if not has_capacity:
+        raise ValueError(
+            f"Storage capacity exceeded in region {resolved_region_id}: need {amount:.4f} additional units"
+        )
     resource = await _get_resource(session, resource_ticker)
     inventory = await _get_or_create_inventory_row(
         session,

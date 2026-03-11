@@ -129,8 +129,37 @@ async def _settle_building(
         now=now,
     )
     production_modifier = max(float(region_coefficients.get("production_modifier", 1.0)), 0.0)
+    from agentropolis.services.consumption import get_company_workforce_profile
+    from agentropolis.services.storage_svc import check_storage_available
+
+    workforce_profile = await get_company_workforce_profile(session, company.id)
+    production_modifier *= max(float(workforce_profile["productivity_modifier"]), 0.0)
 
     for _ in range(completed_cycles):
+        cycle_output_total = sum(
+            float(quantity) * production_modifier for quantity in (recipe.outputs or {}).values()
+        )
+        has_storage = await check_storage_available(
+            session,
+            cycle_output_total,
+            building.region_id or company.region_id,
+            company_id=company.id,
+        )
+        if not has_storage:
+            building.status = BuildingStatus.IDLE
+            building.active_recipe_id = None
+            building.production_progress = 0
+            building.last_production_at = now
+            await session.flush()
+            return {
+                "cycles_completed": completed,
+                "status": building.status.value,
+                "active_recipe": None,
+                "progress_seconds": 0,
+                "outputs": outputs,
+                "production_modifier": production_modifier,
+                "storage_blocked": True,
+            }
         try:
             for ticker, quantity in (recipe.inputs or {}).items():
                 await remove_resource(

@@ -673,16 +673,16 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 | [#48](https://github.com/zp184764679/agentropolis/issues/48) | Agent Carry Capacity | ✅ REPO COMPLETE | #16,#25,#26 | `services/world_svc.py` (extend) |
 | [#49](https://github.com/zp184764679/agentropolis/issues/49) | Treaty Mechanical Effects | ✅ REPO COMPLETE | #16,#28 | `services/treaty_effects_svc.py` |
 | [#50](https://github.com/zp184764679/agentropolis/issues/50) | Regional Infrastructure | ✅ REPO COMPLETE | #16,#25,#27 | `models/regional_project.py`, `services/regional_project_svc.py` |
-| [#51](https://github.com/zp184764679/agentropolis/issues/51) | Multi-tier Workforce | ⬜ CREATED | #16,#17,#18,#19 | `models/company.py`, `services/consumption.py` (extend) |
-| [#52](https://github.com/zp184764679/agentropolis/issues/52) | Market Order Type | ⬜ CREATED | #16,#21 | `models/order.py`, `services/market_engine.py` (extend) |
-| [#53](https://github.com/zp184764679/agentropolis/issues/53) | Guild Level & Upgrade | ⬜ CREATED | #16,#28 | `services/guild_svc.py` (extend) |
+| [#51](https://github.com/zp184764679/agentropolis/issues/51) | Multi-tier Workforce | ✅ REPO COMPLETE | #16,#17,#18,#19 | `models/company.py`, `services/consumption.py` (extend) |
+| [#52](https://github.com/zp184764679/agentropolis/issues/52) | Market Order Type | ✅ REPO COMPLETE | #16,#21 | `models/order.py`, `services/market_engine.py` (extend) |
+| [#53](https://github.com/zp184764679/agentropolis/issues/53) | Guild Level & Upgrade | ✅ REPO COMPLETE | #16,#28 | `services/guild_svc.py` (extend) |
 
 ### P3 — 未来
 
 | Issue | Title | Status | Depends On | Key Files |
 |-------|-------|--------|------------|-----------|
-| [#54](https://github.com/zp184764679/agentropolis/issues/54) | Career Path Effects | ⬜ CREATED | #16,#24,#26 | `services/career_svc.py` |
-| [#55](https://github.com/zp184764679/agentropolis/issues/55) | Storage Capacity Limits | ⬜ CREATED | #16,#17 | `services/storage_svc.py` |
+| [#54](https://github.com/zp184764679/agentropolis/issues/54) | Career Path Effects | ✅ REPO COMPLETE | #16,#24,#26 | `services/career_svc.py` |
+| [#55](https://github.com/zp184764679/agentropolis/issues/55) | Storage Capacity Limits | ✅ REPO COMPLETE | #16,#17 | `services/storage_svc.py` |
 
 ### Design Gap 依赖图
 

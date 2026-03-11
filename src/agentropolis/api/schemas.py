@@ -73,12 +73,14 @@ class PlaceOrderRequest(BaseModel):
     resource: str = Field(..., description="Resource ticker, e.g. 'H2O'")
     quantity: float = Field(..., gt=0)
     price: float = Field(..., gt=0)
+    time_in_force: str = Field(default="GTC", description="Order persistence policy: GTC or IOC")
 
 
 class OrderResponse(BaseModel):
     order_id: int
     order_type: str
     resource: str
+    time_in_force: str = "GTC"
     price: float
     quantity: float
     remaining: float
@@ -186,6 +188,10 @@ class WorkerInfo(BaseModel):
     company_id: int | None = None
     count: int
     satisfaction: float
+    employment_count: int = 0
+    total_headcount: int = 0
+    tier_counts: dict[str, int] = Field(default_factory=dict)
+    management_bonus: float = 0.0
     rat_consumption_per_tick: float
     dw_consumption_per_tick: float
     productivity_modifier: float  # 1.0 normal, 0.5 if low satisfaction

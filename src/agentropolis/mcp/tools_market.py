@@ -82,6 +82,7 @@ async def place_buy_order(
     resource: str,
     quantity: float,
     price: float,
+    time_in_force: str = "GTC",
 ) -> dict:
     try:
         async with company_tool_context(
@@ -97,6 +98,7 @@ async def place_buy_order(
                 resource,
                 quantity,
                 price,
+                time_in_force,
             )
             await session.commit()
             orders = await market_engine.get_my_orders(session, company.id, status="ALL")
@@ -119,6 +121,7 @@ async def place_sell_order(
     resource: str,
     quantity: float,
     price: float,
+    time_in_force: str = "GTC",
 ) -> dict:
     try:
         async with company_tool_context(
@@ -133,6 +136,7 @@ async def place_sell_order(
                 resource,
                 quantity,
                 price,
+                time_in_force,
             )
             await session.commit()
             orders = await market_engine.get_my_orders(session, company.id, status="ALL")

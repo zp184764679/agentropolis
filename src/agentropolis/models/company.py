@@ -43,3 +43,22 @@ class Company(Base, TimestampMixin):
     @property
     def available_balance(self) -> float:
         return float(self.balance or 0)
+
+    @property
+    def workforce_tier_counts(self) -> dict[str, int]:
+        counts = {
+            "npc_workers": int(self.workers.count if self.workers else 0),
+            "worker": 0,
+            "foreman": 0,
+            "manager": 0,
+            "director": 0,
+            "ceo": 0,
+        }
+        for employment in self.employments:
+            counts[employment.role.value] = counts.get(employment.role.value, 0) + 1
+        return counts
+
+    @property
+    def total_workforce_headcount(self) -> int:
+        tiers = self.workforce_tier_counts
+        return int(tiers["npc_workers"] + sum(v for k, v in tiers.items() if k != "npc_workers"))

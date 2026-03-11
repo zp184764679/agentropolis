@@ -8,7 +8,18 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from agentropolis.models import Company, GameState, Order, OrderStatus, OrderType, PriceHistory, Resource, Trade
+from agentropolis.models import (
+    Agent,
+    Company,
+    GameState,
+    Order,
+    OrderStatus,
+    OrderType,
+    PriceHistory,
+    Resource,
+    TimeInForce,
+    Trade,
+)
 from agentropolis.services.company_svc import credit_balance, debit_balance
 from agentropolis.services.inventory_svc import (
     add_resource,
@@ -26,6 +37,16 @@ def _coerce_now(now: datetime | None = None) -> datetime:
     if now.tzinfo is None:
         return now.replace(tzinfo=UTC)
     return now
+
+
+def _coerce_time_in_force(value: str | None = None) -> TimeInForce:
+    if value is None:
+        return TimeInForce.GTC
+    try:
+        return TimeInForce(str(value).upper())
+    except ValueError as err:
+        valid = ", ".join(item.value for item in TimeInForce)
+        raise ValueError(f"Invalid time_in_force: {value}. Valid: {valid}") from err
 
 
 async def _get_company_for_update(session: AsyncSession, company_id: int) -> Company:
@@ -98,12 +119,42 @@ def _serialize_order(order: Order, resource_ticker: str) -> dict:
         "order_id": order.id,
         "order_type": order.order_type.value,
         "resource": resource_ticker,
+        "time_in_force": order.time_in_force.value,
         "price": float(order.price),
         "quantity": float(order.quantity),
         "remaining": float(order.remaining),
         "status": order.status.value,
         "created_at_tick": int(order.created_at_tick),
     }
+
+
+async def _seller_tax_modifier(
+    session: AsyncSession,
+    *,
+    buyer: Company,
+    seller: Company,
+) -> float:
+    modifier = 1.0
+    if buyer.founder_agent_id is not None and seller.founder_agent_id is not None:
+        treaties = await get_treaty_between(session, buyer.founder_agent_id, seller.founder_agent_id)
+        modifier *= get_trade_tax_modifier(treaties)
+
+    if seller.founder_agent_id is None:
+        return max(0.0, modifier)
+
+    seller_founder = await session.get(Agent, seller.founder_agent_id)
+    if seller_founder is not None:
+        from agentropolis.services.career_svc import get_career_tax_reduction
+
+        modifier *= 1.0 - get_career_tax_reduction(seller_founder.career_path)
+
+    from agentropolis.services.guild_svc import get_agent_guild_effects
+    from agentropolis.services.training_hooks import get_trade_tax_modifier as get_trait_trade_tax_modifier
+
+    guild_effects = await get_agent_guild_effects(session, seller.founder_agent_id)
+    modifier *= 1.0 - float(guild_effects["tax_reduction"])
+    modifier *= await get_trait_trade_tax_modifier(session, seller.founder_agent_id)
+    return max(0.0, modifier)
 
 
 async def _lock_open_orders(
@@ -147,10 +198,7 @@ async def _settle_match(
 
     buyer = await _get_company_for_update(session, buy_order.company_id)
     seller = await _get_company_for_update(session, sell_order.company_id)
-    treaty_tax_modifier = 1.0
-    if buyer.founder_agent_id is not None and seller.founder_agent_id is not None:
-        treaties = await get_treaty_between(session, buyer.founder_agent_id, seller.founder_agent_id)
-        treaty_tax_modifier = get_trade_tax_modifier(treaties)
+    seller_tax_modifier = await _seller_tax_modifier(session, buyer=buyer, seller=seller)
 
     await consume_reserved_resource(
         session,
@@ -175,7 +223,7 @@ async def _settle_match(
     tax_summary = await collect_tax(
         session,
         sell_order.region_id or seller.region_id,
-        gross_value * treaty_tax_modifier,
+        gross_value * seller_tax_modifier,
         "market_trade",
         payer_company_id=seller.id,
     )
@@ -308,6 +356,7 @@ async def place_buy_order(
     resource_ticker: str,
     quantity: float,
     price: float,
+    time_in_force: str = "GTC",
     current_tick: int | None = None,
 ) -> int:
     """Place a company buy order and attempt immediate matching."""
@@ -316,6 +365,7 @@ async def place_buy_order(
 
     company = await _get_company_for_update(session, company_id)
     resource = await _get_resource(session, resource_ticker)
+    tif = _coerce_time_in_force(time_in_force)
     tick_number = int(current_tick if current_tick is not None else await _current_tick(session))
     escrow = float(quantity) * float(price)
     await debit_balance(session, company.id, escrow)
@@ -329,6 +379,7 @@ async def place_buy_order(
         quantity=quantity,
         remaining=quantity,
         status=OrderStatus.OPEN,
+        time_in_force=tif,
         created_at_tick=tick_number,
     )
     session.add(order)
@@ -339,6 +390,8 @@ async def place_buy_order(
         resource_id=resource.id,
         tick_number=tick_number,
     )
+    if tif == TimeInForce.IOC and float(order.remaining) > 0:
+        await cancel_order(session, company.id, order.id)
     return order.id
 
 
@@ -348,6 +401,7 @@ async def place_sell_order(
     resource_ticker: str,
     quantity: float,
     price: float,
+    time_in_force: str = "GTC",
     current_tick: int | None = None,
 ) -> int:
     """Place a company sell order and attempt immediate matching."""
@@ -356,6 +410,7 @@ async def place_sell_order(
 
     company = await _get_company_for_update(session, company_id)
     resource = await _get_resource(session, resource_ticker)
+    tif = _coerce_time_in_force(time_in_force)
     tick_number = int(current_tick if current_tick is not None else await _current_tick(session))
     await reserve_resource(
         session,
@@ -374,6 +429,7 @@ async def place_sell_order(
         quantity=quantity,
         remaining=quantity,
         status=OrderStatus.OPEN,
+        time_in_force=tif,
         created_at_tick=tick_number,
     )
     session.add(order)
@@ -384,6 +440,8 @@ async def place_sell_order(
         resource_id=resource.id,
         tick_number=tick_number,
     )
+    if tif == TimeInForce.IOC and float(order.remaining) > 0:
+        await cancel_order(session, company.id, order.id)
     return order.id
 
 

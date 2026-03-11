@@ -21,6 +21,11 @@ class OrderStatus(str, enum.Enum):
     CANCELLED = "CANCELLED"
 
 
+class TimeInForce(str, enum.Enum):
+    GTC = "GTC"
+    IOC = "IOC"
+
+
 class Order(Base):
     __tablename__ = "orders"
 
@@ -44,6 +49,11 @@ class Order(Base):
         nullable=False,
         index=True,
     )
+    time_in_force: Mapped[TimeInForce] = mapped_column(
+        Enum(TimeInForce, values_callable=lambda obj: [e.value for e in obj]),
+        default=TimeInForce.GTC,
+        nullable=False,
+    )
     created_at_tick: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -57,5 +67,5 @@ class Order(Base):
     def __repr__(self) -> str:
         return (
             f"<Order {self.id} {self.order_type.value} {self.resource_id} "
-            f"@{self.price} qty={self.remaining}/{self.quantity}>"
+            f"@{self.price} tif={self.time_in_force.value} qty={self.remaining}/{self.quantity}>"
         )

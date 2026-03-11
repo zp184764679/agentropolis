@@ -42,7 +42,7 @@ from agentropolis.models.mercenary_contract import (
 from agentropolis.models.nexus_state import NexusCrystalState
 from agentropolis.models.notification import Notification, NotificationType
 from agentropolis.models.npc_shop import NpcShop
-from agentropolis.models.order import Order, OrderStatus, OrderType
+from agentropolis.models.order import Order, OrderStatus, OrderType, TimeInForce
 from agentropolis.models.player_contract import ContractType, PlayerContract, PlayerContractStatus
 from agentropolis.models.price_history import PriceHistory
 from agentropolis.models.recipe import Recipe
@@ -111,6 +111,7 @@ __all__ = [
     "Order",
     "OrderStatus",
     "OrderType",
+    "TimeInForce",
     "ParticipantRole",
     "ParticipantStatus",
     "PlayerContract",

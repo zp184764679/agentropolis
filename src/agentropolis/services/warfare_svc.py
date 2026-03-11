@@ -98,17 +98,22 @@ async def _gather_combat_modifiers(
 
     Returns {agent_id: {"attack_mult", "defense_mult", "trait_attack_bonus", "trait_defense_bonus"}}
     """
+    from sqlalchemy import select
+
+    from agentropolis.services.career_svc import get_career_combat_modifier
     from agentropolis.services.strategy_svc import get_combat_modifiers, get_profile
     from agentropolis.services.trait_svc import get_combat_trait_modifiers
 
     modifiers: dict[int, dict] = {}
     for aid in agent_ids:
+        agent = (await session.execute(select(Agent).where(Agent.id == aid))).scalar_one_or_none()
         profile = await get_profile(session, aid)
         combat_mods = get_combat_modifiers(profile)
         trait_mods = await get_combat_trait_modifiers(session, aid)
+        career_mult = get_career_combat_modifier(agent.career_path if agent is not None else None)
         modifiers[aid] = {
-            "attack_mult": combat_mods["attack_mult"],
-            "defense_mult": combat_mods["defense_mult"],
+            "attack_mult": combat_mods["attack_mult"] * career_mult,
+            "defense_mult": combat_mods["defense_mult"] * career_mult,
             "trait_attack_bonus": trait_mods["attack_bonus"],
             "trait_defense_bonus": trait_mods["defense_bonus"],
         }

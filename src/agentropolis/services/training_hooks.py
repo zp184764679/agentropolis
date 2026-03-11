@@ -204,10 +204,20 @@ async def get_xp_modifier(session: AsyncSession, agent_id: int, skill_category: 
 
     Called from skill_svc.award_xp() to adjust XP amounts.
     """
+    from sqlalchemy import select
+
+    from agentropolis.models.agent import Agent
+    from agentropolis.services.career_svc import get_career_xp_multiplier
     from agentropolis.services.strategy_svc import get_profile, get_xp_multiplier
 
     profile = await get_profile(session, agent_id)
-    return get_xp_multiplier(profile, skill_category)
+    agent = (
+        await session.execute(select(Agent).where(Agent.id == agent_id))
+    ).scalar_one_or_none()
+    career_path = agent.career_path if agent is not None else None
+    strategy_multiplier = get_xp_multiplier(profile, skill_category)
+    career_multiplier = get_career_xp_multiplier(career_path, skill_category)
+    return strategy_multiplier * career_multiplier
 
 
 async def get_npc_price_modifier(session: AsyncSession, agent_id: int) -> float:

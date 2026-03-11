@@ -312,19 +312,11 @@ async def get_company_workers(session: AsyncSession, company_id: int) -> dict[st
     if company is None:
         raise ValueError(f"Company {company_id} not found")
 
-    worker = (
-        await session.execute(select(Worker).where(Worker.company_id == company_id))
-    ).scalar_one_or_none()
-    count = int(worker.count if worker else 0)
-    satisfaction = float(worker.satisfaction if worker else 0.0)
-    return {
-        "company_id": company.id,
-        "count": count,
-        "satisfaction": satisfaction,
-        "rat_consumption_per_tick": count * settings.WORKER_RAT_PER_TICK,
-        "dw_consumption_per_tick": count * settings.WORKER_DW_PER_TICK,
-        "productivity_modifier": _worker_productivity_modifier(satisfaction),
-    }
+    from agentropolis.services.consumption import get_company_workforce_profile
+
+    workforce = await get_company_workforce_profile(session, company_id)
+    workforce["company_id"] = company.id
+    return workforce
 
 
 async def get_agent_company(session: AsyncSession, agent_id: int) -> dict | None:

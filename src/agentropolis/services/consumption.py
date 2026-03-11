@@ -6,8 +6,26 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.config import settings
-from agentropolis.models import Company, Worker
+from agentropolis.models import AgentEmployment, Company, Worker
 from agentropolis.services.inventory_svc import remove_resource
+
+ROLE_CONSUMPTION_MULTIPLIER = {
+    "worker": 1.00,
+    "foreman": 1.20,
+    "manager": 1.50,
+    "director": 2.00,
+    "ceo": 2.50,
+}
+
+ROLE_PRODUCTIVITY_BONUS = {
+    "worker": 0.00,
+    "foreman": 0.03,
+    "manager": 0.08,
+    "director": 0.15,
+    "ceo": 0.25,
+}
+
+MAX_MANAGEMENT_BONUS = 0.75
 
 
 async def _consume_company_resource(
@@ -32,6 +50,10 @@ async def _consume_company_resource(
         return 0.0
 
 
+def _base_worker_productivity_modifier(satisfaction: float) -> float:
+    return 0.5 if satisfaction < settings.LOW_SATISFACTION_THRESHOLD else 1.0
+
+
 def _next_satisfaction(
     *,
     current: float,
@@ -49,6 +71,84 @@ def _next_satisfaction(
     return max(0.0, current - settings.SATISFACTION_DECAY_RATE * penalties)
 
 
+def _empty_tier_counts() -> dict[str, int]:
+    return {
+        "npc_workers": 0,
+        "worker": 0,
+        "foreman": 0,
+        "manager": 0,
+        "director": 0,
+        "ceo": 0,
+    }
+
+
+def _employment_tier_counts(employments: list[AgentEmployment]) -> dict[str, int]:
+    counts = _empty_tier_counts()
+    for employment in employments:
+        counts[employment.role.value] = counts.get(employment.role.value, 0) + 1
+    return counts
+
+
+def _tier_consumption_load(employments: list[AgentEmployment]) -> float:
+    return sum(
+        ROLE_CONSUMPTION_MULTIPLIER.get(employment.role.value, 1.0)
+        for employment in employments
+    )
+
+
+def _management_bonus(employments: list[AgentEmployment]) -> float:
+    return min(
+        MAX_MANAGEMENT_BONUS,
+        sum(ROLE_PRODUCTIVITY_BONUS.get(employment.role.value, 0.0) for employment in employments),
+    )
+
+
+async def get_company_workforce_profile(
+    session: AsyncSession,
+    company_id: int,
+) -> dict:
+    company = (
+        await session.execute(select(Company).where(Company.id == company_id))
+    ).scalar_one_or_none()
+    if company is None:
+        raise ValueError(f"Company {company_id} not found")
+
+    worker = (
+        await session.execute(select(Worker).where(Worker.company_id == company_id))
+    ).scalar_one_or_none()
+    employments = list(
+        (
+            await session.execute(
+                select(AgentEmployment).where(AgentEmployment.company_id == company_id)
+            )
+        ).scalars().all()
+    )
+
+    tier_counts = _employment_tier_counts(employments)
+    npc_workers = int(worker.count if worker else 0)
+    tier_counts["npc_workers"] = npc_workers
+    satisfaction = float(worker.satisfaction if worker else 0.0)
+    employment_count = len(employments)
+    management_bonus = _management_bonus(employments)
+    equivalent_load = float(npc_workers) + _tier_consumption_load(employments)
+
+    return {
+        "company_id": company.id,
+        "count": npc_workers,
+        "satisfaction": satisfaction,
+        "employment_count": employment_count,
+        "total_headcount": npc_workers + employment_count,
+        "tier_counts": tier_counts,
+        "management_bonus": round(management_bonus, 3),
+        "rat_consumption_per_tick": round(equivalent_load * settings.WORKER_RAT_PER_TICK, 3),
+        "dw_consumption_per_tick": round(equivalent_load * settings.WORKER_DW_PER_TICK, 3),
+        "productivity_modifier": round(
+            _base_worker_productivity_modifier(satisfaction) * (1.0 + management_bonus),
+            3,
+        ),
+    }
+
+
 async def tick_consumption(session: AsyncSession) -> dict:
     """Settle one worker upkeep cycle for all active companies."""
     result = await session.execute(
@@ -62,11 +162,25 @@ async def tick_consumption(session: AsyncSession) -> dict:
     total_dw = 0.0
     workers_lost = 0
     satisfaction_map: dict[int, float] = {}
+    productivity_map: dict[int, float] = {}
+    tier_counts_map: dict[int, dict[str, int]] = {}
+    employment_count_map: dict[int, int] = {}
+
+    employment_rows = (
+        await session.execute(select(AgentEmployment).where(AgentEmployment.company_id.is_not(None)))
+    ).scalars().all()
+    employments_by_company: dict[int, list[AgentEmployment]] = {}
+    for employment in employment_rows:
+        employments_by_company.setdefault(employment.company_id, []).append(employment)
 
     for company, worker in rows:
         worker_count = int(worker.count or 0)
-        required_rat = float(worker_count) * float(settings.WORKER_RAT_PER_TICK)
-        required_dw = float(worker_count) * float(settings.WORKER_DW_PER_TICK)
+        employments = employments_by_company.get(company.id, [])
+        tier_counts = _employment_tier_counts(employments)
+        tier_counts["npc_workers"] = worker_count
+        equivalent_load = float(worker_count) + _tier_consumption_load(employments)
+        required_rat = equivalent_load * float(settings.WORKER_RAT_PER_TICK)
+        required_dw = equivalent_load * float(settings.WORKER_DW_PER_TICK)
 
         consumed_rat = await _consume_company_resource(
             session,
@@ -96,6 +210,13 @@ async def tick_consumption(session: AsyncSession) -> dict:
             workers_lost += lost
 
         satisfaction_map[company.id] = float(worker.satisfaction)
+        productivity_map[company.id] = round(
+            _base_worker_productivity_modifier(float(worker.satisfaction))
+            * (1.0 + _management_bonus(employments)),
+            3,
+        )
+        tier_counts_map[company.id] = tier_counts
+        employment_count_map[company.id] = len(employments)
 
     await session.flush()
     return {
@@ -104,4 +225,7 @@ async def tick_consumption(session: AsyncSession) -> dict:
         "total_dw_consumed": total_dw,
         "workers_lost": workers_lost,
         "satisfaction_map": satisfaction_map,
+        "productivity_map": productivity_map,
+        "tier_counts_map": tier_counts_map,
+        "employment_count_map": employment_count_map,
     }

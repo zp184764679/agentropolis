@@ -28,6 +28,15 @@ async def get_agent_storage(
     Returns: {"region_id", "capacity", "used", "available"}
     """
     capacity = settings.AGENT_BASE_STORAGE_PER_REGION
+    from agentropolis.services.guild_svc import get_agent_guild_effects
+
+    guild_effects = await get_agent_guild_effects(session, agent_id)
+    if (
+        guild_effects["guild_id"] is not None
+        and int(guild_effects["level"]) >= 2
+        and int(guild_effects["home_region_id"]) == int(region_id)
+    ):
+        capacity += int(guild_effects["warehouse_bonus"])
 
     # TODO: Add Strength skill bonus when skill_svc is available
     # capacity += strength_level * settings.AGENT_CARRY_PER_STRENGTH_LEVEL * 10

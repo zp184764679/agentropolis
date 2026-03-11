@@ -203,15 +203,17 @@ def get_xp_multiplier(profile: StrategyProfile | None, skill_category: str) -> f
     if profile is None:
         return 1.0
 
+    skill_key = skill_category
+    normalized = skill_key.lower()
     primary_skills = FOCUS_SKILLS.get(profile.primary_focus, [])
     has_secondary = profile.secondary_focus is not None
 
-    if skill_category in primary_skills:
+    if skill_key in primary_skills or normalized == profile.primary_focus.value.lower():
         return 1.75 if not has_secondary else 1.50
 
     if has_secondary:
         secondary_skills = FOCUS_SKILLS.get(profile.secondary_focus, [])
-        if skill_category in secondary_skills:
+        if skill_key in secondary_skills or normalized == profile.secondary_focus.value.lower():
             return 1.25
 
     return 0.75
