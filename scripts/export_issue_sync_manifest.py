@@ -79,6 +79,20 @@ REPO_COMPLETE_ISSUES = [
         "evidence_commits": ["39ac91d"],
     },
     {
+        "issue": 49,
+        "title": "Treaty Mechanical Effects",
+        "repo_status": "repo_complete",
+        "sync_action": "close_if_acceptance_matches",
+        "evidence_commits": ["8f454da"],
+    },
+    {
+        "issue": 50,
+        "title": "Regional Infrastructure",
+        "repo_status": "repo_complete",
+        "sync_action": "close_if_acceptance_matches",
+        "evidence_commits": ["8f454da"],
+    },
+    {
         "issue": 64,
         "title": "Server Autopilot — Reflex + Standing Orders",
         "repo_status": "repo_complete",
