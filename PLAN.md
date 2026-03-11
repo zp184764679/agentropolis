@@ -671,8 +671,8 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 | Issue | Title | Status | Depends On | Key Files |
 |-------|-------|--------|------------|-----------|
 | [#48](https://github.com/zp184764679/agentropolis/issues/48) | Agent Carry Capacity | ✅ REPO COMPLETE | #16,#25,#26 | `services/world_svc.py` (extend) |
-| [#49](https://github.com/zp184764679/agentropolis/issues/49) | Treaty Mechanical Effects | ⬜ CREATED | #16,#28 | `services/treaty_effects_svc.py` |
-| [#50](https://github.com/zp184764679/agentropolis/issues/50) | Regional Infrastructure | ⬜ CREATED | #16,#25,#27 | `models/regional_project.py`, `services/regional_project_svc.py` |
+| [#49](https://github.com/zp184764679/agentropolis/issues/49) | Treaty Mechanical Effects | ✅ REPO COMPLETE | #16,#28 | `services/treaty_effects_svc.py` |
+| [#50](https://github.com/zp184764679/agentropolis/issues/50) | Regional Infrastructure | ✅ REPO COMPLETE | #16,#25,#27 | `models/regional_project.py`, `services/regional_project_svc.py` |
 | [#51](https://github.com/zp184764679/agentropolis/issues/51) | Multi-tier Workforce | ⬜ CREATED | #16,#17,#18,#19 | `models/company.py`, `services/consumption.py` (extend) |
 | [#52](https://github.com/zp184764679/agentropolis/issues/52) | Market Order Type | ⬜ CREATED | #16,#21 | `models/order.py`, `services/market_engine.py` (extend) |
 | [#53](https://github.com/zp184764679/agentropolis/issues/53) | Guild Level & Upgrade | ⬜ CREATED | #16,#28 | `services/guild_svc.py` (extend) |

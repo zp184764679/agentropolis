@@ -17,6 +17,7 @@ from agentropolis.services.inventory_svc import (
     unreserve_resource,
 )
 from agentropolis.services.tax_svc import collect_tax
+from agentropolis.services.treaty_effects_svc import get_trade_tax_modifier, get_treaty_between
 
 
 def _coerce_now(now: datetime | None = None) -> datetime:
@@ -146,6 +147,10 @@ async def _settle_match(
 
     buyer = await _get_company_for_update(session, buy_order.company_id)
     seller = await _get_company_for_update(session, sell_order.company_id)
+    treaty_tax_modifier = 1.0
+    if buyer.founder_agent_id is not None and seller.founder_agent_id is not None:
+        treaties = await get_treaty_between(session, buyer.founder_agent_id, seller.founder_agent_id)
+        treaty_tax_modifier = get_trade_tax_modifier(treaties)
 
     await consume_reserved_resource(
         session,
@@ -170,7 +175,7 @@ async def _settle_match(
     tax_summary = await collect_tax(
         session,
         sell_order.region_id or seller.region_id,
-        gross_value,
+        gross_value * treaty_tax_modifier,
         "market_trade",
         payer_company_id=seller.id,
     )

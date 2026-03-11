@@ -47,6 +47,30 @@ async def get_treaty_between(
     ]
 
 
+async def get_mutual_defense_allies(
+    session: AsyncSession,
+    agent_id: int,
+) -> list[int]:
+    """Return allied agent IDs whose treaties imply mutual defense obligations."""
+    result = await session.execute(
+        select(Treaty).where(
+            Treaty.is_active == True,  # noqa: E712
+            Treaty.treaty_type.in_(("mutual_defense", "alliance")),
+            or_(
+                Treaty.party_a_agent_id == agent_id,
+                Treaty.party_b_agent_id == agent_id,
+            ),
+        )
+    )
+    allies: set[int] = set()
+    for treaty in result.scalars().all():
+        if treaty.party_a_agent_id == agent_id and treaty.party_b_agent_id is not None:
+            allies.add(int(treaty.party_b_agent_id))
+        elif treaty.party_b_agent_id == agent_id and treaty.party_a_agent_id is not None:
+            allies.add(int(treaty.party_a_agent_id))
+    return sorted(allies)
+
+
 def _get_effects_for_type(treaty_type) -> dict[str, str]:
     """Get effects description for a treaty type."""
     tt = treaty_type.value if hasattr(treaty_type, 'value') else str(treaty_type)

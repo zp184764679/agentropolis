@@ -10,13 +10,14 @@ All combat is deterministic (no randomness). Power is calculated from skill leve
 import logging
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from agentropolis.config import settings
 from agentropolis.models.agent import Agent
 from agentropolis.models.building import Building, BuildingStatus
+from agentropolis.models.company import Company
 from agentropolis.models.mercenary_contract import (
     ContractParticipant,
     ContractStatus,
@@ -27,7 +28,12 @@ from agentropolis.models.mercenary_contract import (
 )
 from agentropolis.models.region import Region, SafetyTier
 from agentropolis.models.transport_order import TransportOrder, TransportStatus
-from agentropolis.models.treaty import Treaty, TreatyType
+from agentropolis.services.treaty_effects_svc import (
+    check_mutual_defense,
+    check_warfare_blocked,
+    get_mutual_defense_allies,
+    get_treaty_between,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -293,6 +299,9 @@ async def create_contract(
     # Validate mission type
     mission = MissionType(mission_type)
 
+    target_building_owner_agent_id: int | None = None
+    target_transport_owner_agent_id: int | None = None
+
     # Validate target
     if mission in (MissionType.SABOTAGE_BUILDING, MissionType.DEFEND_BUILDING):
         if not target_building_id:
@@ -305,9 +314,34 @@ async def create_contract(
             raise ValueError("Target building not found")
         if building.region_id != target_region_id:
             raise ValueError("Building is not in the target region")
+        target_building_owner_agent_id = building.agent_id
 
-    if mission in (MissionType.RAID_TRANSPORT, MissionType.ESCORT_TRANSPORT) and not target_transport_id:
-        raise ValueError(f"target_transport_id required for {mission}")
+    if mission in (MissionType.RAID_TRANSPORT, MissionType.ESCORT_TRANSPORT):
+        if not target_transport_id:
+            raise ValueError(f"target_transport_id required for {mission}")
+        result = await session.execute(
+            select(TransportOrder).where(TransportOrder.id == target_transport_id)
+        )
+        transport = result.scalar_one_or_none()
+        if not transport:
+            raise ValueError("Target transport not found")
+        if transport.owner_agent_id is not None:
+            target_transport_owner_agent_id = transport.owner_agent_id
+        elif transport.owner_company_id is not None:
+            result = await session.execute(
+                select(Agent).join(Company, Company.founder_agent_id == Agent.id).where(
+                    Company.id == transport.owner_company_id
+                )
+            )
+            owner_agent = result.scalar_one_or_none()
+            if owner_agent is not None:
+                target_transport_owner_agent_id = owner_agent.id
+
+    blocked_defender_id = target_building_owner_agent_id or target_transport_owner_agent_id
+    if blocked_defender_id is not None:
+        is_blocked = await _check_treaty_block(session, employer_agent_id, blocked_defender_id)
+        if is_blocked:
+            raise ValueError("Active treaty blocks warfare against this target")
 
     # Calculate and deduct escrow
     escrow_total = reward_per_agent * max_agents
@@ -336,6 +370,16 @@ async def create_contract(
     session.add(contract)
     await session.flush()
 
+    mutual_defense_contracts = 0
+    if mission == MissionType.SABOTAGE_BUILDING and target_building_owner_agent_id is not None:
+        mutual_defense_contracts = await _spawn_mutual_defense_contracts(
+            session,
+            defender_agent_id=target_building_owner_agent_id,
+            target_building_id=target_building_id,
+            target_region_id=target_region_id,
+            now=now,
+        )
+
     logger.info("Contract %d created by agent %d, escrow=%d", contract.id, employer_agent_id, escrow_total)
 
     # Decision log: creating a contract is a strategic combat decision
@@ -360,6 +404,7 @@ async def create_contract(
         "escrow_total": contract.escrow_total,
         "expires_at": contract.expires_at.isoformat(),
         "status": contract.status.value,
+        "mutual_defense_contracts_created": mutual_defense_contracts,
     }
 
 
@@ -528,19 +573,54 @@ async def cancel_contract(
 # ─── Combat Execution ───────────────────────────────────────────────────────
 
 
-async def _check_treaty(session: AsyncSession, attacker_id: int, defender_owner_id: int) -> bool:
-    """Check if a non-aggression or alliance treaty exists between two agents."""
-    result = await session.execute(
-        select(Treaty).where(
-            Treaty.is_active.is_(True),
-            Treaty.treaty_type.in_([TreatyType.NON_AGGRESSION, TreatyType.ALLIANCE, TreatyType.MUTUAL_DEFENSE]),
-            (
-                (and_(Treaty.party_a_agent_id == attacker_id, Treaty.party_b_agent_id == defender_owner_id))
-                | (and_(Treaty.party_a_agent_id == defender_owner_id, Treaty.party_b_agent_id == attacker_id))
-            ),
+async def _check_treaty_block(session: AsyncSession, attacker_id: int, defender_owner_id: int) -> bool:
+    treaties = await get_treaty_between(session, attacker_id, defender_owner_id)
+    return check_warfare_blocked(treaties)
+
+
+async def _spawn_mutual_defense_contracts(
+    session: AsyncSession,
+    *,
+    defender_agent_id: int,
+    target_building_id: int | None,
+    target_region_id: int,
+    now: datetime,
+) -> int:
+    allies = await get_mutual_defense_allies(session, defender_agent_id)
+    created = 0
+    for ally_id in allies:
+        treaties = await get_treaty_between(session, defender_agent_id, ally_id)
+        if not check_mutual_defense(treaties):
+            continue
+        existing = await session.execute(
+            select(MercenaryContract).where(
+                MercenaryContract.employer_agent_id == ally_id,
+                MercenaryContract.mission_type == MissionType.DEFEND_BUILDING,
+                MercenaryContract.target_building_id == target_building_id,
+                MercenaryContract.status.in_([ContractStatus.OPEN, ContractStatus.ACTIVE]),
+            )
         )
-    )
-    return result.scalar_one_or_none() is not None
+        if existing.scalar_one_or_none() is not None:
+            continue
+        session.add(
+            MercenaryContract(
+                employer_agent_id=ally_id,
+                mission_type=MissionType.DEFEND_BUILDING,
+                target_building_id=target_building_id,
+                target_region_id=target_region_id,
+                reward_per_agent=0,
+                max_agents=settings.WARFARE_MAX_GARRISON_PER_BUILDING,
+                escrow_total=0,
+                mission_duration_seconds=0,
+                expires_at=now + timedelta(hours=6),
+                status=ContractStatus.OPEN,
+                result_summary={"source": "mutual_defense"},
+            )
+        )
+        created += 1
+    if created:
+        await session.flush()
+    return created
 
 
 async def execute_sabotage(
@@ -589,19 +669,10 @@ async def execute_sabotage(
     if not building:
         raise ValueError("Target building not found")
 
-    # Check treaty with building owner
-    building_owner_id = building.agent_id or building.company_id
-    if building_owner_id and building.agent_id:
-        has_treaty = await _check_treaty(session, contract.employer_agent_id, building.agent_id)
+    if building.agent_id is not None:
+        has_treaty = await _check_treaty_block(session, contract.employer_agent_id, building.agent_id)
         if has_treaty:
-            # Treaty violation: massive reputation penalty, but still proceed
-            result2 = await session.execute(
-                select(Agent).where(Agent.id == contract.employer_agent_id).with_for_update()
-            )
-            employer = result2.scalar_one_or_none()
-            if employer:
-                employer.reputation -= 50.0
-                logger.warning("Agent %d violated treaty! Reputation -50", contract.employer_agent_id)
+            raise ValueError("Active treaty blocks warfare against this target")
 
     # Gather attackers
     active_attackers = [

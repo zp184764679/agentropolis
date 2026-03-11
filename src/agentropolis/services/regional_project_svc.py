@@ -17,7 +17,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.config import settings
+from agentropolis.models.building import Building
+from agentropolis.models.npc_shop import NpcShop
 from agentropolis.models.region import Region
+from agentropolis.models.region import RegionConnection
 from agentropolis.models.regional_project import (
     ProjectStatus,
     ProjectType,
@@ -61,6 +64,18 @@ PROJECT_DEFS: dict[str, dict] = {
         "duration_seconds": 14400,
     },
 }
+
+
+def _trade_hub_shop_payload() -> dict:
+    return {
+        "shop_type": "trade_hub",
+        "buy_prices": {"ORE": 8, "CRP": 4, "FE": 22, "BLD": 75},
+        "sell_prices": {"RAT": 13, "DW": 11, "BLD": 90, "MCH": 140},
+        "stock": {"RAT": 180, "DW": 180, "BLD": 60, "MCH": 10},
+        "restock_rate": {"RAT": 10, "DW": 10, "BLD": 3, "MCH": 1},
+        "max_stock": {"RAT": 400, "DW": 400, "BLD": 120, "MCH": 25},
+        "elasticity": settings.NPC_SHOP_DEFAULT_ELASTICITY,
+    }
 
 
 async def propose_project(
@@ -233,8 +248,39 @@ async def _apply_project_effect(session: AsyncSession, project: RegionalProject)
     if pt == "market_expansion":
         # Reduce tax rate
         region.tax_rate = max(0.0, region.tax_rate - project.effect_value)
-    # road_improvement and fortification effects are checked dynamically
-    # trade_hub would seed an NPC shop - simplified for now
+    elif pt == "road_improvement":
+        result = await session.execute(
+            select(RegionConnection)
+            .where(RegionConnection.from_region_id == project.region_id)
+            .with_for_update()
+        )
+        for connection in result.scalars().all():
+            connection.travel_time_seconds = max(
+                1,
+                int(round(connection.travel_time_seconds * (1.0 - project.effect_value))),
+            )
+    elif pt == "fortification":
+        result = await session.execute(
+            select(Building).where(Building.region_id == project.region_id).with_for_update()
+        )
+        multiplier = 1.0 + project.effect_value
+        for building in result.scalars().all():
+            building.max_durability = round(float(building.max_durability) * multiplier, 3)
+            building.durability = min(
+                float(building.max_durability),
+                round(float(building.durability) * multiplier, 3),
+            )
+    elif pt == "trade_hub":
+        result = await session.execute(
+            select(NpcShop)
+            .where(
+                NpcShop.region_id == project.region_id,
+                NpcShop.shop_type == "trade_hub",
+            )
+            .with_for_update()
+        )
+        if result.scalar_one_or_none() is None:
+            session.add(NpcShop(region_id=project.region_id, **_trade_hub_shop_payload()))
 
     logger.info(
         "Project %d (%s) completed in region %d",
