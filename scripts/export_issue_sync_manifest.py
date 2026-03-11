@@ -9,6 +9,48 @@ from pathlib import Path
 
 REPO_COMPLETE_ISSUES = [
     {
+        "issue": 39,
+        "title": "Employment & Wages",
+        "repo_status": "repo_complete",
+        "sync_action": "close_if_acceptance_matches",
+        "evidence_commits": ["4b86023"],
+    },
+    {
+        "issue": 40,
+        "title": "Player Contract (Escrow)",
+        "repo_status": "repo_complete",
+        "sync_action": "close_if_acceptance_matches",
+        "evidence_commits": ["4b86023"],
+    },
+    {
+        "issue": 41,
+        "title": "Notification & Event Feed",
+        "repo_status": "repo_complete",
+        "sync_action": "close_if_acceptance_matches",
+        "evidence_commits": ["4b86023"],
+    },
+    {
+        "issue": 42,
+        "title": "Perishable Goods Decay",
+        "repo_status": "repo_complete",
+        "sync_action": "close_if_acceptance_matches",
+        "evidence_commits": ["4b86023"],
+    },
+    {
+        "issue": 43,
+        "title": "Event Effects Application",
+        "repo_status": "repo_complete",
+        "sync_action": "close_if_acceptance_matches",
+        "evidence_commits": ["4b86023"],
+    },
+    {
+        "issue": 44,
+        "title": "Building Natural Decay",
+        "repo_status": "repo_complete",
+        "sync_action": "close_if_acceptance_matches",
+        "evidence_commits": ["4b86023"],
+    },
+    {
         "issue": 64,
         "title": "Server Autopilot — Reflex + Standing Orders",
         "repo_status": "repo_complete",
@@ -132,10 +174,11 @@ REPO_COMPLETE_ISSUES = [
 
 def build_issue_sync_manifest() -> dict:
     return {
-        "scope": "created_issues_repo_complete_since_p5",
+        "scope": "created_issues_repo_complete_pending_sync",
         "notes": [
             "This manifest tracks repo-truthful completion for created issues whose GitHub state may still need manual synchronization.",
             "It does not assert that remote issues are already closed.",
+            "It covers created issues across the current roadmap, including completed design-gap and autonomy/control-plane ranges.",
             "Proposed backlog #81+ is intentionally excluded because those issues may not exist on GitHub.",
         ],
         "issues": REPO_COMPLETE_ISSUES,
