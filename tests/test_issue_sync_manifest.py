@@ -8,7 +8,7 @@ from scripts.export_issue_sync_manifest import build_issue_sync_manifest
 def test_issue_sync_manifest_tracks_repo_complete_created_issues() -> None:
     payload = build_issue_sync_manifest()
 
-    assert payload["scope"] == "created_issues_repo_complete_pending_sync"
+    assert payload["scope"] == "created_issues_repo_complete_evidence_catalog"
     assert len(payload["issues"]) >= 10
     assert any(item["issue"] == 17 and "7860056" in item["evidence_commits"] for item in payload["issues"])
     assert any(item["issue"] == 27 and "72c4a08" in item["evidence_commits"] for item in payload["issues"])

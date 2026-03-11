@@ -1,4 +1,4 @@
-"""Export a machine-readable manifest of repo-complete GitHub issues pending sync."""
+"""Export a machine-readable evidence catalog for repo-complete created issues."""
 
 from __future__ import annotations
 
@@ -426,11 +426,11 @@ REPO_COMPLETE_ISSUES = [
 
 def build_issue_sync_manifest() -> dict:
     return {
-        "scope": "created_issues_repo_complete_pending_sync",
+        "scope": "created_issues_repo_complete_evidence_catalog",
         "notes": [
-            "This manifest tracks repo-truthful completion for created issues whose GitHub state may still need manual synchronization.",
-            "It does not assert that remote issues are already closed.",
-            "It covers created issues across the current roadmap, including completed design-gap and autonomy/control-plane ranges.",
+            "This manifest tracks repo-truthful completion evidence for created issues across the current roadmap.",
+            "It is safe to use as a close checklist, but some entries may already be synchronized remotely.",
+            "It covers created issues across the current roadmap, including completed core, design-gap, autonomy, and control-plane ranges.",
             "Proposed backlog #81+ is intentionally excluded because those issues may not exist on GitHub.",
         ],
         "issues": REPO_COMPLETE_ISSUES,
