@@ -8,7 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 from agentropolis.api.auth import hash_api_key
-from agentropolis.models import Agent, Base, Inventory, Region, Resource, StrategyProfile
+from agentropolis.models import Agent, Base, Inventory, NpcShop, Region, Resource, StrategyProfile
+from agentropolis.services.game_engine import run_housekeeping_sweep
+from agentropolis.services.npc_shop_svc import buy_from_shop, restock_shops, sell_to_shop
 from agentropolis.services.agent_svc import (
     eat,
     get_agent_status,
@@ -218,5 +220,92 @@ def test_skill_progression_and_transport_delivery() -> None:
             if ticker == "RAT" and region_id == regions["Iron Vale"].id
         ]
         assert destination_rat == [2.0]
+
+    asyncio.run(_run_seeded_session(scenario))
+
+
+def test_npc_shop_buy_sell_and_restock_integrate_with_housekeeping() -> None:
+    async def scenario(session: AsyncSession) -> None:
+        created = await register_agent(session, "Scout Five", None)
+        region_id = created["current_region_id"]
+
+        shop = (
+            await session.execute(
+                select(NpcShop).where(NpcShop.region_id == region_id).limit(1)
+            )
+        ).scalar_one()
+        rat_resource = (
+            await session.execute(select(Resource).where(Resource.ticker == "RAT"))
+        ).scalar_one()
+        ore_resource = (
+            await session.execute(select(Resource).where(Resource.ticker == "ORE"))
+        ).scalar_one()
+
+        starter_rats = (
+            await session.execute(
+                select(Inventory.quantity)
+                .where(
+                    Inventory.agent_id == created["agent_id"],
+                    Inventory.region_id == region_id,
+                    Inventory.resource_id == rat_resource.id,
+                )
+            )
+        ).scalar_one()
+        session.add(
+            Inventory(
+                agent_id=created["agent_id"],
+                company_id=None,
+                region_id=region_id,
+                resource_id=ore_resource.id,
+                quantity=5,
+                reserved=0,
+            )
+        )
+        await session.flush()
+
+        bought = await buy_from_shop(session, created["agent_id"], shop.id, "RAT", 2)
+        assert bought["quantity"] == 2
+        assert bought["remaining_stock"] == int((shop.stock or {})["RAT"])
+
+        sold = await sell_to_shop(session, created["agent_id"], shop.id, "ORE", 3)
+        assert sold["quantity"] == 3
+        assert sold["remaining_stock"] >= 3
+
+        rat_qty = (
+            await session.execute(
+                select(Inventory.quantity)
+                .where(
+                    Inventory.agent_id == created["agent_id"],
+                    Inventory.region_id == region_id,
+                    Inventory.resource_id == rat_resource.id,
+                )
+            )
+        ).scalar_one()
+        ore_qty = (
+            await session.execute(
+                select(Inventory.quantity)
+                .where(
+                    Inventory.agent_id == created["agent_id"],
+                    Inventory.region_id == region_id,
+                    Inventory.resource_id == ore_resource.id,
+                )
+            )
+        ).scalar_one()
+        assert float(rat_qty) == float(starter_rats) + 2.0
+        assert float(ore_qty) == 2.0
+
+        shop.stock = {"RAT": 10, "DW": 10, "BLD": 10}
+        shop.last_restock_at = datetime.now(UTC) - timedelta(hours=2)
+        await session.flush()
+        restocked = await restock_shops(session, now=datetime.now(UTC))
+        assert restocked >= 1
+        assert int((shop.stock or {})["RAT"]) > 10
+
+        shop.stock = {"RAT": 5, "DW": 5, "BLD": 5}
+        shop.last_restock_at = datetime.now(UTC) - timedelta(hours=2)
+        await session.flush()
+        sweep = await run_housekeeping_sweep(session, now=datetime.now(UTC))
+        assert int((shop.stock or {})["RAT"]) > 5
+        assert int(sweep["admin"]["shops_restocked"]) >= 1
 
     asyncio.run(_run_seeded_session(scenario))

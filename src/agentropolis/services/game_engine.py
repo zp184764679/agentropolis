@@ -31,6 +31,7 @@ from agentropolis.services.market_engine import match_all_resources
 from agentropolis.services.maintenance_svc import settle_all_building_decay
 from agentropolis.services.nxc_mining_svc import adjust_difficulty, check_halving, update_active_refineries
 from agentropolis.services.notification_svc import prune_old_notifications
+from agentropolis.services.npc_shop_svc import restock_shops
 from agentropolis.services.production import settle_all_buildings
 from agentropolis.services.regional_project_svc import settle_project_completions
 from agentropolis.services.structured_logging import emit_structured_log
@@ -476,6 +477,7 @@ def _admin_phase(session: AsyncSession, now: datetime):
         notifications_pruned = await prune_old_notifications(session, now=now)
         perishable_decay = await settle_all_perishable_decay(session, now=now)
         building_decay = await settle_all_building_decay(session, now=now)
+        shops_restocked = await restock_shops(session, now=now)
         projects_completed = await settle_project_completions(session, now=now)
         return {
             "bankruptcies": bankruptcies,
@@ -484,6 +486,7 @@ def _admin_phase(session: AsyncSession, now: datetime):
             "notifications_pruned": notifications_pruned,
             "perishable_decay": perishable_decay,
             "building_decay": building_decay,
+            "shops_restocked": shops_restocked,
             "projects_completed": projects_completed,
         }
 
