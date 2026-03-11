@@ -26,6 +26,7 @@ from agentropolis.services.agent_svc import drink, eat, rest
 from agentropolis.services.company_svc import get_active_company_model
 from agentropolis.services.decision_log_svc import record_decision
 from agentropolis.services.inventory_svc import get_resource_quantity_in_region
+from agentropolis.services.inventory_svc import normalize_quantity_amount
 from agentropolis.services.market_engine import (
     get_my_orders,
     get_order_book,
@@ -104,8 +105,8 @@ def _normalize_standing_orders(standing_orders: dict | None) -> dict:
 
     for raw_rule in payload.get("buy_rules", []) or []:
         resource = str(raw_rule.get("resource", "")).upper().strip()
-        below_price = float(raw_rule.get("below_price", 0))
-        max_qty = float(raw_rule.get("max_qty", 0))
+        below_price = normalize_quantity_amount(raw_rule.get("below_price", 0))
+        max_qty = normalize_quantity_amount(raw_rule.get("max_qty", 0))
         source = raw_rule.get("source")
         if source is not None:
             source = str(source).lower()
@@ -126,8 +127,8 @@ def _normalize_standing_orders(standing_orders: dict | None) -> dict:
 
     for raw_rule in payload.get("sell_rules", []) or []:
         resource = str(raw_rule.get("resource", "")).upper().strip()
-        above_price = float(raw_rule.get("above_price", 0))
-        min_qty = float(raw_rule.get("min_qty", 0))
+        above_price = normalize_quantity_amount(raw_rule.get("above_price", 0))
+        min_qty = normalize_quantity_amount(raw_rule.get("min_qty", 0))
         if not resource:
             raise ValueError("Standing-order sell rule requires resource")
         if above_price <= 0 or min_qty <= 0:
@@ -369,11 +370,11 @@ async def run_all_reflexes(
     }
 
 
-def _best_price(order_book: dict, side: str) -> float | None:
+def _best_price(order_book: dict, side: str) -> int | None:
     entries = order_book.get("asks" if side == "ask" else "bids", [])
     if not entries:
         return None
-    return float(entries[0]["price"])
+    return int(entries[0]["price"])
 
 
 def _has_open_order(open_orders: list[dict], *, resource: str, side: str) -> bool:
@@ -452,7 +453,7 @@ async def run_all_standing_orders(
                     order_book = await get_order_book(session, resource)
                     order_book_cache[resource] = order_book
                 best_ask = _best_price(order_book, "ask")
-                if best_ask is None or best_ask > float(buy_rule["below_price"]):
+                if best_ask is None or best_ask > int(buy_rule["below_price"]):
                     continue
 
                 remaining_budget = max(
@@ -463,12 +464,10 @@ async def run_all_standing_orders(
                     skipped_budget += 1
                     continue
 
-                max_affordable = math.floor(
-                    min(
-                        float(buy_rule["max_qty"]),
-                        int(company.balance) / float(buy_rule["below_price"]),
-                        remaining_budget / float(buy_rule["below_price"]),
-                    )
+                max_affordable = min(
+                    int(buy_rule["max_qty"]),
+                    int(company.balance) // int(buy_rule["below_price"]),
+                    remaining_budget // int(buy_rule["below_price"]),
                 )
                 if max_affordable <= 0:
                     skipped_budget += 1
@@ -479,18 +478,18 @@ async def run_all_standing_orders(
                     company.id,
                     "company_market",
                     operation="place_buy_order",
-                    spend_amount=float(buy_rule["below_price"]) * max_affordable,
+                    spend_amount=int(buy_rule["below_price"]) * max_affordable,
                 )
                 order_id = await place_buy_order(
                     session,
                     company.id,
                     resource,
-                    float(max_affordable),
-                    float(buy_rule["below_price"]),
+                    int(max_affordable),
+                    int(buy_rule["below_price"]),
                     current_tick=current_tick,
                 )
                 state.spending_this_hour = int(state.spending_this_hour) + int(
-                    round(float(buy_rule["below_price"]) * max_affordable)
+                    int(buy_rule["below_price"]) * max_affordable
                 )
                 await record_decision(
                     session,
@@ -499,15 +498,15 @@ async def run_all_standing_orders(
                     f"Autopilot buy order for {resource}",
                     context_snapshot={
                         "resource": resource,
-                        "price": float(buy_rule["below_price"]),
-                        "quantity": float(max_affordable),
+                        "price": int(buy_rule["below_price"]),
+                        "quantity": int(max_affordable),
                         "order_type": "BUY",
                         "origin": "standing_order",
                     },
                     reference_type="order",
                     reference_id=order_id,
                     region_id=company.region_id,
-                    amount_copper=int(round(float(buy_rule["below_price"]) * max_affordable)),
+                    amount_copper=int(buy_rule["below_price"]) * max_affordable,
                 )
                 buy_orders_created += 1
                 open_orders.append(
@@ -543,7 +542,7 @@ async def run_all_standing_orders(
                     order_book = await get_order_book(session, resource)
                     order_book_cache[resource] = order_book
                 best_bid = _best_price(order_book, "bid")
-                if best_bid is None or best_bid < float(sell_rule["above_price"]):
+                if best_bid is None or best_bid < int(sell_rule["above_price"]):
                     continue
 
                 quantity_snapshot = await get_resource_quantity_in_region(
@@ -552,8 +551,8 @@ async def run_all_standing_orders(
                     resource,
                     region_id=company.region_id,
                 )
-                available = float(quantity_snapshot["available"])
-                order_qty = min(available, float(sell_rule["min_qty"]))
+                available = int(quantity_snapshot["available"])
+                order_qty = min(available, int(sell_rule["min_qty"]))
                 if order_qty <= 0:
                     continue
 
@@ -567,8 +566,8 @@ async def run_all_standing_orders(
                     session,
                     company.id,
                     resource,
-                    float(order_qty),
-                    float(sell_rule["above_price"]),
+                    int(order_qty),
+                    int(sell_rule["above_price"]),
                     current_tick=current_tick,
                 )
                 await record_decision(
@@ -578,15 +577,15 @@ async def run_all_standing_orders(
                     f"Autopilot sell order for {resource}",
                     context_snapshot={
                         "resource": resource,
-                        "price": float(sell_rule["above_price"]),
-                        "quantity": float(order_qty),
+                        "price": int(sell_rule["above_price"]),
+                        "quantity": int(order_qty),
                         "order_type": "SELL",
                         "origin": "standing_order",
                     },
                     reference_type="order",
                     reference_id=order_id,
                     region_id=company.region_id,
-                    amount_copper=int(round(float(sell_rule["above_price"]) * order_qty)),
+                    amount_copper=int(sell_rule["above_price"]) * order_qty,
                 )
                 sell_orders_created += 1
                 open_orders.append(

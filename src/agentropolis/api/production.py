@@ -3,10 +3,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agentropolis.api.auth import get_current_company
+from agentropolis.api.auth import get_current_agent_company
 from agentropolis.api.preview_guard import (
     ERROR_CODE_HEADER,
-    make_company_preview_write_guard,
+    make_agent_preview_access_guard,
+    make_agent_preview_write_guard,
 )
 from agentropolis.api.schemas import (
     BuildBuildingRequest,
@@ -32,21 +33,22 @@ from agentropolis.services.production import (
 router = APIRouter(prefix="/production", tags=["production"])
 
 
-async def _build_building_spend_resolver(request, session, _company) -> int:
+async def _build_building_spend_resolver(request, session, _agent) -> int:
     payload = await request.json()
     return await estimate_build_building_cost_svc(session, payload["building_type"])
 
 
-production_build_guard = make_company_preview_write_guard(
+production_access_guard = make_agent_preview_access_guard("company_production")
+production_build_guard = make_agent_preview_write_guard(
     "company_production",
     operation="build_building",
     spend_resolver=_build_building_spend_resolver,
 )
-production_start_guard = make_company_preview_write_guard(
+production_start_guard = make_agent_preview_write_guard(
     "company_production",
     operation="start_production",
 )
-production_stop_guard = make_company_preview_write_guard(
+production_stop_guard = make_agent_preview_write_guard(
     "company_production",
     operation="stop_production",
 )
@@ -54,7 +56,8 @@ production_stop_guard = make_company_preview_write_guard(
 
 @router.get("/buildings", response_model=list[BuildingInfo])
 async def get_buildings(
-    company: Company = Depends(get_current_company),
+    _guard: None = Depends(production_access_guard),
+    company: Company = Depends(get_current_agent_company),
     session: AsyncSession = Depends(get_session),
 ):
     """Get all your buildings and their status."""
@@ -90,7 +93,7 @@ async def get_building_types(session: AsyncSession = Depends(get_session)):
 )
 async def start_production(
     req: StartProductionRequest,
-    company: Company = Depends(get_current_company),
+    company: Company = Depends(get_current_agent_company),
     session: AsyncSession = Depends(get_session),
 ):
     """Start production on a building with a recipe."""
@@ -120,7 +123,7 @@ async def start_production(
 )
 async def stop_production(
     building_id: int,
-    company: Company = Depends(get_current_company),
+    company: Company = Depends(get_current_agent_company),
     session: AsyncSession = Depends(get_session),
 ):
     """Stop production on a building."""
@@ -139,7 +142,7 @@ async def stop_production(
 )
 async def build_building(
     req: BuildBuildingRequest,
-    company: Company = Depends(get_current_company),
+    company: Company = Depends(get_current_agent_company),
     session: AsyncSession = Depends(get_session),
 ):
     """Construct a new building."""

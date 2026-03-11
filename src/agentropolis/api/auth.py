@@ -1,9 +1,4 @@
-"""Legacy scaffold API-key authentication dependency for FastAPI.
-
-Current behavior resolves `X-API-Key` to a Company.
-Target architecture moves auth toward Agent-based identity plus explicit authorization scopes.
-See `PLAN.md` proposed control-plane backlog for the target model.
-"""
+"""Agent-first API-key authentication dependencies for FastAPI."""
 
 import hashlib
 from typing import Any
@@ -16,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agentropolis.control_contract import AUTH_ERROR_CODES
 from agentropolis.database import get_session
 from agentropolis.models import Company
+from agentropolis.services.company_svc import get_active_company_model
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
@@ -36,35 +32,6 @@ def _require_api_key(api_key: str | None) -> str:
     return hash_api_key(api_key)
 
 
-async def get_current_company(
-    api_key: str | None = Security(api_key_header),
-    request: Request = None,
-    session: AsyncSession = Depends(get_session),
-) -> Company:
-    """Resolve API key to a Company in the legacy scaffold auth model."""
-    company = await resolve_company_from_api_key(session, api_key)
-    if request is not None:
-        request.state.authenticated_actor_kind = "company"
-        request.state.authenticated_actor_key = f"company:{company.id}"
-    return company
-
-
-async def get_optional_current_company(
-    api_key: str | None = Security(api_key_header),
-    request: Request = None,
-    session: AsyncSession = Depends(get_session),
-) -> Company | None:
-    """Resolve API key to a Company when present, otherwise allow anonymous access."""
-    if not api_key:
-        return None
-
-    company = await resolve_company_from_api_key(session, api_key)
-    if request is not None:
-        request.state.authenticated_actor_kind = "company"
-        request.state.authenticated_actor_key = f"company:{company.id}"
-    return company
-
-
 async def get_current_agent(
     api_key: str | None = Security(api_key_header),
     request: Request = None,
@@ -82,25 +49,6 @@ async def get_current_agent(
         request.state.authenticated_actor_kind = "agent"
         request.state.authenticated_actor_key = f"agent:{agent.id}"
     return agent
-
-
-async def resolve_company_from_api_key(
-    session: AsyncSession,
-    api_key: str | None,
-) -> Company:
-    """Resolve an API key to an active company without FastAPI dependency wiring."""
-    key_hash = _require_api_key(api_key)
-    result = await session.execute(
-        select(Company).where(Company.api_key_hash == key_hash, Company.is_active.is_(True))
-    )
-    company = result.scalar_one_or_none()
-    if not company:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or inactive API key",
-            headers={"X-Agentropolis-Error-Code": "auth_company_api_key_invalid"},
-        )
-    return company
 
 
 async def resolve_agent_from_api_key(
@@ -138,3 +86,39 @@ async def resolve_agent_from_api_key(
             headers={"X-Agentropolis-Error-Code": "auth_agent_api_key_invalid"},
         )
     return agent
+
+
+async def resolve_active_company_for_agent(
+    session: AsyncSession,
+    agent_id: int,
+) -> Company:
+    """Resolve the active company owned by an authenticated agent."""
+    company = await get_active_company_model(session, agent_id)
+    if company is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Agent does not have an active company",
+            headers={"X-Agentropolis-Error-Code": "agent_company_not_found"},
+        )
+    return company
+
+
+async def get_current_agent_company(
+    agent: Any = Depends(get_current_agent),
+    session: AsyncSession = Depends(get_session),
+) -> Company:
+    """Resolve the active company for the authenticated agent."""
+    return await resolve_active_company_for_agent(session, agent.id)
+
+
+async def get_optional_current_agent_company(
+    api_key: str | None = Security(api_key_header),
+    request: Request = None,
+    session: AsyncSession = Depends(get_session),
+) -> Company | None:
+    """Resolve the active company for an authenticated agent when present."""
+    if not api_key:
+        return None
+
+    agent = await get_current_agent(api_key=api_key, request=request, session=session)
+    return await resolve_active_company_for_agent(session, agent.id)

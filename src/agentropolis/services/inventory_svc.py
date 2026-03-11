@@ -17,10 +17,17 @@ Invariants:
 
 from __future__ import annotations
 
+from decimal import Decimal, ROUND_HALF_UP
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentropolis.models import Agent, Company, Inventory, Region, Resource
+
+
+def normalize_quantity_amount(amount: int | float | Decimal) -> int:
+    """Normalize resource quantities onto integer units."""
+    return int(Decimal(str(amount)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 async def _resolve_company_region_id(
@@ -100,15 +107,16 @@ async def add_resource(
     session: AsyncSession,
     company_id: int,
     resource_ticker: str,
-    amount: float,
+    amount: int | float | Decimal,
     *,
     region_id: int | None = None,
-) -> float:
+) -> int:
     """Add resources to inventory. Creates row if not exists.
 
     Returns: new quantity
     """
-    if amount <= 0:
+    normalized_amount = normalize_quantity_amount(amount)
+    if normalized_amount <= 0:
         raise ValueError("amount must be greater than 0")
     resolved_region_id = await _resolve_company_region_id(
         session,
@@ -119,13 +127,13 @@ async def add_resource(
 
     has_capacity = await check_storage_available(
         session,
-        amount,
+        normalized_amount,
         resolved_region_id,
         company_id=company_id,
     )
     if not has_capacity:
         raise ValueError(
-            f"Storage capacity exceeded in region {resolved_region_id}: need {amount:.4f} additional units"
+            f"Storage capacity exceeded in region {resolved_region_id}: need {normalized_amount} additional units"
         )
     resource = await _get_resource(session, resource_ticker)
     inventory = await _get_or_create_inventory_row(
@@ -134,25 +142,26 @@ async def add_resource(
         region_id=resolved_region_id,
         resource_id=resource.id,
     )
-    inventory.quantity = float(inventory.quantity) + amount
+    inventory.quantity = int(inventory.quantity or 0) + normalized_amount
     await session.flush()
-    return float(inventory.quantity)
+    return int(inventory.quantity)
 
 
 async def remove_resource(
     session: AsyncSession,
     company_id: int,
     resource_ticker: str,
-    amount: float,
+    amount: int | float | Decimal,
     *,
     region_id: int | None = None,
-) -> float:
+) -> int:
     """Remove resources from inventory.
 
     Returns: new quantity
     Raises: ValueError if insufficient available quantity
     """
-    if amount <= 0:
+    normalized_amount = normalize_quantity_amount(amount)
+    if normalized_amount <= 0:
         raise ValueError("amount must be greater than 0")
     resolved_region_id = await _resolve_company_region_id(
         session,
@@ -166,30 +175,31 @@ async def remove_resource(
         region_id=resolved_region_id,
         resource_id=resource.id,
     )
-    available = float(inventory.quantity) - float(inventory.reserved)
-    if available < amount:
+    available = int(inventory.quantity or 0) - int(inventory.reserved or 0)
+    if available < normalized_amount:
         raise ValueError(
-            f"Insufficient {resource_ticker}: need {amount:.4f}, available {available:.4f}"
+            f"Insufficient {resource_ticker}: need {normalized_amount}, available {available}"
         )
-    inventory.quantity = float(inventory.quantity) - amount
+    inventory.quantity = int(inventory.quantity or 0) - normalized_amount
     await session.flush()
-    return float(inventory.quantity)
+    return int(inventory.quantity)
 
 
 async def reserve_resource(
     session: AsyncSession,
     company_id: int,
     resource_ticker: str,
-    amount: float,
+    amount: int | float | Decimal,
     *,
     region_id: int | None = None,
-) -> float:
+) -> int:
     """Reserve resources (for sell orders). Does not reduce quantity.
 
     Returns: new reserved amount
     Raises: ValueError if insufficient available (quantity - reserved)
     """
-    if amount <= 0:
+    normalized_amount = normalize_quantity_amount(amount)
+    if normalized_amount <= 0:
         raise ValueError("amount must be greater than 0")
     resolved_region_id = await _resolve_company_region_id(
         session,
@@ -203,29 +213,30 @@ async def reserve_resource(
         region_id=resolved_region_id,
         resource_id=resource.id,
     )
-    available = float(inventory.quantity) - float(inventory.reserved)
-    if available < amount:
+    available = int(inventory.quantity or 0) - int(inventory.reserved or 0)
+    if available < normalized_amount:
         raise ValueError(
-            f"Insufficient {resource_ticker}: need {amount:.4f}, available {available:.4f}"
+            f"Insufficient {resource_ticker}: need {normalized_amount}, available {available}"
         )
-    inventory.reserved = float(inventory.reserved) + amount
+    inventory.reserved = int(inventory.reserved or 0) + normalized_amount
     await session.flush()
-    return float(inventory.reserved)
+    return int(inventory.reserved)
 
 
 async def unreserve_resource(
     session: AsyncSession,
     company_id: int,
     resource_ticker: str,
-    amount: float,
+    amount: int | float | Decimal,
     *,
     region_id: int | None = None,
-) -> float:
+) -> int:
     """Release reserved resources (on order cancel).
 
     Returns: new reserved amount
     """
-    if amount <= 0:
+    normalized_amount = normalize_quantity_amount(amount)
+    if normalized_amount <= 0:
         raise ValueError("amount must be greater than 0")
     resolved_region_id = await _resolve_company_region_id(
         session,
@@ -239,13 +250,13 @@ async def unreserve_resource(
         region_id=resolved_region_id,
         resource_id=resource.id,
     )
-    if float(inventory.reserved) < amount:
+    if int(inventory.reserved or 0) < normalized_amount:
         raise ValueError(
-            f"Cannot unreserve {amount:.4f} {resource_ticker}; reserved is {float(inventory.reserved):.4f}"
+            f"Cannot unreserve {normalized_amount} {resource_ticker}; reserved is {int(inventory.reserved or 0)}"
         )
-    inventory.reserved = float(inventory.reserved) - amount
+    inventory.reserved = int(inventory.reserved or 0) - normalized_amount
     await session.flush()
-    return float(inventory.reserved)
+    return int(inventory.reserved)
 
 
 async def get_inventory(session: AsyncSession, company_id: int) -> list[dict]:
@@ -269,8 +280,8 @@ async def get_inventory(session: AsyncSession, company_id: int) -> list[dict]:
 
     items: list[dict] = []
     for ticker, name, base_price, quantity, reserved in result.all():
-        quantity_value = float(quantity or 0)
-        reserved_value = float(reserved or 0)
+        quantity_value = int(quantity or 0)
+        reserved_value = int(reserved or 0)
         items.append(
             {
                 "ticker": ticker,
@@ -313,8 +324,8 @@ async def get_resource_quantity(
         raise ValueError(f"Unknown resource ticker: {resource_ticker}")
 
     ticker, name, base_price, quantity, reserved = row
-    quantity_value = float(quantity or 0)
-    reserved_value = float(reserved or 0)
+    quantity_value = int(quantity or 0)
+    reserved_value = int(reserved or 0)
     return {
         "ticker": ticker,
         "name": name,
@@ -345,8 +356,8 @@ async def get_resource_quantity_in_region(
         region_id=resolved_region_id,
         resource_id=resource.id,
     )
-    quantity_value = float(inventory.quantity or 0)
-    reserved_value = float(inventory.reserved or 0)
+    quantity_value = int(inventory.quantity or 0)
+    reserved_value = int(inventory.reserved or 0)
     return {
         "ticker": resource.ticker,
         "name": resource.name,
@@ -362,12 +373,13 @@ async def consume_reserved_resource(
     session: AsyncSession,
     company_id: int,
     resource_ticker: str,
-    amount: float,
+    amount: int | float | Decimal,
     *,
     region_id: int | None = None,
 ) -> dict:
     """Consume quantity that is already reserved for a sell-side execution."""
-    if amount <= 0:
+    normalized_amount = normalize_quantity_amount(amount)
+    if normalized_amount <= 0:
         raise ValueError("amount must be greater than 0")
     resolved_region_id = await _resolve_company_region_id(
         session,
@@ -381,21 +393,23 @@ async def consume_reserved_resource(
         region_id=resolved_region_id,
         resource_id=resource.id,
     )
-    if float(inventory.reserved) < amount:
+    reserved_value = int(inventory.reserved or 0)
+    quantity_value = int(inventory.quantity or 0)
+    if reserved_value < normalized_amount:
         raise ValueError(
-            f"Insufficient reserved {resource_ticker}: need {amount:.4f}, reserved {float(inventory.reserved):.4f}"
+            f"Insufficient reserved {resource_ticker}: need {normalized_amount}, reserved {reserved_value}"
         )
-    if float(inventory.quantity) < amount:
+    if quantity_value < normalized_amount:
         raise ValueError(
-            f"Insufficient quantity {resource_ticker}: need {amount:.4f}, quantity {float(inventory.quantity):.4f}"
+            f"Insufficient quantity {resource_ticker}: need {normalized_amount}, quantity {quantity_value}"
         )
-    inventory.reserved = float(inventory.reserved) - amount
-    inventory.quantity = float(inventory.quantity) - amount
+    inventory.reserved = reserved_value - normalized_amount
+    inventory.quantity = quantity_value - normalized_amount
     await session.flush()
     return {
         "ticker": resource.ticker,
-        "quantity": float(inventory.quantity),
-        "reserved": float(inventory.reserved),
-        "available": float(inventory.quantity) - float(inventory.reserved),
+        "quantity": int(inventory.quantity),
+        "reserved": int(inventory.reserved),
+        "available": int(inventory.quantity) - int(inventory.reserved),
         "region_id": resolved_region_id,
     }

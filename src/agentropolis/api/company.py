@@ -3,9 +3,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agentropolis.api.auth import get_current_agent, get_current_company
+from agentropolis.api.auth import get_current_agent, get_current_agent_company
 from agentropolis.api.preview_guard import (
     ERROR_CODE_HEADER,
+    make_agent_preview_access_guard,
     make_agent_preview_write_guard,
 )
 from agentropolis.api.schemas import (
@@ -29,6 +30,7 @@ company_register_guard = make_agent_preview_write_guard(
     allow_in_degraded_mode=True,
     operation="legacy_company_register",
 )
+company_status_guard = make_agent_preview_access_guard("agent_self")
 
 
 @router.post(
@@ -62,7 +64,8 @@ async def register_company(
 
 @router.get("/status", response_model=CompanyStatus)
 async def get_status(
-    company: Company = Depends(get_current_company),
+    _guard: None = Depends(company_status_guard),
+    company: Company = Depends(get_current_agent_company),
     session: AsyncSession = Depends(get_session),
 ):
     """Get your company's current status."""
@@ -78,7 +81,8 @@ async def get_status(
 
 @router.get("/workers", response_model=WorkerInfo)
 async def get_workers(
-    company: Company = Depends(get_current_company),
+    _guard: None = Depends(company_status_guard),
+    company: Company = Depends(get_current_agent_company),
     session: AsyncSession = Depends(get_session),
 ):
     """Get your workforce details."""

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from agentropolis.mcp._shared import (
-    company_tool_context,
+    agent_company_tool_context,
     handle_tool_error,
     parity_http_error,
 )
@@ -19,9 +19,12 @@ from agentropolis.services.production import (
 
 
 @mcp.tool()
-async def get_recipes(company_api_key: str, building_type: str | None = None) -> dict:
+async def get_recipes(agent_api_key: str, building_type: str | None = None) -> dict:
     try:
-        async with company_tool_context(company_api_key) as (session, _company):
+        async with agent_company_tool_context(
+            agent_api_key,
+            family="company_production",
+        ) as (session, _agent, _company):
             try:
                 payload = await get_recipes_svc(session, building_type)
             except ValueError as exc:
@@ -36,19 +39,22 @@ async def get_recipes(company_api_key: str, building_type: str | None = None) ->
 
 
 @mcp.tool()
-async def get_building_types(company_api_key: str) -> dict:
+async def get_building_types(agent_api_key: str) -> dict:
     try:
-        async with company_tool_context(company_api_key) as (session, _company):
+        async with agent_company_tool_context(
+            agent_api_key,
+            family="company_production",
+        ) as (session, _agent, _company):
             return {"ok": True, "building_types": await get_building_types_svc(session)}
     except Exception as exc:
         return handle_tool_error(exc)
 
 
 @mcp.tool()
-async def build_building(company_api_key: str, building_type: str) -> dict:
+async def build_building(agent_api_key: str, building_type: str) -> dict:
     try:
-        async with company_tool_context(
-            company_api_key,
+        async with agent_company_tool_context(
+            agent_api_key,
             family="company_production",
             mutate=True,
             operation="build_building",
@@ -56,7 +62,7 @@ async def build_building(company_api_key: str, building_type: str) -> dict:
                 session,
                 building_type,
             ),
-        ) as (session, company):
+        ) as (session, _agent, company):
             payload = await build_building_svc(session, company.id, building_type)
             await session.commit()
             return {
@@ -80,17 +86,17 @@ async def build_building(company_api_key: str, building_type: str) -> dict:
 
 @mcp.tool()
 async def start_production(
-    company_api_key: str,
+    agent_api_key: str,
     building_id: int,
     recipe_id: int,
 ) -> dict:
     try:
-        async with company_tool_context(
-            company_api_key,
+        async with agent_company_tool_context(
+            agent_api_key,
             family="company_production",
             mutate=True,
             operation="start_production",
-        ) as (session, company):
+        ) as (session, _agent, company):
             payload = await start_production_svc(session, company.id, building_id, recipe_id)
             await session.commit()
             return {
@@ -114,14 +120,14 @@ async def start_production(
 
 
 @mcp.tool()
-async def stop_production(company_api_key: str, building_id: int) -> dict:
+async def stop_production(agent_api_key: str, building_id: int) -> dict:
     try:
-        async with company_tool_context(
-            company_api_key,
+        async with agent_company_tool_context(
+            agent_api_key,
             family="company_production",
             mutate=True,
             operation="stop_production",
-        ) as (session, company):
+        ) as (session, _agent, company):
             stopped = await stop_production_svc(session, company.id, building_id)
             await session.commit()
             return {

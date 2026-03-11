@@ -6,8 +6,8 @@ from datetime import UTC, datetime
 
 from sqlalchemy import func, select
 
-from agentropolis.api.auth import resolve_company_from_api_key
 from agentropolis.mcp._shared import (
+    agent_company_tool_context,
     agent_tool_context,
     handle_tool_error,
     parity_http_error,
@@ -110,13 +110,39 @@ async def get_game_status() -> dict:
 
 
 @mcp.tool()
-async def get_leaderboard(metric: str = "net_worth", company_api_key: str | None = None) -> dict:
+async def get_leaderboard(metric: str = "net_worth", agent_api_key: str | None = None) -> dict:
     try:
-        async with public_tool_context() as session:
-            company = None
-            if company_api_key:
-                company = await resolve_company_from_api_key(session, company_api_key)
+        if agent_api_key:
+            async with agent_company_tool_context(
+                agent_api_key,
+                family="intel",
+            ) as (session, _agent, company):
+                ranked = await leaderboard_svc.get_leaderboard(session, metric=metric, limit=None)
+                entries = [
+                    {
+                        "rank": row["rank"],
+                        "company_name": row["company_name"],
+                        "net_worth": row["net_worth"],
+                        "balance": row["balance"],
+                        "worker_count": row["worker_count"],
+                        "building_count": row["building_count"],
+                    }
+                    for row in ranked[:20]
+                ]
+                your_rank = next(
+                    (row["rank"] for row in ranked if row["company_id"] == company.id),
+                    None,
+                )
 
+                return {
+                    "ok": True,
+                    "leaderboard": {
+                        "metric": metric.lower(),
+                        "entries": entries,
+                        "your_rank": your_rank,
+                    },
+                }
+        async with public_tool_context() as session:
             ranked = await leaderboard_svc.get_leaderboard(session, metric=metric, limit=None)
             entries = [
                 {
@@ -129,19 +155,13 @@ async def get_leaderboard(metric: str = "net_worth", company_api_key: str | None
                 }
                 for row in ranked[:20]
             ]
-            your_rank = None
-            if company is not None:
-                your_rank = next(
-                    (row["rank"] for row in ranked if row["company_id"] == company.id),
-                    None,
-                )
 
             return {
                 "ok": True,
                 "leaderboard": {
                     "metric": metric.lower(),
                     "entries": entries,
-                    "your_rank": your_rank,
+                    "your_rank": None,
                 },
             }
     except Exception as exc:

@@ -78,9 +78,6 @@ def test_playable_path_registers_company_runs_production_and_executes_market_tra
             assert company_a.status_code == 200
             assert company_b.status_code == 200
 
-            company_a_key = company_a.json()["api_key"]
-            company_b_key = company_b.json()["api_key"]
-
             company_status = await client.get(
                 "/api/agent/company",
                 headers=_api_key_headers(agent_a_key),
@@ -90,7 +87,7 @@ def test_playable_path_registers_company_runs_production_and_executes_market_tra
 
             buildings_response = await client.get(
                 "/api/production/buildings",
-                headers=_api_key_headers(company_a_key),
+                headers=_api_key_headers(agent_a_key),
             )
             assert buildings_response.status_code == 200
             extractor = next(
@@ -110,7 +107,7 @@ def test_playable_path_registers_company_runs_production_and_executes_market_tra
 
             start_response = await client.post(
                 "/api/production/start",
-                headers=_api_key_headers(company_a_key),
+                headers=_api_key_headers(agent_a_key),
                 json={
                     "building_id": extractor["building_id"],
                     "recipe_id": extract_water_recipe["recipe_id"],
@@ -132,19 +129,19 @@ def test_playable_path_registers_company_runs_production_and_executes_market_tra
 
             inventory_response = await client.get(
                 "/api/inventory/H2O",
-                headers=_api_key_headers(company_a_key),
+                headers=_api_key_headers(agent_a_key),
             )
             assert inventory_response.status_code == 200
-            assert inventory_response.json()["quantity"] >= 110.0
+            assert inventory_response.json()["quantity"] >= 110
 
             sell_response = await client.post(
                 "/api/market/sell",
-                headers=_api_key_headers(company_b_key),
+                headers=_api_key_headers(agent_b_key),
                 json={"resource": "RAT", "quantity": 5, "price": 10},
             )
             buy_response = await client.post(
                 "/api/market/buy",
-                headers=_api_key_headers(company_a_key),
+                headers=_api_key_headers(agent_a_key),
                 json={"resource": "RAT", "quantity": 5, "price": 11},
             )
             assert sell_response.status_code == 200
@@ -160,7 +157,7 @@ def test_playable_path_registers_company_runs_production_and_executes_market_tra
 
             leaderboard = await client.get(
                 "/api/game/leaderboard",
-                headers=_api_key_headers(company_a_key),
+                headers=_api_key_headers(agent_a_key),
             )
             assert leaderboard.status_code == 200
             assert leaderboard.json()["entries"]

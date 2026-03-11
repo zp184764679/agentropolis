@@ -16,11 +16,12 @@ from agentropolis.api.auth import hash_api_key
 from agentropolis.config import settings
 from agentropolis.models import Agent, Inventory, Region, RegionType, Resource, StrategyProfile, TravelQueue
 from agentropolis.services.agent_vitals import settle_agent_vitals
+from agentropolis.services.inventory_svc import normalize_quantity_amount
 from agentropolis.services.training_hooks import get_respawn_balance_modifier
 
-AGENT_STARTER_INVENTORY: dict[str, float] = {
-    "RAT": 8.0,
-    "DW": 8.0,
+AGENT_STARTER_INVENTORY: dict[str, int] = {
+    "RAT": 8,
+    "DW": 8,
 }
 
 
@@ -142,13 +143,13 @@ async def _consume_vital_resource(
         region_id=agent.current_region_id,
         resource=resource,
     )
-    available = float(inventory.quantity) - float(inventory.reserved)
+    available = int(inventory.quantity or 0) - int(inventory.reserved or 0)
     if available < amount:
         raise ValueError(
-            f"Insufficient {resource_ticker}: need {amount}, available {available:.0f}"
+            f"Insufficient {resource_ticker}: need {amount}, available {available}"
         )
 
-    inventory.quantity = float(inventory.quantity) - amount
+    inventory.quantity = int(inventory.quantity or 0) - amount
     return inventory
 
 
@@ -198,7 +199,7 @@ async def register_agent(
             region_id=home_region.id,
             resource=resources[ticker],
         )
-        inventory.quantity = float(inventory.quantity) + quantity
+        inventory.quantity = int(inventory.quantity or 0) + normalize_quantity_amount(quantity)
 
     await session.flush()
 
@@ -236,7 +237,7 @@ async def eat(session: AsyncSession, agent_id: int, amount: int = 1) -> dict:
         "agent_id": agent.id,
         "resource_ticker": "RAT",
         "consumed": amount,
-        "remaining_quantity": round(float(inventory.quantity), 3),
+        "remaining_quantity": int(inventory.quantity),
         "status": _serialize_agent_status(agent),
     }
 
@@ -265,7 +266,7 @@ async def drink(session: AsyncSession, agent_id: int, amount: int = 1) -> dict:
         "agent_id": agent.id,
         "resource_ticker": "DW",
         "consumed": amount,
-        "remaining_quantity": round(float(inventory.quantity), 3),
+        "remaining_quantity": int(inventory.quantity),
         "status": _serialize_agent_status(agent),
     }
 

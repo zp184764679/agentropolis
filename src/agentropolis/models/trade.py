@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from agentropolis.models.base import Base
@@ -20,8 +20,8 @@ class Trade(Base):
         ForeignKey("resources.id"), nullable=False, index=True
     )
     region_id: Mapped[int | None] = mapped_column(ForeignKey("regions.id"), index=True)
-    price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
-    quantity: Mapped[float] = mapped_column(Numeric(16, 4), nullable=False)
+    price: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    quantity: Mapped[int] = mapped_column(BigInteger, nullable=False)
     tick_executed: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

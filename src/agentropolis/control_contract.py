@@ -18,9 +18,9 @@ REQUEST_ID_HEADER = "X-Agentropolis-Request-ID"
 
 AUTH_ERROR_CODES = {
     "auth_api_key_missing": "X-API-Key header is required for this operation.",
-    "auth_company_api_key_invalid": "Presented company API key is invalid or inactive.",
     "auth_agent_api_key_invalid": "Presented agent API key is invalid or inactive.",
     "auth_agent_model_unavailable": "Agent auth model exists in the target design but is not active in this runtime.",
+    "agent_company_not_found": "Authenticated agent does not have an active company.",
 }
 
 GENERAL_ERROR_CODES = {
@@ -31,7 +31,6 @@ GENERAL_ERROR_CODES = {
 AUTHORIZATION_ACTOR_KINDS = [
     "public",
     "agent",
-    "company",
     "admin",
 ]
 
@@ -102,8 +101,8 @@ AUTHORIZATION_RESOURCE_RULES = [
     },
     {
         "resource": "company_operations",
-        "owned_by": "company",
-        "principal_kinds": ["company"],
+        "owned_by": "agent",
+        "principal_kinds": ["agent"],
         "allowed_actions": ["read", "mutate"],
         "scope_families": [
             "company_inventory",
@@ -122,7 +121,7 @@ AUTHORIZATION_RESOURCE_RULES = [
             "market",
             "production",
         ],
-        "notes": "Company keys are restricted to company-scoped economy surfaces and never substitute for agent identity.",
+        "notes": "Company-scoped economy surfaces are reached through agent auth and the agent's active company.",
     },
     {
         "resource": "social_and_warfare_resources",
@@ -157,32 +156,6 @@ AUTHORIZATION_RESOURCE_RULES = [
 ]
 
 AUTHORIZATION_DELEGATION_RULES = [
-    {
-        "rule": "company_keys_do_not_upgrade_to_agent_identity",
-        "source_actor_kind": "company",
-        "delegated_actor_kind": None,
-        "applies_to_families": [
-            "agent_self",
-            "world",
-            "transport",
-            "social",
-            "strategy",
-            "warfare",
-        ],
-        "effect": "denied",
-        "notes": "Company API keys cannot access agent-auth preview families or social/warfare surfaces.",
-    },
-    {
-        "rule": "company_mutations_obey_founder_agent_preview_policy",
-        "source_actor_kind": "company",
-        "delegated_actor_kind": "agent",
-        "applies_to_families": [
-            "company_market",
-            "company_production",
-        ],
-        "effect": "delegated_preview_policy_check",
-        "notes": "Company-key market/production mutations inherit the founder agent's preview family budgets, operation budgets, and spend caps.",
-    },
     {
         "rule": "guild_and_treaty_resources_are_agent_mediated",
         "source_actor_kind": "agent",
@@ -231,12 +204,12 @@ REST_MCP_PARITY_REST_ONLY_OPERATIONS = [
     {
         "method": "GET",
         "path": "/api/company/status",
-        "reason": "Legacy company-key compatibility route; MCP company module is intentionally agent-centric.",
+        "reason": "Legacy /api/company compatibility facade; MCP company module remains the agent-auth canonical surface.",
     },
     {
         "method": "GET",
         "path": "/api/company/workers",
-        "reason": "Legacy company-key compatibility route; MCP company module is intentionally agent-centric.",
+        "reason": "Legacy /api/company compatibility facade; MCP company module remains the agent-auth canonical surface.",
     },
     {
         "method": "POST",
@@ -548,9 +521,9 @@ REST_ROUTE_SCOPE_GROUPS = [
     },
     {
         "prefix": "/api/company",
-        "actor_kind": "mixed_agent_company",
+        "actor_kind": "agent",
         "scope_family": "agent_self_or_company",
-        "read_policy": "agent_creation_plus_company_status_reads",
+        "read_policy": "agent_owned_company_reads",
         "write_policy": "agent_creation_plus_entity_lock",
         "idempotency_policy": "mixed_create_and_status",
         "execution_semantics": "sync_committed",
@@ -558,9 +531,9 @@ REST_ROUTE_SCOPE_GROUPS = [
     },
     {
         "prefix": "/api/inventory",
-        "actor_kind": "mixed_company_public",
+        "actor_kind": "mixed_agent_public",
         "scope_family": "company_inventory",
-        "read_policy": "company_or_public_resource_info",
+        "read_policy": "agent_or_public_resource_info",
         "write_policy": "none",
         "idempotency_policy": "safe_read",
         "execution_semantics": "sync",
@@ -568,10 +541,10 @@ REST_ROUTE_SCOPE_GROUPS = [
     },
     {
         "prefix": "/api/market",
-        "actor_kind": "mixed_company_public",
+        "actor_kind": "mixed_agent_public",
         "scope_family": "company_market",
-        "read_policy": "public_market_reads_plus_company_order_reads",
-        "write_policy": "company_auth_plus_entity_lock",
+        "read_policy": "public_market_reads_plus_agent_company_order_reads",
+        "write_policy": "agent_auth_plus_entity_lock",
         "idempotency_policy": "mixed_order_mutations",
         "execution_semantics": "sync_committed",
         "dangerous_operations": [
@@ -582,10 +555,10 @@ REST_ROUTE_SCOPE_GROUPS = [
     },
     {
         "prefix": "/api/production",
-        "actor_kind": "mixed_company_public",
+        "actor_kind": "mixed_agent_public",
         "scope_family": "company_production",
-        "read_policy": "public_recipe_reads_plus_company_building_reads",
-        "write_policy": "company_auth_plus_entity_lock",
+        "read_policy": "public_recipe_reads_plus_agent_company_building_reads",
+        "write_policy": "agent_auth_plus_entity_lock",
         "idempotency_policy": "mixed_building_mutations",
         "execution_semantics": "sync_committed",
         "dangerous_operations": [
@@ -596,9 +569,9 @@ REST_ROUTE_SCOPE_GROUPS = [
     },
     {
         "prefix": "/api/game",
-        "actor_kind": "mixed_public_company",
+        "actor_kind": "mixed_public_agent",
         "scope_family": None,
-        "read_policy": "public_status_plus_optional_company_leaderboard_context",
+        "read_policy": "public_status_plus_optional_agent_company_leaderboard_context",
         "write_policy": "none",
         "idempotency_policy": "safe_read",
         "execution_semantics": "sync",
@@ -651,7 +624,7 @@ _MCP_TOOL_GROUP_SPECS = [
     },
     {
         "module": "inventory",
-        "actor_kind": "mixed_company_public",
+        "actor_kind": "mixed_agent_public",
         "scope_family": "company_inventory",
         "rest_fallback_prefix": "/api/inventory",
         "tools": [
@@ -664,7 +637,7 @@ _MCP_TOOL_GROUP_SPECS = [
     },
     {
         "module": "market",
-        "actor_kind": "company",
+        "actor_kind": "agent",
         "scope_family": "company_market",
         "rest_fallback_prefix": "/api/market",
         "tools": [
@@ -703,7 +676,7 @@ _MCP_TOOL_GROUP_SPECS = [
     },
     {
         "module": "production",
-        "actor_kind": "company",
+        "actor_kind": "agent",
         "scope_family": "company_production",
         "rest_fallback_prefix": "/api/production",
         "tools": [

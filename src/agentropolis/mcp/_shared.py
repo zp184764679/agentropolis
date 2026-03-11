@@ -11,9 +11,8 @@ from time import monotonic
 
 from fastapi import HTTPException
 
-from agentropolis.api.auth import resolve_agent_from_api_key, resolve_company_from_api_key
+from agentropolis.api.auth import resolve_active_company_for_agent, resolve_agent_from_api_key
 from agentropolis.api.preview_guard import (
-    allow_internal_company_family_mutation,
     allow_internal_preview_family_access,
     allow_internal_preview_family_mutation,
 )
@@ -128,31 +127,32 @@ async def agent_tool_context(
 
 
 @asynccontextmanager
-async def company_tool_context(
-    company_api_key: str,
+async def agent_company_tool_context(
+    agent_api_key: str,
     *,
-    family: str | None = None,
+    family: str,
     mutate: bool = False,
     allow_in_degraded_mode: bool = False,
     operation: str | None = None,
     spend_amount: float | int | Callable | None = None,
 ):
-    async with _instrumented_tool_call("company"):
+    async with _instrumented_tool_call("agent"):
         async with async_session() as session:
-            company = await resolve_company_from_api_key(session, company_api_key)
+            agent = await resolve_agent_from_api_key(session, agent_api_key)
+            company = await resolve_active_company_for_agent(session, agent.id)
             if mutate:
-                if family is None:
-                    raise ValueError("family is required for mutating company tools")
                 resolved_spend = await _resolve_spend_amount(session, company, spend_amount)
-                await allow_internal_company_family_mutation(
+                await allow_internal_preview_family_mutation(
                     session,
-                    company,
+                    agent.id,
                     family,
-                    operation=operation,
                     allow_in_degraded_mode=allow_in_degraded_mode,
+                    operation=operation,
                     spend_amount=resolved_spend,
                 )
-            yield session, company
+            else:
+                await allow_internal_preview_family_access(session, agent.id, family)
+            yield session, agent, company
 
 
 async def _resolve_spend_amount(session, actor, spend_amount) -> float | int:

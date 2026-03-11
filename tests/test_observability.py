@@ -79,7 +79,7 @@ def test_observability_endpoint_reports_request_and_housekeeping_data() -> None:
             company = await create_company(agent["agent"]["api_key"], "Observability Company")
             assert company["ok"] is True
             agent_status = await get_agent_status(agent["agent"]["api_key"])
-            market_prices = await get_market_prices(company["company"]["api_key"])
+            market_prices = await get_market_prices(agent["agent"]["api_key"])
             assert agent_status["ok"] is True
             assert market_prices["ok"] is True
 
@@ -96,7 +96,6 @@ def test_observability_endpoint_reports_request_and_housekeeping_data() -> None:
             assert payload["mcp"]["calls_total"] >= 4
             assert payload["mcp"]["by_actor_kind"]["public"] >= 1
             assert payload["mcp"]["by_actor_kind"]["agent"] >= 1
-            assert payload["mcp"]["by_actor_kind"]["company"] >= 1
             assert "register_agent" in payload["mcp"]["by_tool"]
             assert payload["concurrency"]["authenticated_request_scope"] == "all"
             assert payload["concurrency"]["entity_lock_scope"] == "writes_only"

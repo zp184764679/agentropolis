@@ -14,7 +14,7 @@ def test_runtime_metadata_reports_target_registry() -> None:
         for group in meta["rest_surface"]["mounted_route_groups"]
     }
 
-    assert meta["auth_surface"]["agent_auth"]["status"] == "migration_compatible"
+    assert meta["auth_surface"]["agent_auth"]["status"] == "canonical"
     assert meta["preview_guard"]["surface_enabled"] is True
     assert meta["preview_guard"]["writes_enabled"] is True
     assert meta["preview_guard"]["degraded_mode"] is False
@@ -80,7 +80,7 @@ def test_runtime_metadata_reports_target_registry() -> None:
     assert "/meta/contract" in meta["reliable_endpoints"]
     assert mounted["agent"] == "preview_service_backed"
     assert mounted["production"] == "service_backed_writes"
-    assert mounted["company"] == "mixed_agent_creation_legacy_company_ops"
+    assert mounted["company"] == "agent_owned_company_ops"
     assert mounted["transport"] == "preview_service_backed"
     assert mounted["strategy"] == "preview_service_backed"
     assert mounted["warfare"] == "preview_service_backed"

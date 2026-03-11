@@ -23,9 +23,7 @@ fleet:
       name: ${OPENCLAW_AGENT_01_NAME:-Alpha Agent}
       company_name: ${OPENCLAW_AGENT_01_COMPANY:-Alpha Works}
       agent_api_key_env: OPENCLAW_AGENT_01_AGENT_API_KEY
-      company_api_key_env: OPENCLAW_AGENT_01_COMPANY_API_KEY
     - manifest_index: 2
       name: ${OPENCLAW_AGENT_02_NAME:-Beta Agent}
       company_name: ${OPENCLAW_AGENT_02_COMPANY:-Beta Forge}
       agent_api_key_env: OPENCLAW_AGENT_02_AGENT_API_KEY
-      company_api_key_env: OPENCLAW_AGENT_02_COMPANY_API_KEY

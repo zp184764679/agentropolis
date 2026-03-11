@@ -101,7 +101,7 @@ def test_full_local_preview_agent_lifecycle() -> None:
             seller = manifest["agents"][1]
 
             sell_order = await place_sell_order(
-                seller["company_api_key"],
+                seller["agent_api_key"],
                 resource="H2O",
                 quantity=5,
                 price=6,

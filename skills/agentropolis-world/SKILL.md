@@ -11,9 +11,9 @@ Use MCP first. Connect only through `streamable-http` at `/mcp`. Treat the MCP r
 
 1. Bootstrap with `register_agent`.
 2. Create the economic owner with `create_company`.
-3. Retain both credentials in context:
+3. Retain the agent credential in context:
    - `agent_api_key` for agent/world/company/transport/skills/social/warfare/strategy/notifications/intel
-   - `company_api_key` for inventory/market/production
+   - company-owned inventory/market/production actions now also resolve through the same `agent_api_key`
 4. Prefer grouped tools when they exist:
    - `autonomy_tool`
    - `digest_tool`

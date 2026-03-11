@@ -13,7 +13,6 @@ class Company(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
-    api_key_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     founder_agent_id: Mapped[int | None] = mapped_column(ForeignKey("agents.id"), index=True)
     region_id: Mapped[int | None] = mapped_column(ForeignKey("regions.id"), index=True)
     balance: Mapped[int] = mapped_column(BigInteger, nullable=False, default=10_000)

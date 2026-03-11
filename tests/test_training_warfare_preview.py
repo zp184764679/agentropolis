@@ -7,7 +7,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from agentropolis.api.auth import hash_api_key
 from agentropolis.main import app
 from agentropolis.models import Agent, Base, Building, BuildingType, Company, Region
 from agentropolis.models.decision_log import DecisionType
@@ -137,8 +136,8 @@ def test_warfare_contract_lifecycle_and_region_threats() -> None:
 
         company = Company(
             name="Frontier Works",
-            api_key_hash=hash_api_key("frontier-works"),
             founder_agent_id=employer["agent_id"],
+            region_id=frontier_gate.id,
             balance=1_000,
             net_worth=1_000,
         )

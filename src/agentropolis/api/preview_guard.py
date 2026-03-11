@@ -68,6 +68,7 @@ _FAMILY_LIMIT_ATTRS = {
     "social": "PREVIEW_SOCIAL_MUTATIONS_PER_WINDOW",
     "strategy": "PREVIEW_STRATEGY_MUTATIONS_PER_WINDOW",
     "warfare": "PREVIEW_WARFARE_MUTATIONS_PER_WINDOW",
+    "company_inventory": "PREVIEW_COMPANY_INVENTORY_MUTATIONS_PER_WINDOW",
     "company_market": "PREVIEW_COMPANY_MARKET_MUTATIONS_PER_WINDOW",
     "company_production": "PREVIEW_COMPANY_PRODUCTION_MUTATIONS_PER_WINDOW",
 }
@@ -648,19 +649,25 @@ def make_company_preview_write_guard(
     allow_in_degraded_mode: bool = False,
     spend_resolver: SpendResolver | None = None,
 ):
-    """Build a dependency that applies preview abuse/budget policy to company-auth writes."""
+    """Build a dependency for agent-owned company writes.
 
-    from agentropolis.api.auth import get_current_company
+    The name is retained as a compatibility wrapper for call sites that still
+    think in company-backed economy families, but the authenticated principal is
+    the agent API key and the company is resolved from that agent's active company.
+    """
+
+    from agentropolis.api.auth import get_current_agent, get_current_agent_company
 
     async def dependency(
         request: Request = None,
-        company: Company = Depends(get_current_company),
+        agent: Any = Depends(get_current_agent),
+        company: Company = Depends(get_current_agent_company),
         session: AsyncSession = Depends(get_session),
     ) -> None:
         if not isinstance(request, Request):
-            if isinstance(company, AsyncSession):
-                session = company
-            company = request
+            if isinstance(agent, AsyncSession):
+                session = agent
+            agent = request
             request = None
         await _require_preview_surface_enabled(session)
         await _require_preview_writes_enabled(session)
@@ -672,29 +679,26 @@ def make_company_preview_write_guard(
         spend_amount = await _resolve_spend_amount_from_request(
             request,
             session,
-            company,
+            agent,
             spend_resolver,
         )
-        founder_agent_id = await _resolve_company_policy_agent_id(session, company)
-        if founder_agent_id is not None:
-            await _apply_agent_policy_gate(
-                session,
-                agent_id=founder_agent_id,
-                family=family,
-                consume_budget=False,
-                operation=operation,
-                spend_amount=spend_amount,
-            )
-        _record_actor_mutation("company", company.id, family)
-        if founder_agent_id is not None:
-            await _apply_agent_policy_gate(
-                session,
-                agent_id=founder_agent_id,
-                family=family,
-                consume_budget=True,
-                operation=operation,
-                spend_amount=spend_amount,
-            )
+        await _apply_agent_policy_gate(
+            session,
+            agent_id=agent.id,
+            family=family,
+            consume_budget=False,
+            operation=operation,
+            spend_amount=spend_amount,
+        )
+        _record_actor_mutation("agent", agent.id, family)
+        await _apply_agent_policy_gate(
+            session,
+            agent_id=agent.id,
+            family=family,
+            consume_budget=True,
+            operation=operation,
+            spend_amount=spend_amount,
+        )
 
     return dependency
 

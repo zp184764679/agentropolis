@@ -20,7 +20,6 @@ bootstrap:
 
 credentials:
   agent_api_key_env: ${OPENCLAW_AGENT_API_KEY_ENV:-OPENCLAW_AGENT_01_AGENT_API_KEY}
-  company_api_key_env: ${OPENCLAW_COMPANY_API_KEY_ENV:-OPENCLAW_AGENT_01_COMPANY_API_KEY}
 
 runtime:
   preferred_interface: mcp

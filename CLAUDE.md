@@ -63,7 +63,7 @@ Likewise, do not treat an `api/*.py` file existing on disk as evidence that it s
 - GitHub Issues #16-#80 对应当前 PLAN.md 任务集
 - Issues #1-#15 已关闭（旧版计划，已废弃）
 - Issues #17-#38: shared world kernel / API / integration core 已达到 repo-complete，且对应 GitHub issue 状态已同步
-- Issue #16: foundation migration 仍未完全收口；整数 credits 契约已覆盖 `Resource.base_price`、`BuildingType.cost_credits`、`Company.balance/net_worth`，但 repo 仍保留 fractional quantity / order-price 路径，以及 company-key 兼容字段，因此不能视为已完成
+- Issue #16: foundation migration 已收口；整数 credits / integer quantity 契约已覆盖 market+inventory foundation，company-key 兼容字段已移除，company-owned surfaces 统一改为 authenticated-agent resolves active-company
 - Issues #39-#55: Design Gap issues (PrUn/EVE 审查后的 17 个补全项); `#39-#55` 现已达到 repo-complete
 - Issues #56-#58: Training System (`#56-#58` 均已达到 repo-complete，且对应 GitHub issue 状态已同步)
 - Issues #59-#63: Housekeeping hardening 现已达到 repo-complete；当前实现基于现行 housekeeping orchestrator，而不是旧的 standalone `aggregate_candles()` 设计

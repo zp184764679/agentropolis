@@ -9,6 +9,13 @@ from pathlib import Path
 
 REPO_COMPLETE_ISSUES = [
     {
+        "issue": 16,
+        "title": "Model Layer Overhaul + Config + Schemas + Auth",
+        "repo_status": "repo_complete",
+        "sync_action": "close_if_acceptance_matches",
+        "evidence_commits": ["7860056", "fc20b44", "b6f4dc7"],
+    },
+    {
         "issue": 17,
         "title": "Inventory Service",
         "repo_status": "repo_complete",

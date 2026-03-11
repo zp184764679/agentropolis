@@ -307,9 +307,6 @@ def test_rest_and_mcp_cover_market_production_inventory_and_game_parity() -> Non
             assert seller_company["ok"] is True
             assert buyer_company["ok"] is True
 
-            seller_company_key = seller_company["company"]["api_key"]
-            buyer_company_key = buyer_company["company"]["api_key"]
-
             rest_building_types = await client.get("/api/production/building-types")
             rest_recipes = await client.get("/api/production/recipes")
             rest_prices = await client.get("/api/market/prices")
@@ -331,10 +328,10 @@ def test_rest_and_mcp_cover_market_production_inventory_and_game_parity() -> Non
                 )
             )
 
-            mcp_building_types = await get_building_types(seller_company_key)
-            mcp_recipes = await get_recipes(seller_company_key)
-            mcp_prices = await get_market_prices(seller_company_key)
-            mcp_order_book = await get_order_book(seller_company_key, "H2O")
+            mcp_building_types = await get_building_types(seller_key)
+            mcp_recipes = await get_recipes(seller_key)
+            mcp_prices = await get_market_prices(seller_key)
+            mcp_order_book = await get_order_book(seller_key, "H2O")
             mcp_game_status = await get_game_status()
             mcp_leaderboard = await get_leaderboard()
 
@@ -367,7 +364,7 @@ def test_rest_and_mcp_cover_market_production_inventory_and_game_parity() -> Non
             )
 
             mcp_start = await start_production(
-                seller_company_key,
+                seller_key,
                 building_id=building_id,
                 recipe_id=matching_recipe["recipe_id"],
             )
@@ -375,7 +372,7 @@ def test_rest_and_mcp_cover_market_production_inventory_and_game_parity() -> Non
 
             rest_started_buildings = await client.get(
                 "/api/production/buildings",
-                headers=api_key_headers(seller_company_key),
+                headers=api_key_headers(seller_key),
             )
             assert rest_started_buildings.status_code == 200
             active_building = next(
@@ -387,16 +384,16 @@ def test_rest_and_mcp_cover_market_production_inventory_and_game_parity() -> Non
 
             rest_stop = await client.post(
                 "/api/production/stop",
-                headers=api_key_headers(seller_company_key),
+                headers=api_key_headers(seller_key),
                 params={"building_id": building_id},
             )
             assert rest_stop.status_code == 200
 
-            mcp_stopped = await stop_production(seller_company_key, building_id=building_id)
+            mcp_stopped = await stop_production(seller_key, building_id=building_id)
             assert mcp_stopped["ok"] is True
 
             mcp_sell = await place_sell_order(
-                seller_company_key,
+                seller_key,
                 resource="H2O",
                 quantity=5,
                 price=6,
@@ -405,7 +402,7 @@ def test_rest_and_mcp_cover_market_production_inventory_and_game_parity() -> Non
 
             rest_buy = await client.post(
                 "/api/market/buy",
-                headers=api_key_headers(buyer_company_key),
+                headers=api_key_headers(buyer_key),
                 json={"resource": "H2O", "quantity": 5, "price": 6},
             )
             assert rest_buy.status_code == 200
@@ -414,16 +411,16 @@ def test_rest_and_mcp_cover_market_production_inventory_and_game_parity() -> Non
             rest_history = await client.get("/api/market/history/H2O")
             rest_orders = await client.get(
                 "/api/market/orders",
-                headers=api_key_headers(seller_company_key),
+                headers=api_key_headers(seller_key),
                 params={"status": "ALL"},
             )
             rest_inventory = await client.get(
                 "/api/inventory",
-                headers=api_key_headers(seller_company_key),
+                headers=api_key_headers(seller_key),
             )
             rest_inventory_item = await client.get(
                 "/api/inventory/H2O",
-                headers=api_key_headers(seller_company_key),
+                headers=api_key_headers(seller_key),
             )
 
             assert all(
@@ -437,11 +434,11 @@ def test_rest_and_mcp_cover_market_production_inventory_and_game_parity() -> Non
                 )
             )
 
-            mcp_trade_history = await get_trade_history(seller_company_key, resource="H2O")
-            mcp_price_history = await get_price_history(seller_company_key, resource="H2O")
-            mcp_orders = await get_my_orders(seller_company_key, status="ALL")
-            mcp_inventory = await get_inventory(seller_company_key)
-            mcp_inventory_item = await get_inventory_item(seller_company_key, resource="H2O")
+            mcp_trade_history = await get_trade_history(seller_key, resource="H2O")
+            mcp_price_history = await get_price_history(seller_key, resource="H2O")
+            mcp_orders = await get_my_orders(seller_key, status="ALL")
+            mcp_inventory = await get_inventory(seller_key)
+            mcp_inventory_item = await get_inventory_item(seller_key, resource="H2O")
 
             assert mcp_trade_history["trades"] == rest_trades.json()
             assert mcp_price_history["history"] == rest_history.json()
@@ -752,8 +749,8 @@ def test_rest_and_mcp_cover_mutation_message_parity_for_agent_and_company_flows(
             assert rest_company["ok"] is True
             assert mcp_company["ok"] is True
 
-            rest_company_key = rest_company["company"]["api_key"]
-            mcp_company_key = mcp_company["company"]["api_key"]
+            rest_company_key = rest_owner["agent"]["api_key"]
+            mcp_company_key = mcp_owner["agent"]["api_key"]
 
             rest_build = await client.post(
                 "/api/production/build",
@@ -952,7 +949,7 @@ def test_rest_and_mcp_expose_equivalent_errors_on_key_negative_paths() -> None:
             company_agent_key = company_agent["agent"]["api_key"]
             created_company = await create_company(company_agent_key, "Parity Error Works")
             assert created_company["ok"] is True
-            company_key = created_company["company"]["api_key"]
+            company_key = company_agent_key
 
             rest_missing_company = await client.get(
                 "/api/agent/company",

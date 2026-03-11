@@ -382,7 +382,6 @@ def test_company_market_write_honors_operation_denylist(
                     json={"company_name": "Denied Trading Co"},
                 )
                 assert company_response.status_code == 200
-                company_api_key = company_response.json()["api_key"]
 
                 policy_response = await client.put(
                     f"/meta/control-plane/agents/{agent_id}/policy",
@@ -396,7 +395,7 @@ def test_company_market_write_honors_operation_denylist(
 
                 blocked = await client.post(
                     "/api/market/buy",
-                    headers={"X-API-Key": company_api_key},
+                    headers={"X-API-Key": "preview-test-agent"},
                     json={"resource": "RAT", "quantity": 1, "price": 10},
                 )
 
@@ -431,7 +430,6 @@ def test_company_market_write_enforces_spend_caps_and_operation_refill(
                     json={"company_name": "Budget Trading Co"},
                 )
                 assert company_response.status_code == 200
-                company_api_key = company_response.json()["api_key"]
 
                 policy_response = await client.put(
                     f"/meta/control-plane/agents/{agent_id}/policy",
@@ -447,7 +445,7 @@ def test_company_market_write_enforces_spend_caps_and_operation_refill(
 
                 spend_cap_blocked = await client.post(
                     "/api/market/buy",
-                    headers={"X-API-Key": company_api_key},
+                    headers={"X-API-Key": "preview-test-agent"},
                     json={"resource": "RAT", "quantity": 1, "price": 10},
                 )
                 _assert_error_contract(
@@ -471,7 +469,7 @@ def test_company_market_write_enforces_spend_caps_and_operation_refill(
 
                 spend_budget_blocked = await client.post(
                     "/api/market/buy",
-                    headers={"X-API-Key": company_api_key},
+                    headers={"X-API-Key": "preview-test-agent"},
                     json={"resource": "RAT", "quantity": 1, "price": 10},
                 )
                 _assert_error_contract(

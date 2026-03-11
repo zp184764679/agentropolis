@@ -187,9 +187,6 @@ def test_housekeeping_drives_autonomy_goal_digest_dashboard_and_intel() -> None:
             assert buyer_company.status_code == 200
             assert seller_company.status_code == 200
 
-            buyer_company_key = buyer_company.json()["api_key"]
-            seller_company_key = seller_company.json()["api_key"]
-
             config_response = await client.put(
                 "/api/autonomy/config",
                 headers=_api_key_headers(buyer_agent_key),
@@ -234,7 +231,7 @@ def test_housekeeping_drives_autonomy_goal_digest_dashboard_and_intel() -> None:
 
             sell_response = await client.post(
                 "/api/market/sell",
-                headers=_api_key_headers(seller_company_key),
+                headers=_api_key_headers(seller_agent_key),
                 json={"resource": "H2O", "quantity": 5, "price": 6},
             )
             assert sell_response.status_code == 200
@@ -326,9 +323,9 @@ def test_housekeeping_drives_autonomy_goal_digest_dashboard_and_intel() -> None:
 
             inventory_response = await client.get(
                 "/api/inventory/H2O",
-                headers=_api_key_headers(buyer_company_key),
+                headers=_api_key_headers(buyer_agent_key),
             )
             assert inventory_response.status_code == 200
-            assert inventory_response.json()["quantity"] >= 105.0
+            assert inventory_response.json()["quantity"] >= 105
 
     asyncio.run(scenario())

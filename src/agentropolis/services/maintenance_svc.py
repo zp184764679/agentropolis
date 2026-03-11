@@ -17,6 +17,12 @@ from agentropolis.models.building import Building, BuildingStatus
 logger = logging.getLogger(__name__)
 
 
+def _coerce_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 async def settle_building_decay(
     session: AsyncSession,
     building_id: int,
@@ -28,6 +34,8 @@ async def settle_building_decay(
     """
     if now is None:
         now = datetime.now(UTC)
+    else:
+        now = _coerce_utc(now)
 
     result = await session.execute(
         select(Building).where(Building.id == building_id).with_for_update()
@@ -45,7 +53,7 @@ async def settle_building_decay(
         }
 
     # Use last_durability_at as the stable decay cursor, falling back once to updated_at.
-    last_check = building.last_durability_at or building.updated_at or now
+    last_check = _coerce_utc(building.last_durability_at or building.updated_at or now)
     elapsed_hours = (now - last_check).total_seconds() / 3600.0
 
     if elapsed_hours <= 0:
@@ -86,6 +94,8 @@ async def settle_all_building_decay(
     """
     if now is None:
         now = datetime.now(UTC)
+    else:
+        now = _coerce_utc(now)
 
     result = await session.execute(
         select(Building.id).where(Building.durability > 0)

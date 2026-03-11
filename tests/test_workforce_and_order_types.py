@@ -140,7 +140,7 @@ def test_multi_tier_workforce_changes_consumption_and_output() -> None:
             region_id=managed_company["region_id"],
         )
         assert round(float(baseline_ore["quantity"]), 2) == 8.0
-        assert round(float(managed_ore["quantity"]), 2) == 9.84
+        assert round(float(managed_ore["quantity"]), 2) == 10.0
         assert float(managed_ore["quantity"]) > float(baseline_ore["quantity"])
 
     asyncio.run(_run_seeded_session(scenario))

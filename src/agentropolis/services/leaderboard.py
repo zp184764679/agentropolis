@@ -111,17 +111,17 @@ async def get_market_analysis(session: AsyncSession, resource_ticker: str) -> di
     avg_price = None
     trend = "stable"
     if history:
-        closes = [float(row.close) for row in history]
-        avg_price = sum(closes) / len(closes)
+        closes = [int(row.close) for row in history]
+        avg_price = round(sum(closes) / len(closes))
         if len(closes) >= 2:
             delta = closes[-1] - closes[0]
-            if delta > 0.01:
+            if delta > 0:
                 trend = "rising"
-            elif delta < -0.01:
+            elif delta < 0:
                 trend = "falling"
 
     open_order_statuses = (OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED)
-    buy_volume = float(
+    buy_volume = int(
         (
             await session.execute(
                 select(func.coalesce(func.sum(Order.remaining), 0))
@@ -134,7 +134,7 @@ async def get_market_analysis(session: AsyncSession, resource_ticker: str) -> di
         ).scalar_one()
         or 0
     )
-    sell_volume = float(
+    sell_volume = int(
         (
             await session.execute(
                 select(func.coalesce(func.sum(Order.remaining), 0))
@@ -232,8 +232,8 @@ async def get_trade_history(
             "buyer": buyer_name,
             "seller": seller_name,
             "resource": ticker,
-            "price": float(price or 0),
-            "quantity": float(quantity or 0),
+            "price": int(price or 0),
+            "quantity": int(quantity or 0),
             "tick": int(tick_executed),
         }
         for trade_id, buyer_name, seller_name, ticker, price, quantity, tick_executed in result.all()
@@ -263,11 +263,11 @@ async def get_price_history(
     return [
         {
             "tick": int(row.tick),
-            "open": float(row.open),
-            "high": float(row.high),
-            "low": float(row.low),
-            "close": float(row.close),
-            "volume": float(row.volume),
+            "open": int(row.open),
+            "high": int(row.high),
+            "low": int(row.low),
+            "close": int(row.close),
+            "volume": int(row.volume),
         }
         for row in history_rows
     ]

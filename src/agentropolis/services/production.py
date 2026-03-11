@@ -15,6 +15,7 @@ from agentropolis.services.event_svc import get_effective_region_coefficients
 from agentropolis.services.inventory_svc import (
     add_resource,
     get_resource_quantity_in_region,
+    normalize_quantity_amount,
     remove_resource,
 )
 
@@ -120,7 +121,7 @@ async def _settle_building(
             "progress_seconds": progress_seconds,
         }
 
-    outputs: dict[str, float] = {}
+    outputs: dict[str, int] = {}
     completed = 0
     company = await _get_company_for_validation(session, building.company_id)
     region_coefficients = await get_effective_region_coefficients(
@@ -137,7 +138,8 @@ async def _settle_building(
 
     for _ in range(completed_cycles):
         cycle_output_total = sum(
-            float(quantity) * production_modifier for quantity in (recipe.outputs or {}).values()
+            normalize_quantity_amount(float(quantity) * production_modifier)
+            for quantity in (recipe.outputs or {}).values()
         )
         has_storage = await check_storage_available(
             session,
@@ -166,7 +168,7 @@ async def _settle_building(
                     session,
                     company.id,
                     ticker,
-                    float(quantity),
+                    normalize_quantity_amount(quantity),
                     region_id=building.region_id or company.region_id,
                 )
         except ValueError:
@@ -184,7 +186,9 @@ async def _settle_building(
             }
 
         for ticker, quantity in (recipe.outputs or {}).items():
-            adjusted_quantity = float(quantity) * production_modifier
+            adjusted_quantity = normalize_quantity_amount(float(quantity) * production_modifier)
+            if adjusted_quantity <= 0:
+                continue
             await add_resource(
                 session,
                 company.id,
@@ -192,7 +196,7 @@ async def _settle_building(
                 adjusted_quantity,
                 region_id=building.region_id or company.region_id,
             )
-            outputs[ticker] = outputs.get(ticker, 0.0) + adjusted_quantity
+            outputs[ticker] = outputs.get(ticker, 0) + adjusted_quantity
         completed += 1
 
     building.last_production_at = last_production_at + timedelta(
@@ -220,14 +224,14 @@ async def tick_production(
         .with_for_update()
     )
     buildings = list(result.scalars().all())
-    total_outputs: dict[str, float] = {}
+    total_outputs: dict[str, int] = {}
     completed = 0
 
     for building in buildings:
         settled = await _settle_building(session, building, now=_coerce_now())
         completed += settled.get("cycles_completed", 0)
         for ticker, quantity in (settled.get("outputs") or {}).items():
-            total_outputs[ticker] = total_outputs.get(ticker, 0.0) + float(quantity)
+            total_outputs[ticker] = total_outputs.get(ticker, 0) + int(quantity)
 
     return {
         "buildings_advanced": len(buildings),
@@ -258,10 +262,11 @@ async def start_production(
             ticker,
             region_id=building.region_id or company.region_id,
         )
-        if float(stock["available"]) < float(quantity):
+        required_quantity = normalize_quantity_amount(quantity)
+        if int(stock["available"]) < required_quantity:
             raise ValueError(
-                f"Cannot start recipe '{recipe.name}': need {float(quantity):.4f} {ticker}, "
-                f"available {float(stock['available']):.4f}"
+                f"Cannot start recipe '{recipe.name}': need {required_quantity} {ticker}, "
+                f"available {int(stock['available'])}"
             )
 
     now = _coerce_now()
@@ -325,7 +330,7 @@ async def build_building(
             session,
             company_id,
             ticker,
-            float(quantity),
+            normalize_quantity_amount(quantity),
             region_id=company.region_id,
         )
 
@@ -343,7 +348,10 @@ async def build_building(
         "building_id": building.id,
         "building_type": building_type.name,
         "cost_credits": int(building_type.cost_credits),
-        "cost_materials": building_type.cost_materials or {},
+        "cost_materials": {
+            ticker: normalize_quantity_amount(quantity)
+            for ticker, quantity in (building_type.cost_materials or {}).items()
+        },
     }
 
 
@@ -421,8 +429,14 @@ async def get_recipes(
             "recipe_id": recipe.id,
             "name": recipe.name,
             "building_type": building_types.get(recipe.building_type_id, ""),
-            "inputs": recipe.inputs or {},
-            "outputs": recipe.outputs or {},
+            "inputs": {
+                ticker: normalize_quantity_amount(quantity)
+                for ticker, quantity in (recipe.inputs or {}).items()
+            },
+            "outputs": {
+                ticker: normalize_quantity_amount(quantity)
+                for ticker, quantity in (recipe.outputs or {}).items()
+            },
             "duration_ticks": recipe.duration_ticks,
         }
         for recipe in recipes
@@ -437,7 +451,10 @@ async def get_building_types(session: AsyncSession) -> list[dict]:
             "name": building_type.name,
             "display_name": building_type.display_name,
             "cost_credits": int(building_type.cost_credits),
-            "cost_materials": building_type.cost_materials or {},
+            "cost_materials": {
+                ticker: normalize_quantity_amount(quantity)
+                for ticker, quantity in (building_type.cost_materials or {}).items()
+            },
             "max_workers": building_type.max_workers,
             "description": building_type.description or "",
         }
@@ -464,13 +481,13 @@ async def settle_all_buildings(
         .with_for_update()
     )
     buildings = list(result.scalars().all())
-    outputs: dict[str, float] = {}
+    outputs: dict[str, int] = {}
     cycles_completed = 0
     for building in buildings:
         settled = await _settle_building(session, building, now=timestamp)
         cycles_completed += int(settled.get("cycles_completed", 0))
         for ticker, quantity in (settled.get("outputs") or {}).items():
-            outputs[ticker] = outputs.get(ticker, 0.0) + float(quantity)
+            outputs[ticker] = outputs.get(ticker, 0) + int(quantity)
     return {
         "buildings_processed": len(buildings),
         "cycles_completed": cycles_completed,

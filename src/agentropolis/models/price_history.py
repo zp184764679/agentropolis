@@ -1,6 +1,6 @@
 """PriceHistory model - OHLCV candlestick data per resource per tick."""
 
-from sqlalchemy import ForeignKey, Integer, Numeric, UniqueConstraint
+from sqlalchemy import BigInteger, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from agentropolis.models.base import Base
@@ -15,11 +15,11 @@ class PriceHistory(Base):
         ForeignKey("resources.id"), nullable=False, index=True
     )
     tick: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
-    open: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
-    high: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
-    low: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
-    close: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
-    volume: Mapped[float] = mapped_column(Numeric(16, 4), nullable=False, default=0)
+    open: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    high: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    low: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    close: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    volume: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
 
     # Relationships
     resource = relationship("Resource", back_populates="price_history")

@@ -247,7 +247,7 @@ async def buy_from_shop(
         region_id=shop.region_id,
         resource_id=resource.id,
     )
-    inventory.quantity = float(inventory.quantity) + float(quantity)
+    inventory.quantity = int(inventory.quantity or 0) + int(quantity)
     stock[resource_ticker] = available_stock - quantity
     shop.stock = stock
     agent.personal_balance = int(agent.personal_balance) - total_cost
@@ -301,14 +301,14 @@ async def sell_to_shop(
         region_id=shop.region_id,
         resource_id=resource.id,
     )
-    available = float(inventory.quantity) - float(inventory.reserved)
+    available = int(inventory.quantity or 0) - int(inventory.reserved or 0)
     if available < quantity:
         raise ValueError(
-            f"Insufficient {resource_ticker}: need {quantity}, available {available:.0f}"
+            f"Insufficient {resource_ticker}: need {quantity}, available {available}"
         )
 
     total_earned = int(unit_price) * int(quantity)
-    inventory.quantity = float(inventory.quantity) - float(quantity)
+    inventory.quantity = int(inventory.quantity or 0) - int(quantity)
 
     stock = dict(shop.stock or {})
     stock[resource_ticker] = int(stock.get(resource_ticker, 0)) + int(quantity)

@@ -24,6 +24,7 @@ from agentropolis.services.company_svc import credit_balance, debit_balance
 from agentropolis.services.inventory_svc import (
     add_resource,
     consume_reserved_resource,
+    normalize_quantity_amount,
     reserve_resource,
     unreserve_resource,
 )
@@ -85,8 +86,8 @@ async def _record_price_point(
     *,
     resource_id: int,
     tick: int,
-    price: float,
-    quantity: float,
+    price: int,
+    quantity: int,
 ) -> None:
     candle = (
         await session.execute(
@@ -107,10 +108,10 @@ async def _record_price_point(
         )
         session.add(candle)
     else:
-        candle.high = max(float(candle.high), price)
-        candle.low = min(float(candle.low), price)
+        candle.high = max(int(candle.high), price)
+        candle.low = min(int(candle.low), price)
         candle.close = price
-        candle.volume = float(candle.volume) + quantity
+        candle.volume = int(candle.volume or 0) + quantity
     await session.flush()
 
 
@@ -120,9 +121,9 @@ def _serialize_order(order: Order, resource_ticker: str) -> dict:
         "order_type": order.order_type.value,
         "resource": resource_ticker,
         "time_in_force": order.time_in_force.value,
-        "price": float(order.price),
-        "quantity": float(order.quantity),
-        "remaining": float(order.remaining),
+        "price": int(order.price),
+        "quantity": int(order.quantity),
+        "remaining": int(order.remaining),
         "status": order.status.value,
         "created_at_tick": int(order.created_at_tick),
     }
@@ -187,10 +188,10 @@ async def _settle_match(
     buy_order: Order,
     sell_order: Order,
     tick_number: int,
-) -> float:
-    trade_quantity = min(float(buy_order.remaining), float(sell_order.remaining))
+) -> int:
+    trade_quantity = min(int(buy_order.remaining), int(sell_order.remaining))
     maker_is_buy = buy_order.id < sell_order.id
-    execution_price = float(buy_order.price if maker_is_buy else sell_order.price)
+    execution_price = int(buy_order.price if maker_is_buy else sell_order.price)
     gross_value = execution_price * trade_quantity
     resource_ticker = (
         await session.execute(select(Resource.ticker).where(Resource.id == buy_order.resource_id))
@@ -215,8 +216,8 @@ async def _settle_match(
         region_id=buy_order.region_id,
     )
 
-    if float(buy_order.price) > execution_price:
-        refund = (float(buy_order.price) - execution_price) * trade_quantity
+    if int(buy_order.price) > execution_price:
+        refund = (int(buy_order.price) - execution_price) * trade_quantity
         if refund > 0:
             await credit_balance(session, buyer.id, refund)
 
@@ -227,17 +228,17 @@ async def _settle_match(
         "market_trade",
         payer_company_id=seller.id,
     )
-    seller_credit = gross_value - float(tax_summary["amount"])
+    seller_credit = gross_value - int(tax_summary["amount"])
     if seller_credit > 0:
         await credit_balance(session, seller.id, seller_credit)
 
-    buy_order.remaining = float(buy_order.remaining) - trade_quantity
-    sell_order.remaining = float(sell_order.remaining) - trade_quantity
+    buy_order.remaining = int(buy_order.remaining) - trade_quantity
+    sell_order.remaining = int(sell_order.remaining) - trade_quantity
     buy_order.status = (
-        OrderStatus.FILLED if float(buy_order.remaining) <= 0 else OrderStatus.PARTIALLY_FILLED
+        OrderStatus.FILLED if int(buy_order.remaining) <= 0 else OrderStatus.PARTIALLY_FILLED
     )
     sell_order.status = (
-        OrderStatus.FILLED if float(sell_order.remaining) <= 0 else OrderStatus.PARTIALLY_FILLED
+        OrderStatus.FILLED if int(sell_order.remaining) <= 0 else OrderStatus.PARTIALLY_FILLED
     )
 
     trade = Trade(
@@ -284,19 +285,19 @@ async def _match_region_resource(
     )
 
     trades = 0
-    volume = 0.0
+    volume = 0
     bid_index = 0
     ask_index = 0
     while bid_index < len(bids) and ask_index < len(asks):
         bid = bids[bid_index]
         ask = asks[ask_index]
-        if float(bid.remaining) <= 0:
+        if int(bid.remaining) <= 0:
             bid_index += 1
             continue
-        if float(ask.remaining) <= 0:
+        if int(ask.remaining) <= 0:
             ask_index += 1
             continue
-        if float(bid.price) < float(ask.price):
+        if int(bid.price) < int(ask.price):
             break
 
         settled_quantity = await _settle_match(
@@ -307,10 +308,10 @@ async def _match_region_resource(
         )
         # Recompute actual remaining after settlement for index movement.
         trades += 1
-        volume += float(settled_quantity)
-        if float(bid.remaining) <= 0:
+        volume += int(settled_quantity)
+        if int(bid.remaining) <= 0:
             bid_index += 1
-        if float(ask.remaining) <= 0:
+        if int(ask.remaining) <= 0:
             ask_index += 1
 
     return {"trades": trades, "volume": volume}
@@ -329,7 +330,7 @@ async def match_all_resources(session: AsyncSession, current_tick: int) -> dict:
     pairs = result.all()
     summary: dict[str, dict[str, float | int]] = {}
     total_trades = 0
-    total_volume = 0.0
+    total_volume = 0
     for region_id, resource_id in pairs:
         if region_id is None:
             continue
@@ -346,7 +347,7 @@ async def match_all_resources(session: AsyncSession, current_tick: int) -> dict:
         ).scalar_one()
         summary[ticker] = match_summary
         total_trades += int(match_summary["trades"])
-        total_volume += float(match_summary["volume"])
+        total_volume += int(match_summary["volume"])
     return {"total_trades": total_trades, "total_volume": total_volume, "by_resource": summary}
 
 
@@ -354,12 +355,14 @@ async def place_buy_order(
     session: AsyncSession,
     company_id: int,
     resource_ticker: str,
-    quantity: float,
-    price: float,
+    quantity: int,
+    price: int,
     time_in_force: str = "GTC",
     current_tick: int | None = None,
 ) -> int:
     """Place a company buy order and attempt immediate matching."""
+    quantity = normalize_quantity_amount(quantity)
+    price = int(price)
     if quantity <= 0 or price <= 0:
         raise ValueError("quantity and price must be greater than 0")
 
@@ -367,7 +370,7 @@ async def place_buy_order(
     resource = await _get_resource(session, resource_ticker)
     tif = _coerce_time_in_force(time_in_force)
     tick_number = int(current_tick if current_tick is not None else await _current_tick(session))
-    escrow = float(quantity) * float(price)
+    escrow = quantity * price
     await debit_balance(session, company.id, escrow)
 
     order = Order(
@@ -399,12 +402,14 @@ async def place_sell_order(
     session: AsyncSession,
     company_id: int,
     resource_ticker: str,
-    quantity: float,
-    price: float,
+    quantity: int,
+    price: int,
     time_in_force: str = "GTC",
     current_tick: int | None = None,
 ) -> int:
     """Place a company sell order and attempt immediate matching."""
+    quantity = normalize_quantity_amount(quantity)
+    price = int(price)
     if quantity <= 0 or price <= 0:
         raise ValueError("quantity and price must be greater than 0")
 
@@ -440,7 +445,7 @@ async def place_sell_order(
         resource_id=resource.id,
         tick_number=tick_number,
     )
-    if tif == TimeInForce.IOC and float(order.remaining) > 0:
+    if tif == TimeInForce.IOC and int(order.remaining) > 0:
         await cancel_order(session, company.id, order.id)
     return order.id
 
@@ -459,9 +464,9 @@ async def cancel_order(session: AsyncSession, company_id: int, order_id: int) ->
     if order.status not in (OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED):
         return False
 
-    remaining = float(order.remaining)
+    remaining = int(order.remaining)
     if order.order_type == OrderType.BUY and remaining > 0:
-        await credit_balance(session, company_id, remaining * float(order.price))
+        await credit_balance(session, company_id, remaining * int(order.price))
     elif order.order_type == OrderType.SELL and remaining > 0:
         resource_ticker = (
             await session.execute(select(Resource.ticker).where(Resource.id == order.resource_id))
@@ -522,13 +527,13 @@ async def get_market_prices(session: AsyncSession) -> list[dict]:
         if trade_cutoff is not None:
             volume_stmt = volume_stmt.where(Trade.tick_executed >= trade_cutoff)
         volume = (await session.execute(volume_stmt)).scalar_one()
-        best_bid_value = float(best_bid) if best_bid is not None else None
-        best_ask_value = float(best_ask) if best_ask is not None else None
+        best_bid_value = int(best_bid) if best_bid is not None else None
+        best_ask_value = int(best_ask) if best_ask is not None else None
         prices.append(
             {
                 "ticker": resource.ticker,
                 "name": resource.name,
-                "last_price": float(latest_price) if latest_price is not None else None,
+                "last_price": int(latest_price) if latest_price is not None else None,
                 "best_bid": best_bid_value,
                 "best_ask": best_ask_value,
                 "spread": (
@@ -536,7 +541,7 @@ async def get_market_prices(session: AsyncSession) -> list[dict]:
                     if best_bid_value is not None and best_ask_value is not None
                     else None
                 ),
-                "volume_24h": float(volume or 0),
+                "volume_24h": int(volume or 0),
             }
         )
     return prices
@@ -563,8 +568,8 @@ async def get_order_book(session: AsyncSession, resource_ticker: str) -> dict:
     asks: list[dict] = []
     for order_type, price, quantity, order_count in result.all():
         entry = {
-            "price": float(price),
-            "quantity": float(quantity or 0),
+            "price": int(price),
+            "quantity": int(quantity or 0),
             "order_count": int(order_count or 0),
         }
         if order_type == OrderType.BUY:
@@ -641,8 +646,8 @@ async def get_recent_trades(
             "buyer": buyer_name,
             "seller": seller_name,
             "resource": ticker,
-            "price": float(price),
-            "quantity": float(quantity),
+            "price": int(price),
+            "quantity": int(quantity),
             "tick": int(tick_executed),
         }
         for trade_id, buyer_name, seller_name, ticker, price, quantity, tick_executed in result.all()

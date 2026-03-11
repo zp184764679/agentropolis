@@ -6,10 +6,11 @@ Dependencies: services/market_engine.py, services/leaderboard.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agentropolis.api.auth import get_current_company
+from agentropolis.api.auth import get_current_agent_company
 from agentropolis.api.preview_guard import (
     ERROR_CODE_HEADER,
-    make_company_preview_write_guard,
+    make_agent_preview_access_guard,
+    make_agent_preview_write_guard,
 )
 from agentropolis.api.schemas import (
     CancelOrderRequest,
@@ -30,21 +31,22 @@ from agentropolis.services import market_engine
 router = APIRouter(prefix="/market", tags=["market"])
 
 
-async def _buy_order_spend_resolver(request, _session, _company) -> float:
+async def _buy_order_spend_resolver(request, _session, _agent) -> int:
     payload = await request.json()
-    return float(payload["quantity"]) * float(payload["price"])
+    return int(payload["quantity"]) * int(payload["price"])
 
 
-market_buy_guard = make_company_preview_write_guard(
+market_access_guard = make_agent_preview_access_guard("company_market")
+market_buy_guard = make_agent_preview_write_guard(
     "company_market",
     operation="place_buy_order",
     spend_resolver=_buy_order_spend_resolver,
 )
-market_sell_guard = make_company_preview_write_guard(
+market_sell_guard = make_agent_preview_write_guard(
     "company_market",
     operation="place_sell_order",
 )
-market_cancel_guard = make_company_preview_write_guard(
+market_cancel_guard = make_agent_preview_write_guard(
     "company_market",
     operation="cancel_order",
 )
@@ -91,7 +93,7 @@ async def get_price_history(
 )
 async def place_buy_order(
     req: PlaceOrderRequest,
-    company: Company = Depends(get_current_company),
+    company: Company = Depends(get_current_agent_company),
     session: AsyncSession = Depends(get_session),
 ):
     """Place a buy order on the market."""
@@ -124,7 +126,7 @@ async def place_buy_order(
 )
 async def place_sell_order(
     req: PlaceOrderRequest,
-    company: Company = Depends(get_current_company),
+    company: Company = Depends(get_current_agent_company),
     session: AsyncSession = Depends(get_session),
 ):
     """Place a sell order on the market."""
@@ -157,7 +159,7 @@ async def place_sell_order(
 )
 async def cancel_order(
     req: CancelOrderRequest,
-    company: Company = Depends(get_current_company),
+    company: Company = Depends(get_current_agent_company),
     session: AsyncSession = Depends(get_session),
 ):
     """Cancel an open order."""
@@ -177,7 +179,8 @@ async def cancel_order(
 @router.get("/orders", response_model=list[OrderResponse])
 async def get_my_orders(
     status: str = "OPEN",
-    company: Company = Depends(get_current_company),
+    _guard: None = Depends(market_access_guard),
+    company: Company = Depends(get_current_agent_company),
     session: AsyncSession = Depends(get_session),
 ):
     """Get your open or historical orders."""

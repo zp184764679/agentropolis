@@ -88,8 +88,8 @@ def test_control_contract_catalog_matches_runtime_and_mcp_registry() -> None:
     assert catalog["error_taxonomy"]["auth_agent_api_key_invalid"] == (
         "Presented agent API key is invalid or inactive."
     )
-    assert catalog["error_taxonomy"]["auth_company_api_key_invalid"] == (
-        "Presented company API key is invalid or inactive."
+    assert catalog["error_taxonomy"]["agent_company_not_found"] == (
+        "Authenticated agent does not have an active company."
     )
     assert len(catalog["authorization"]["mcp_tool_scopes"]) == 60
     assert catalog["parity_surface"]["mode"] == "semantic_parity_subset"
@@ -147,12 +147,12 @@ def test_meta_contract_and_auth_failures_use_stable_contract_headers() -> None:
             assert invalid_agent_key.headers[ERROR_CODE_HEADER] == "auth_agent_api_key_invalid"
             assert invalid_agent_key.json()["error_code"] == "auth_agent_api_key_invalid"
 
-            invalid_company_key = await client.get(
+            invalid_inventory_key = await client.get(
                 "/api/inventory",
-                headers={"X-API-Key": "not-a-real-company-key"},
+                headers={"X-API-Key": "not-a-real-agent-key"},
             )
-            assert invalid_company_key.status_code == 401
-            assert invalid_company_key.headers[ERROR_CODE_HEADER] == "auth_company_api_key_invalid"
-            assert invalid_company_key.json()["error_code"] == "auth_company_api_key_invalid"
+            assert invalid_inventory_key.status_code == 401
+            assert invalid_inventory_key.headers[ERROR_CODE_HEADER] == "auth_agent_api_key_invalid"
+            assert invalid_inventory_key.json()["error_code"] == "auth_agent_api_key_invalid"
 
     asyncio.run(scenario())

@@ -169,8 +169,6 @@ def test_mcp_wave1_strategy_tools_match_rest_surface() -> None:
             assert seller_company["ok"] is True
             assert buyer_company["ok"] is True
 
-            seller_company_key = seller_company["company"]["api_key"]
-
             updated_config = await autonomy_tool(
                 buyer_agent_key,
                 action="update_config",
@@ -205,7 +203,7 @@ def test_mcp_wave1_strategy_tools_match_rest_surface() -> None:
             assert created_goal["ok"] is True
 
             sell_order = await place_sell_order(
-                seller_company_key,
+                seller_agent_key,
                 resource="H2O",
                 quantity=5,
                 price=6,
@@ -272,8 +270,6 @@ def test_mcp_wave1_expanded_surface_smoke() -> None:
             secondary_company = await create_company(secondary_agent_key, "Wave1 Backup")
             assert primary_company["ok"] is True
             assert secondary_company["ok"] is True
-
-            primary_company_key = primary_company["company"]["api_key"]
 
             status = await get_agent_status(primary_agent_key)
             profile = await get_agent_profile(primary_agent_key, primary["agent"]["agent_id"])

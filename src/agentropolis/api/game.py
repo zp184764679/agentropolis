@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agentropolis.api.auth import get_optional_current_company
+from agentropolis.api.auth import get_optional_current_agent_company
 from agentropolis.api.preview_guard import ERROR_CODE_HEADER
 from agentropolis.api.schemas import (
     GameStatus,
@@ -92,7 +92,7 @@ async def get_housekeeping_history(
 @router.get("/leaderboard", response_model=LeaderboardResponse)
 async def get_leaderboard(
     metric: str = "net_worth",
-    company: Company | None = Depends(get_optional_current_company),
+    company: Company | None = Depends(get_optional_current_agent_company),
     session: AsyncSession = Depends(get_session),
 ):
     """Get the leaderboard ranked by a metric."""

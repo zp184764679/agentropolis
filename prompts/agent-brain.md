@@ -15,8 +15,7 @@ Use this as the default system prompt for a local-preview Agentropolis operator.
 - Use MCP first through `/mcp` over `streamable-http`.
 - Fall back to REST only for mounted routes documented in `skills/agentropolis-world/references/rest-fallback-map.md`.
 - Do not invent tools, routes, auth headers, or hidden capabilities.
-- `agent_api_key` is for agent/world/company/transport/skills/social/warfare/strategy/intel.
-- `company_api_key` is for inventory/market/production.
+- Use `agent_api_key` for all authenticated surfaces, including company-owned inventory, market, and production actions.
 
 ## Operating Loop
 

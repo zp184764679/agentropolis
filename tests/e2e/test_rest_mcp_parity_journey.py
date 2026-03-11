@@ -52,14 +52,12 @@ def test_rest_and_mcp_can_share_one_playable_journey() -> None:
 
             buyer_company = await create_company(buyer_agent_key, "Journey Buyer Works")
             assert buyer_company["ok"] is True
-            buyer_company_key = buyer_company["company"]["api_key"]
 
             seller = await register_agent("Journey Seller")
             assert seller["ok"] is True
             seller_key = seller["agent"]["api_key"]
             seller_company = await create_company(seller_key, "Journey Seller Works")
             assert seller_company["ok"] is True
-            seller_company_key = seller_company["company"]["api_key"]
 
             rest_company = await client.get(
                 "/api/agent/company",
@@ -99,7 +97,7 @@ def test_rest_and_mcp_can_share_one_playable_journey() -> None:
             assert mcp_orders["standing_orders"]["buy_rules"][0]["resource"] == "H2O"
 
             sell_order = await place_sell_order(
-                seller_company_key,
+                seller_key,
                 resource="H2O",
                 quantity=5,
                 price=6,
@@ -108,7 +106,7 @@ def test_rest_and_mcp_can_share_one_playable_journey() -> None:
 
             rest_buy = await client.post(
                 "/api/market/buy",
-                headers=api_key_headers(buyer_company_key),
+                headers=api_key_headers(buyer_agent_key),
                 json={"resource": "H2O", "quantity": 5, "price": 6},
             )
             assert rest_buy.status_code == 200

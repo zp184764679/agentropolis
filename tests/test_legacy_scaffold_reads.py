@@ -12,6 +12,7 @@ from agentropolis.api.auth import hash_api_key
 from agentropolis.database import get_session
 from agentropolis.main import app
 from agentropolis.models import (
+    Agent,
     Base,
     Building,
     BuildingType,
@@ -25,9 +26,10 @@ from agentropolis.models import (
     Trade,
 )
 from agentropolis.services.seed import seed_game_data
+from agentropolis.services.seed_world import seed_world
 
 
-def _company_headers(api_key: str) -> dict[str, str]:
+def _agent_headers(api_key: str) -> dict[str, str]:
     return {"X-API-Key": api_key}
 
 
@@ -50,6 +52,7 @@ async def _legacy_client():
 
     async with session_factory() as seed_session:
         await seed_game_data(seed_session)
+        await seed_world(seed_session)
 
         resources = {
             resource.ticker: resource
@@ -62,12 +65,30 @@ async def _legacy_client():
                 select(BuildingType).where(BuildingType.name == "extractor")
             )
         ).scalar_one()
+        region_id = 1
 
-        alpha_api_key = "alpha-company-key"
-        beta_api_key = "beta-company-key"
+        alpha_api_key = "alpha-agent-key"
+        beta_api_key = "beta-agent-key"
+        alpha_agent = Agent(
+            name="Alpha Agent",
+            api_key_hash=hash_api_key(alpha_api_key),
+            current_region_id=region_id,
+            home_region_id=region_id,
+            personal_balance=0,
+        )
+        beta_agent = Agent(
+            name="Beta Agent",
+            api_key_hash=hash_api_key(beta_api_key),
+            current_region_id=region_id,
+            home_region_id=region_id,
+            personal_balance=0,
+        )
+        seed_session.add_all([alpha_agent, beta_agent])
+        await seed_session.flush()
         alpha = Company(
             name="Alpha Works",
-            api_key_hash=hash_api_key(alpha_api_key),
+            founder_agent_id=alpha_agent.id,
+            region_id=region_id,
             balance=2500,
             net_worth=8200,
             npc_worker_count=14,
@@ -76,7 +97,8 @@ async def _legacy_client():
         )
         beta = Company(
             name="Beta Forge",
-            api_key_hash=hash_api_key(beta_api_key),
+            founder_agent_id=beta_agent.id,
+            region_id=region_id,
             balance=1700,
             net_worth=5100,
             npc_worker_count=8,
@@ -93,18 +115,21 @@ async def _legacy_client():
                 Building(company_id=beta.id, building_type_id=building_type.id),
                 Inventory(
                     company_id=alpha.id,
+                    region_id=region_id,
                     resource_id=resources["ORE"].id,
                     quantity=50,
                     reserved=10,
                 ),
                 Inventory(
                     company_id=alpha.id,
+                    region_id=region_id,
                     resource_id=resources["H2O"].id,
                     quantity=20,
                     reserved=0,
                 ),
                 Inventory(
                     company_id=beta.id,
+                    region_id=region_id,
                     resource_id=resources["ORE"].id,
                     quantity=15,
                     reserved=0,
@@ -142,9 +167,10 @@ async def _legacy_client():
 
         buy_order = Order(
             company_id=alpha.id,
+            region_id=region_id,
             resource_id=resources["ORE"].id,
             order_type=OrderType.BUY,
-            price=12.5,
+            price=12,
             quantity=10,
             remaining=6,
             status=OrderStatus.OPEN,
@@ -152,9 +178,10 @@ async def _legacy_client():
         )
         sell_order = Order(
             company_id=beta.id,
+            region_id=region_id,
             resource_id=resources["ORE"].id,
             order_type=OrderType.SELL,
-            price=14.0,
+            price=14,
             quantity=8,
             remaining=5,
             status=OrderStatus.OPEN,
@@ -169,8 +196,9 @@ async def _legacy_client():
                 sell_order_id=sell_order.id,
                 buyer_id=alpha.id,
                 seller_id=beta.id,
+                region_id=region_id,
                 resource_id=resources["ORE"].id,
-                price=13.0,
+                price=13,
                 quantity=4,
                 tick_executed=3,
             )
@@ -209,7 +237,7 @@ def test_game_status_and_leaderboard_reads() -> None:
 
             authed_board = await client.get(
                 "/api/game/leaderboard",
-                headers=_company_headers(auth["beta_api_key"]),
+                headers=_agent_headers(auth["beta_api_key"]),
             )
             assert authed_board.status_code == 200
             assert authed_board.json()["your_rank"] == 2
@@ -223,16 +251,16 @@ def test_market_read_endpoints_return_seeded_data() -> None:
             prices = await client.get("/api/market/prices")
             assert prices.status_code == 200
             ore_row = next(row for row in prices.json() if row["ticker"] == "ORE")
-            assert ore_row["last_price"] == 13.0
-            assert ore_row["best_bid"] == 12.5
-            assert ore_row["best_ask"] == 14.0
-            assert ore_row["spread"] == 1.5
-            assert ore_row["volume_24h"] == 4.0
+            assert ore_row["last_price"] == 13
+            assert ore_row["best_bid"] == 12
+            assert ore_row["best_ask"] == 14
+            assert ore_row["spread"] == 2
+            assert ore_row["volume_24h"] == 4
 
             orderbook = await client.get("/api/market/orderbook/ORE")
             assert orderbook.status_code == 200
-            assert orderbook.json()["bids"][0]["quantity"] == 6.0
-            assert orderbook.json()["asks"][0]["quantity"] == 5.0
+            assert orderbook.json()["bids"][0]["quantity"] == 6
+            assert orderbook.json()["asks"][0]["quantity"] == 5
 
             history = await client.get("/api/market/history/ORE")
             assert history.status_code == 200
@@ -246,12 +274,12 @@ def test_market_read_endpoints_return_seeded_data() -> None:
             analysis = await client.get("/api/market/analysis/ORE")
             assert analysis.status_code == 200
             assert analysis.json()["price_trend"] == "rising"
-            assert analysis.json()["total_buy_volume"] == 6.0
-            assert analysis.json()["total_sell_volume"] == 5.0
+            assert analysis.json()["total_buy_volume"] == 6
+            assert analysis.json()["total_sell_volume"] == 5
 
             my_orders = await client.get(
                 "/api/market/orders",
-                headers=_company_headers(auth["alpha_api_key"]),
+                headers=_agent_headers(auth["alpha_api_key"]),
             )
             assert my_orders.status_code == 200
             assert my_orders.json()[0]["resource"] == "ORE"
@@ -270,27 +298,27 @@ def test_inventory_read_endpoints_return_company_stockpile() -> None:
 
             inventory_response = await client.get(
                 "/api/inventory",
-                headers=_company_headers(auth["alpha_api_key"]),
+                headers=_agent_headers(auth["alpha_api_key"]),
             )
             assert inventory_response.status_code == 200
             assert inventory_response.json()["total_value"] > 0
             ore_item = next(
                 item for item in inventory_response.json()["items"] if item["ticker"] == "ORE"
             )
-            assert ore_item["quantity"] == 50.0
-            assert ore_item["reserved"] == 10.0
-            assert ore_item["available"] == 40.0
+            assert ore_item["quantity"] == 50
+            assert ore_item["reserved"] == 10
+            assert ore_item["available"] == 40
 
             detail_response = await client.get(
                 "/api/inventory/ORE",
-                headers=_company_headers(auth["alpha_api_key"]),
+                headers=_agent_headers(auth["alpha_api_key"]),
             )
             assert detail_response.status_code == 200
-            assert detail_response.json()["available"] == 40.0
+            assert detail_response.json()["available"] == 40
 
             company_status = await client.get(
                 "/api/company/status",
-                headers=_company_headers(auth["alpha_api_key"]),
+                headers=_agent_headers(auth["alpha_api_key"]),
             )
             assert company_status.status_code == 200
             assert isinstance(company_status.json()["balance"], int)

@@ -1,26 +1,22 @@
 """Company service - registration, balance operations, net worth.
 
 Handles:
-- Company registration (generates API key, creates starter buildings/inventory)
+- Agent-owned company registration and starter inventory/buildings
 - Balance debit/credit with row-level locking
 - Net worth recalculation (balance + inventory value + building value)
 - Bankruptcy detection (net_worth <= 0 and no assets)
 """
 
-from __future__ import annotations
-
-import secrets
-from typing import Any
-
 from datetime import UTC, datetime
 from decimal import Decimal, ROUND_HALF_UP
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agentropolis.api.auth import hash_api_key
 from agentropolis.config import settings
 from agentropolis.models import Agent, Building, BuildingType, Company, Inventory, Region, Resource
+from agentropolis.services.inventory_svc import normalize_quantity_amount
 from agentropolis.services.seed import STARTER_BUILDINGS, STARTER_INVENTORY
 
 
@@ -107,7 +103,7 @@ async def register_company(
     """Register a new company with starter kit.
 
     Creates: Company, starter buildings, starter inventory.
-    Returns: {"company_id", "api_key", "name", "balance", "founder_agent_id", "region_id"}
+    Returns: {"company_id", "name", "balance", "founder_agent_id", "region_id"}
     Raises: ValueError if name already taken or founder already has an active company
     """
     existing = await session.execute(select(Company).where(Company.name == name))
@@ -126,10 +122,8 @@ async def register_company(
             raise ValueError(f"Agent {founder_agent_id} already has an active company")
 
     region = await _resolve_company_region(session, founder_agent_id=founder_agent_id)
-    api_key = secrets.token_hex(settings.API_KEY_LENGTH)
     company = Company(
         name=name,
-        api_key_hash=hash_api_key(api_key),
         founder_agent_id=founder_agent_id,
         region_id=region.id,
         balance=int(settings.INITIAL_BALANCE),
@@ -177,7 +171,7 @@ async def register_company(
             region_id=region.id,
             resource=resources[ticker],
         )
-        inventory.quantity = float(inventory.quantity) + float(quantity)
+        inventory.quantity = int(inventory.quantity or 0) + normalize_quantity_amount(quantity)
 
     await session.flush()
     await recalculate_net_worth(session, company.id)
@@ -187,7 +181,6 @@ async def register_company(
         "company_name": company.name,
         "founder_agent_id": company.founder_agent_id,
         "region_id": company.region_id,
-        "api_key": api_key,
         "initial_balance": int(company.balance),
     }
 

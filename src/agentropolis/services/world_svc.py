@@ -120,8 +120,8 @@ async def _merge_agent_inventory_region(
             source.region_id = to_region_id
             continue
 
-        destination.quantity = float(destination.quantity) + float(source.quantity)
-        destination.reserved = float(destination.reserved) + float(source.reserved)
+        destination.quantity = int(destination.quantity or 0) + int(source.quantity or 0)
+        destination.reserved = int(destination.reserved or 0) + int(source.reserved or 0)
         await session.delete(source)
 
 
@@ -290,7 +290,7 @@ async def start_travel(
         )
     )
     carried_rows = inventory_result.scalars().all()
-    carried_weight = sum(float(row.quantity) for row in carried_rows)
+    carried_weight = sum(int(row.quantity or 0) for row in carried_rows)
     strength_level = await _get_agent_strength_level(session, agent_id)
     carry_capacity = calculate_carry_capacity(strength_level)
     if carried_weight > carry_capacity:
@@ -322,9 +322,9 @@ async def start_travel(
         departed_at=now,
         arrives_at=now + timedelta(seconds=adjusted_travel_seconds),
         cargo={
-            str(row.resource_id): round(float(row.quantity), 3)
+            str(row.resource_id): int(row.quantity or 0)
             for row in carried_rows
-            if float(row.quantity) > 0
+            if int(row.quantity or 0) > 0
         },
     )
     session.add(travel)

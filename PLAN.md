@@ -207,14 +207,14 @@
 
 | Issue | Title | Status | Files |
 |-------|-------|--------|-------|
-| [#16](https://github.com/zp184764679/agentropolis/issues/16) | Model Layer Overhaul + Config + Schemas + Auth | ⬜ CREATED | 13 new + 10 modified + 4 non-model |
+| [#16](https://github.com/zp184764679/agentropolis/issues/16) | Model Layer Overhaul + Config + Schemas + Auth | ✅ REPO COMPLETE | 13 new + 10 modified + 4 non-model |
 
 > **必须先完成 #16，其余所有 issue 依赖它**
 >
-> 当前 repo 已在兼容层上把 #17-#38 路径跑通，但 #16 自身仍保留 foundation migration 尾项，
-> 当前已把 `Resource.base_price`、`BuildingType.cost_credits`、`Company.balance/net_worth`
-> 收口到整数 credits 契约，但仍保留 fractional quantity / order-price 路径、以及 company-key 兼容字段；
-> 因此 #16 继续保持 open，不能和后续 service/api issue 一起视为已收口。
+> 当前 repo 已完成 #16 foundation migration 收口：
+> `Resource.base_price`、`BuildingType.cost_credits`、`Company.balance/net_worth`、inventory/order/trade/price-history
+> 已统一到整数 credits / integer quantity 契约，company-key 兼容字段已移除，company-owned surfaces 统一改为
+> “authenticated agent resolves active company” 模式；后续 issue 现在可以把 #16 视为 repo-complete foundation。
 
 ---
 
@@ -1003,7 +1003,7 @@ Detailed draft files also exist under `.github/` for copy-paste into GitHub:
 - `#72` 的完成定义是 repo-truthful 的 14 模块 / 60 tools 本地预览面，不要求兼容早期 38-tool 命名
 - auth split 固定为：
   - `agent_api_key`: `agent/world/company/transport/skills/social/warfare/strategy/notifications/intel`
-  - `company_api_key`: `inventory/market/production`
+  - `agent_api_key`: `inventory/market/production` 也通过 active-company resolution 访问
 - `npc` 与 `notifications` 当前允许作为 MCP-only local-preview groups 存在，不要求同步挂载 REST route
 - `#73` 的 skill 保持简洁，MCP-first；只对当前已挂载的 REST 前缀声明 fallback，不在本波次增加 `agents/openai.yaml`
 - `#74-#77` 的当前 repo 目标是“本地/封闭环境可验证的 OpenClaw 原型资产”，包括 prompt、模板、注册 manifest、monitor snapshot、compose 与 e2e；这仍然不等于 public rollout

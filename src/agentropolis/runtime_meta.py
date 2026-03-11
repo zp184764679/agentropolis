@@ -34,31 +34,31 @@ MOUNTED_ROUTE_GROUPS = [
         "module": "market",
         "prefix": "/api/market",
         "state": "mixed_scaffold_reads",
-        "auth_model": "legacy_company_auth",
+        "auth_model": "agent_owned_company_auth",
     },
     {
         "module": "production",
         "prefix": "/api/production",
         "state": "service_backed_writes",
-        "auth_model": "legacy_company_auth",
+        "auth_model": "agent_owned_company_auth",
     },
     {
         "module": "inventory",
         "prefix": "/api/inventory",
         "state": "mixed_scaffold_reads",
-        "auth_model": "legacy_company_auth",
+        "auth_model": "agent_owned_company_auth",
     },
     {
         "module": "company",
         "prefix": "/api/company",
-        "state": "mixed_agent_creation_legacy_company_ops",
-        "auth_model": "mixed_agent_company_auth",
+        "state": "agent_owned_company_ops",
+        "auth_model": "agent_owned_company_auth",
     },
     {
         "module": "game",
         "prefix": "/api/game",
         "state": "mixed_scaffold_reads",
-        "auth_model": "mixed_legacy",
+        "auth_model": "mixed_public_agent",
     },
     {
         "module": "agent",
@@ -350,11 +350,11 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
         },
         "auth_surface": {
             "company_auth": {
-                "status": "active_legacy",
-                "entrypoint": "get_current_company",
+                "status": "retired_compatibility_only",
+                "entrypoint": None,
             },
             "agent_auth": {
-                "status": "migration_compatible",
+                "status": "canonical",
                 "entrypoint": "get_current_agent",
             },
         },
@@ -366,9 +366,8 @@ def build_runtime_metadata(*, preview_guard_state: dict | None = None) -> dict:
             "rest_scope_families": rest_scope_families,
             "mcp_scope_families": mcp_scope_families,
             "company_act_as_rule": (
-                "Company API keys remain company-scoped only; company_market and "
-                "company_production mutations additionally inherit founder-agent "
-                "preview policy budgets and deny rules."
+                "Mounted company economy surfaces resolve the active company from the "
+                "authenticated agent; companies are resources, not auth principals."
             ),
             "guild_actor_model": (
                 "Guilds, treaties, and warfare contracts are resources manipulated by "

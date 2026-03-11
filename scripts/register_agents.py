@@ -137,8 +137,7 @@ async def bootstrap_agents(
                 "agent_api_key_env": f"{env_prefix}_AGENT_API_KEY",
                 "company_name": company_payload["company_name"] if company_payload else None,
                 "company_id": company_payload["company_id"] if company_payload else None,
-                "company_api_key": company_payload["api_key"] if company_payload else None,
-                "company_api_key_env": f"{env_prefix}_COMPANY_API_KEY",
+                "company_auth_model": "agent_owned_company_auth" if company_payload else None,
                 "dashboard_company_name": (
                     dashboard["company"]["name"] if dashboard.get("company") else None
                 ),

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from agentropolis.mcp._shared import (
-    company_tool_context,
+    agent_company_tool_context,
     handle_tool_error,
     parity_http_error,
 )
@@ -13,18 +13,24 @@ from agentropolis.services import market_engine
 
 
 @mcp.tool()
-async def get_market_prices(company_api_key: str) -> dict:
+async def get_market_prices(agent_api_key: str) -> dict:
     try:
-        async with company_tool_context(company_api_key) as (session, _company):
+        async with agent_company_tool_context(
+            agent_api_key,
+            family="company_market",
+        ) as (session, _agent, _company):
             return {"ok": True, "prices": await market_engine.get_market_prices(session)}
     except Exception as exc:
         return handle_tool_error(exc)
 
 
 @mcp.tool()
-async def get_order_book(company_api_key: str, resource: str) -> dict:
+async def get_order_book(agent_api_key: str, resource: str) -> dict:
     try:
-        async with company_tool_context(company_api_key) as (session, _company):
+        async with agent_company_tool_context(
+            agent_api_key,
+            family="company_market",
+        ) as (session, _agent, _company):
             try:
                 payload = await market_engine.get_order_book(session, resource)
             except ValueError as exc:
@@ -39,9 +45,12 @@ async def get_order_book(company_api_key: str, resource: str) -> dict:
 
 
 @mcp.tool()
-async def get_price_history(company_api_key: str, resource: str, ticks: int = 50) -> dict:
+async def get_price_history(agent_api_key: str, resource: str, ticks: int = 50) -> dict:
     try:
-        async with company_tool_context(company_api_key) as (session, _company):
+        async with agent_company_tool_context(
+            agent_api_key,
+            family="company_market",
+        ) as (session, _agent, _company):
             try:
                 payload = await leaderboard_svc.get_price_history(session, resource, ticks=ticks)
             except ValueError as exc:
@@ -57,12 +66,15 @@ async def get_price_history(company_api_key: str, resource: str, ticks: int = 50
 
 @mcp.tool()
 async def get_trade_history(
-    company_api_key: str,
+    agent_api_key: str,
     resource: str | None = None,
     ticks: int = 10,
 ) -> dict:
     try:
-        async with company_tool_context(company_api_key) as (session, _company):
+        async with agent_company_tool_context(
+            agent_api_key,
+            family="company_market",
+        ) as (session, _agent, _company):
             try:
                 payload = await leaderboard_svc.get_trade_history(session, resource, ticks=ticks)
             except ValueError as exc:
@@ -78,20 +90,20 @@ async def get_trade_history(
 
 @mcp.tool()
 async def place_buy_order(
-    company_api_key: str,
+    agent_api_key: str,
     resource: str,
-    quantity: float,
-    price: float,
+    quantity: int,
+    price: int,
     time_in_force: str = "GTC",
 ) -> dict:
     try:
-        async with company_tool_context(
-            company_api_key,
+        async with agent_company_tool_context(
+            agent_api_key,
             family="company_market",
             mutate=True,
             operation="place_buy_order",
-            spend_amount=float(quantity) * float(price),
-        ) as (session, company):
+            spend_amount=int(quantity) * int(price),
+        ) as (session, _agent, company):
             order_id = await market_engine.place_buy_order(
                 session,
                 company.id,
@@ -117,19 +129,19 @@ async def place_buy_order(
 
 @mcp.tool()
 async def place_sell_order(
-    company_api_key: str,
+    agent_api_key: str,
     resource: str,
-    quantity: float,
-    price: float,
+    quantity: int,
+    price: int,
     time_in_force: str = "GTC",
 ) -> dict:
     try:
-        async with company_tool_context(
-            company_api_key,
+        async with agent_company_tool_context(
+            agent_api_key,
             family="company_market",
             mutate=True,
             operation="place_sell_order",
-        ) as (session, company):
+        ) as (session, _agent, company):
             order_id = await market_engine.place_sell_order(
                 session,
                 company.id,
@@ -154,14 +166,14 @@ async def place_sell_order(
 
 
 @mcp.tool()
-async def cancel_order(company_api_key: str, order_id: int) -> dict:
+async def cancel_order(agent_api_key: str, order_id: int) -> dict:
     try:
-        async with company_tool_context(
-            company_api_key,
+        async with agent_company_tool_context(
+            agent_api_key,
             family="company_market",
             mutate=True,
             operation="cancel_order",
-        ) as (session, company):
+        ) as (session, _agent, company):
             cancelled = await market_engine.cancel_order(session, company.id, order_id)
             await session.commit()
             if not cancelled:
@@ -180,9 +192,12 @@ async def cancel_order(company_api_key: str, order_id: int) -> dict:
 
 
 @mcp.tool()
-async def get_my_orders(company_api_key: str, status: str = "OPEN") -> dict:
+async def get_my_orders(agent_api_key: str, status: str = "OPEN") -> dict:
     try:
-        async with company_tool_context(company_api_key) as (session, company):
+        async with agent_company_tool_context(
+            agent_api_key,
+            family="company_market",
+        ) as (session, _agent, company):
             try:
                 payload = await market_engine.get_my_orders(session, company.id, status=status)
             except ValueError as exc:

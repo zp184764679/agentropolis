@@ -100,8 +100,7 @@ async def _register_agent_and_company(
         json={"company_name": company_name},
     )
     assert company_response.status_code == 200
-    company_key = company_response.json()["api_key"]
-    return agent_key, company_key
+    return agent_key, agent_key
 
 
 def test_request_slots_preserve_housekeeping_capacity_and_timeout_when_exhausted(

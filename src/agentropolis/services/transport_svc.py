@@ -197,10 +197,10 @@ async def create_transport(
             raise ValueError(
                 f"No inventory for {ticker} in region {from_region_id}"
             )
-        available = float(inventory.quantity) - float(inventory.reserved)
+        available = int(inventory.quantity or 0) - int(inventory.reserved or 0)
         if available < quantity:
             raise ValueError(
-                f"Insufficient {ticker}: need {quantity}, available {available:.0f}"
+                f"Insufficient {ticker}: need {quantity}, available {available}"
             )
         source_rows.append(inventory)
         total_weight += quantity
@@ -220,7 +220,7 @@ async def create_transport(
         owner.balance = int(owner.balance) - cost
 
     for inventory, ticker in zip(source_rows, normalized_items, strict=False):
-        inventory.quantity = float(inventory.quantity) - normalized_items[ticker]
+        inventory.quantity = int(inventory.quantity or 0) - normalized_items[ticker]
 
     now = _coerce_now()
     transport = TransportOrder(
@@ -305,7 +305,7 @@ async def settle_transport_arrivals(
                 region_id=transport.to_region_id,
                 resource_id=resource.id,
             )
-            destination.quantity = float(destination.quantity) + int(quantity)
+            destination.quantity = int(destination.quantity or 0) + int(quantity)
 
         transport.status = TransportStatus.DELIVERED
 

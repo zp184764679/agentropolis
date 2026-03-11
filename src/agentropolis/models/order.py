@@ -3,7 +3,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, func
+from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Integer, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from agentropolis.models.base import Base
@@ -40,9 +40,9 @@ class Order(Base):
         Enum(OrderType, values_callable=lambda obj: [e.value for e in obj]),
         nullable=False,
     )
-    price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
-    quantity: Mapped[float] = mapped_column(Numeric(16, 4), nullable=False)
-    remaining: Mapped[float] = mapped_column(Numeric(16, 4), nullable=False)
+    price: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    quantity: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    remaining: Mapped[int] = mapped_column(BigInteger, nullable=False)
     status: Mapped[OrderStatus] = mapped_column(
         Enum(OrderStatus, values_callable=lambda obj: [e.value for e in obj]),
         default=OrderStatus.OPEN,

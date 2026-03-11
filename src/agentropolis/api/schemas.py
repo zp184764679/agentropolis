@@ -19,9 +19,8 @@ class RegisterRequest(BaseModel):
 class RegisterResponse(BaseModel):
     company_id: int
     company_name: str
-    api_key: str = Field(..., description="Store this! It cannot be retrieved again.")
     initial_balance: int
-    message: str = "Company registered. Save your API key - it cannot be retrieved later."
+    message: str = "Company registered. Use your agent API key for company operations."
 
 
 # ─── Resource ────────────────────────────────────────────────────────────────
@@ -41,16 +40,16 @@ class ResourceInfo(BaseModel):
 class MarketPrice(BaseModel):
     ticker: str
     name: str
-    last_price: float | None
-    best_bid: float | None
-    best_ask: float | None
-    spread: float | None
-    volume_24h: float
+    last_price: int | None
+    best_bid: int | None
+    best_ask: int | None
+    spread: int | None
+    volume_24h: int
 
 
 class OrderBookEntry(BaseModel):
-    price: float
-    quantity: float
+    price: int
+    quantity: int
     order_count: int
 
 
@@ -62,17 +61,17 @@ class OrderBookResponse(BaseModel):
 
 class PriceCandle(BaseModel):
     tick: int
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: float
+    open: int
+    high: int
+    low: int
+    close: int
+    volume: int
 
 
 class PlaceOrderRequest(BaseModel):
     resource: str = Field(..., description="Resource ticker, e.g. 'H2O'")
-    quantity: float = Field(..., gt=0)
-    price: float = Field(..., gt=0)
+    quantity: int = Field(..., gt=0)
+    price: int = Field(..., gt=0)
     time_in_force: str = Field(default="GTC", description="Order persistence policy: GTC or IOC")
 
 
@@ -81,9 +80,9 @@ class OrderResponse(BaseModel):
     order_type: str
     resource: str
     time_in_force: str = "GTC"
-    price: float
-    quantity: float
-    remaining: float
+    price: int
+    quantity: int
+    remaining: int
     status: str
     created_at_tick: int
 
@@ -97,18 +96,18 @@ class TradeRecord(BaseModel):
     buyer: str
     seller: str
     resource: str
-    price: float
-    quantity: float
+    price: int
+    quantity: int
     tick: int
 
 
 class MarketAnalysis(BaseModel):
     ticker: str
-    avg_price_10t: float | None
+    avg_price_10t: int | None
     price_trend: str  # "rising", "falling", "stable"
     supply_demand_ratio: float | None
-    total_buy_volume: float
-    total_sell_volume: float
+    total_buy_volume: int
+    total_sell_volume: int
     trade_count_10t: int
 
 
@@ -119,8 +118,8 @@ class RecipeInfo(BaseModel):
     recipe_id: int
     name: str
     building_type: str
-    inputs: dict[str, float]
-    outputs: dict[str, float]
+    inputs: dict[str, int]
+    outputs: dict[str, int]
     duration_ticks: int
 
 
@@ -146,7 +145,7 @@ class BuildingTypeInfo(BaseModel):
     name: str
     display_name: str
     cost_credits: int
-    cost_materials: dict[str, float]
+    cost_materials: dict[str, int]
     max_workers: int
     description: str
 
@@ -157,14 +156,14 @@ class BuildingTypeInfo(BaseModel):
 class InventoryItem(BaseModel):
     ticker: str
     name: str
-    quantity: float
-    reserved: float
-    available: float
+    quantity: int
+    reserved: int
+    available: int
 
 
 class InventoryResponse(BaseModel):
     items: list[InventoryItem]
-    total_value: float  # estimated based on last market prices
+    total_value: int  # estimated based on last market prices
 
 
 # ─── Company ─────────────────────────────────────────────────────────────────
@@ -455,9 +454,8 @@ class AgentCompanyCreateResponse(BaseModel):
     company_name: str
     founder_agent_id: int
     region_id: int | None = None
-    api_key: str = Field(..., description="Store this! It cannot be retrieved again.")
     initial_balance: int
-    message: str = "Company registered. Save your API key - it cannot be retrieved later."
+    message: str = "Company registered. Continue using your agent API key for company operations."
 
 
 class AgentStatus(BaseModel):
@@ -514,15 +512,15 @@ class StrategyProfileUpdateRequest(BaseModel):
 
 class StandingOrderBuyRule(BaseModel):
     resource: str
-    below_price: float = Field(..., gt=0)
-    max_qty: float = Field(..., gt=0)
+    below_price: int = Field(..., gt=0)
+    max_qty: int = Field(..., gt=0)
     source: str | None = None
 
 
 class StandingOrderSellRule(BaseModel):
     resource: str
-    above_price: float = Field(..., gt=0)
-    min_qty: float = Field(..., gt=0)
+    above_price: int = Field(..., gt=0)
+    min_qty: int = Field(..., gt=0)
 
 
 class AutonomyStandingOrders(BaseModel):

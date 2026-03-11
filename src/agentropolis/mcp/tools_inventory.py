@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from agentropolis.mcp._shared import (
-    company_tool_context,
+    agent_company_tool_context,
     handle_tool_error,
     parity_http_error,
     public_tool_context,
@@ -19,18 +19,24 @@ from agentropolis.services.inventory_svc import (
 
 
 @mcp.tool()
-async def get_inventory(company_api_key: str) -> dict:
+async def get_inventory(agent_api_key: str) -> dict:
     try:
-        async with company_tool_context(company_api_key) as (session, company):
+        async with agent_company_tool_context(
+            agent_api_key,
+            family="company_inventory",
+        ) as (session, _agent, company):
             return {"ok": True, "items": await get_inventory_svc(session, company.id)}
     except Exception as exc:
         return handle_tool_error(exc)
 
 
 @mcp.tool()
-async def get_inventory_item(company_api_key: str, resource: str) -> dict:
+async def get_inventory_item(agent_api_key: str, resource: str) -> dict:
     try:
-        async with company_tool_context(company_api_key) as (session, company):
+        async with agent_company_tool_context(
+            agent_api_key,
+            family="company_inventory",
+        ) as (session, _agent, company):
             try:
                 payload = await get_resource_quantity(session, company.id, resource)
             except ValueError as exc:
