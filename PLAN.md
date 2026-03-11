@@ -210,6 +210,10 @@
 | [#16](https://github.com/zp184764679/agentropolis/issues/16) | Model Layer Overhaul + Config + Schemas + Auth | ⬜ CREATED | 13 new + 10 modified + 4 non-model |
 
 > **必须先完成 #16，其余所有 issue 依赖它**
+>
+> 当前 repo 已在兼容层上把 #17-#38 路径跑通，但 #16 自身仍保留 foundation migration 尾项，
+> 尤其是 Worker legacy path、Numeric money/quantity、以及 company-key 兼容字段尚未完全移除；
+> 因此 #16 继续保持 open，不能和后续 service/api issue 一起视为已收口。
 
 ---
 
@@ -219,45 +223,45 @@
 
 | Issue | Title | Status | Depends On | Key File |
 |-------|-------|--------|------------|----------|
-| [#17](https://github.com/zp184764679/agentropolis/issues/17) | Inventory Service | ⬜ CREATED | #16 | `services/inventory_svc.py` |
-| [#18](https://github.com/zp184764679/agentropolis/issues/18) | Company Service | ⬜ CREATED | #16, #17 | `services/company_svc.py` |
-| [#19](https://github.com/zp184764679/agentropolis/issues/19) | NPC Consumption | ⬜ CREATED | #16, #17 | `services/consumption.py` |
-| [#20](https://github.com/zp184764679/agentropolis/issues/20) | Production Service | ⬜ CREATED | #16, #17, #19 | `services/production.py` |
-| [#21](https://github.com/zp184764679/agentropolis/issues/21) | Market Engine | ⬜ CREATED | #16, #17, #18 | `services/market_engine.py` |
-| [#22](https://github.com/zp184764679/agentropolis/issues/22) | Leaderboard | ⬜ CREATED | #16 | `services/leaderboard.py` |
-| [#23](https://github.com/zp184764679/agentropolis/issues/23) | Game Engine | ⬜ CREATED | #16-#22 all | `services/game_engine.py` + `main.py` |
+| [#17](https://github.com/zp184764679/agentropolis/issues/17) | Inventory Service | ✅ REPO COMPLETE | #16 | `services/inventory_svc.py` |
+| [#18](https://github.com/zp184764679/agentropolis/issues/18) | Company Service | ✅ REPO COMPLETE | #16, #17 | `services/company_svc.py` |
+| [#19](https://github.com/zp184764679/agentropolis/issues/19) | NPC Consumption | ✅ REPO COMPLETE | #16, #17 | `services/consumption.py` |
+| [#20](https://github.com/zp184764679/agentropolis/issues/20) | Production Service | ✅ REPO COMPLETE | #16, #17, #19 | `services/production.py` |
+| [#21](https://github.com/zp184764679/agentropolis/issues/21) | Market Engine | ✅ REPO COMPLETE | #16, #17, #18 | `services/market_engine.py` |
+| [#22](https://github.com/zp184764679/agentropolis/issues/22) | Leaderboard | ✅ REPO COMPLETE | #16 | `services/leaderboard.py` |
+| [#23](https://github.com/zp184764679/agentropolis/issues/23) | Game Engine | ✅ REPO COMPLETE | #16-#22 all | `services/game_engine.py` + `main.py` |
 
 ### World Services (3)
 
 | Issue | Title | Status | Depends On | Key File |
 |-------|-------|--------|------------|----------|
-| [#24](https://github.com/zp184764679/agentropolis/issues/24) | Agent Service + Vitals | ⬜ CREATED | #16, #17 | `services/agent_svc.py` + `agent_vitals.py` |
-| [#25](https://github.com/zp184764679/agentropolis/issues/25) | World Service + Seed World | ⬜ CREATED | #16 | `services/world_svc.py` + `seed_world.py` |
-| [#26](https://github.com/zp184764679/agentropolis/issues/26) | Skill Service | ⬜ CREATED | #16 | `services/skill_svc.py` + `seed.py` |
+| [#24](https://github.com/zp184764679/agentropolis/issues/24) | Agent Service + Vitals | ✅ REPO COMPLETE | #16, #17 | `services/agent_svc.py` + `agent_vitals.py` |
+| [#25](https://github.com/zp184764679/agentropolis/issues/25) | World Service + Seed World | ✅ REPO COMPLETE | #16 | `services/world_svc.py` + `seed_world.py` |
+| [#26](https://github.com/zp184764679/agentropolis/issues/26) | Skill Service | ✅ REPO COMPLETE | #16 | `services/skill_svc.py` + `seed.py` |
 
 ### Economy Services (1)
 
 | Issue | Title | Status | Depends On | Key File |
 |-------|-------|--------|------------|----------|
-| [#27](https://github.com/zp184764679/agentropolis/issues/27) | Transport + Tax + NPC Shop | ⬜ CREATED | #16, #17, #25 | `transport_svc.py` + `tax_svc.py` + `npc_shop_svc.py` |
+| [#27](https://github.com/zp184764679/agentropolis/issues/27) | Transport + Tax + NPC Shop | ✅ REPO COMPLETE | #16, #17, #25 | `transport_svc.py` + `tax_svc.py` + `npc_shop_svc.py` |
 
 ### Social Services (1)
 
 | Issue | Title | Status | Depends On | Key File |
 |-------|-------|--------|------------|----------|
-| [#28](https://github.com/zp184764679/agentropolis/issues/28) | Guild + Diplomacy | ⬜ CREATED | #16, #24 | `guild_svc.py` + `diplomacy_svc.py` |
+| [#28](https://github.com/zp184764679/agentropolis/issues/28) | Guild + Diplomacy | ✅ REPO COMPLETE | #16, #24 | `guild_svc.py` + `diplomacy_svc.py` |
 
 ### Event Services (1)
 
 | Issue | Title | Status | Depends On | Key File |
 |-------|-------|--------|------------|----------|
-| [#29](https://github.com/zp184764679/agentropolis/issues/29) | World Events + Currency | ⬜ CREATED | #16 | `event_svc.py` + `currency_svc.py` |
+| [#29](https://github.com/zp184764679/agentropolis/issues/29) | World Events + Currency | ✅ REPO COMPLETE | #16 | `event_svc.py` + `currency_svc.py` |
 
 ### NXC Services (1)
 
 | Issue | Title | Status | Depends On | Key File |
 |-------|-------|--------|------------|----------|
-| [#38](https://github.com/zp184764679/agentropolis/issues/38) | NXC Mining Service | ⬜ CREATED | #16, #20 | `services/nxc_mining_svc.py` |
+| [#38](https://github.com/zp184764679/agentropolis/issues/38) | NXC Mining Service | ✅ REPO COMPLETE | #16, #20 | `services/nxc_mining_svc.py` |
 
 ---
 
@@ -265,11 +269,11 @@
 
 | Issue | Title | Status | Depends On | Key File |
 |-------|-------|--------|------------|----------|
-| [#30](https://github.com/zp184764679/agentropolis/issues/30) | Agent + World Endpoints | ⬜ CREATED | #24, #25, #26 | `api/agent.py` + `api/world.py` |
-| [#31](https://github.com/zp184764679/agentropolis/issues/31) | Market + Inventory Endpoints | ⬜ CREATED | #17, #21, #22 | `api/market.py` + `api/inventory.py` |
-| [#32](https://github.com/zp184764679/agentropolis/issues/32) | Production + Company Endpoints | ⬜ CREATED | #18, #20 | `api/production.py` + `api/company.py` |
-| [#33](https://github.com/zp184764679/agentropolis/issues/33) | Game + Leaderboard Endpoints | ⬜ CREATED | #22, #29 | `api/game.py` |
-| [#34](https://github.com/zp184764679/agentropolis/issues/34) | Skills + Transport + Guild + Diplomacy | ⬜ CREATED | #26, #27, #28 | 4 new API files |
+| [#30](https://github.com/zp184764679/agentropolis/issues/30) | Agent + World Endpoints | ✅ REPO COMPLETE | #24, #25, #26 | `api/agent.py` + `api/world.py` |
+| [#31](https://github.com/zp184764679/agentropolis/issues/31) | Market + Inventory Endpoints | ✅ REPO COMPLETE | #17, #21, #22 | `api/market.py` + `api/inventory.py` |
+| [#32](https://github.com/zp184764679/agentropolis/issues/32) | Production + Company Endpoints | ✅ REPO COMPLETE | #18, #20 | `api/production.py` + `api/company.py` |
+| [#33](https://github.com/zp184764679/agentropolis/issues/33) | Game + Leaderboard Endpoints | ✅ REPO COMPLETE | #22, #29 | `api/game.py` |
+| [#34](https://github.com/zp184764679/agentropolis/issues/34) | Skills + Transport + Guild + Diplomacy | ✅ REPO COMPLETE | #26, #27, #28 | 4 new API files |
 
 ---
 
@@ -277,9 +281,9 @@
 
 | Issue | Title | Status | Depends On | Key File |
 |-------|-------|--------|------------|----------|
-| [#35](https://github.com/zp184764679/agentropolis/issues/35) | MCP Tools (initial preview baseline; later rewritten to 14 modules / 60 tools) | ⬜ CREATED | All services + APIs | `mcp/` |
-| [#36](https://github.com/zp184764679/agentropolis/issues/36) | Test Suite | ⬜ CREATED | All services | `tests/` |
-| [#37](https://github.com/zp184764679/agentropolis/issues/37) | CLI + Alembic Migrations | ⬜ CREATED | #16, #25 | `cli.py` + `alembic/` |
+| [#35](https://github.com/zp184764679/agentropolis/issues/35) | MCP Tools (initial preview baseline; later rewritten to 14 modules / 60 tools) | ✅ REPO COMPLETE | All services + APIs | `mcp/` |
+| [#36](https://github.com/zp184764679/agentropolis/issues/36) | Test Suite | ✅ REPO COMPLETE | All services | `tests/` |
+| [#37](https://github.com/zp184764679/agentropolis/issues/37) | CLI + Alembic Migrations | ✅ REPO COMPLETE | #16, #25 | `cli.py` + `alembic/` |
 
 ---
 

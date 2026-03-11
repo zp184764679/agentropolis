@@ -10,6 +10,10 @@ def test_issue_sync_manifest_tracks_repo_complete_created_issues() -> None:
 
     assert payload["scope"] == "created_issues_repo_complete_pending_sync"
     assert len(payload["issues"]) >= 10
+    assert any(item["issue"] == 17 and "7860056" in item["evidence_commits"] for item in payload["issues"])
+    assert any(item["issue"] == 27 and "72c4a08" in item["evidence_commits"] for item in payload["issues"])
+    assert any(item["issue"] == 35 and item["repo_status"] == "repo_complete" for item in payload["issues"])
+    assert any(item["issue"] == 38 and "7860056" in item["evidence_commits"] for item in payload["issues"])
     assert any(item["issue"] == 39 and "4b86023" in item["evidence_commits"] for item in payload["issues"])
     assert any(item["issue"] == 45 and "2c2a843" in item["evidence_commits"] for item in payload["issues"])
     assert any(item["issue"] == 48 and "39ac91d" in item["evidence_commits"] for item in payload["issues"])
